@@ -53,7 +53,7 @@ packages:
         query: tags
         select: "^\d+\.\d+\.\d+$"
 ```
-Inside the current working director create a folder for each package manager. We currently support the following:
+Inside the current working directory, create a folder for each package manager. We currently support the following:
 
 1. Arch Linux PKGBUILDs - `arch`
 1. Gentoo & Funtoo EBUILDs - `ebuild`
