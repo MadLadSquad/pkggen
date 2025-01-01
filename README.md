@@ -1,15 +1,17 @@
-# Metatools
+# pkggen
 A distribution-agnostic way to automatically generate new package versions for your desktop applications.
 
 This project is inspired by [funtoo-metatools](https://www.funtoo.org/Funtoo:Metatools) and users of it will find using it really similar, though it's greatly simplitied in many cases.
-We removed the `funtoo` name, because this project is developed from scratch, and it is not dependent on your distribution or package manager.
 
 ## Who should use this package
-This package is obviously designed to be used by developers that want to ship to multiple platforms, but that's not really the case. Developers of distributions that want to implement
-automatic package updates, as does [Funtoo Linux](https://www.funtoo.org/) will greatly benefit from a more standardised solution that they can just create a plugin for.
+Developers that deal with the following should consider using pkggen in their development process:
 
-## How does metatools work?
-Metatools gets fed a description of your packages with their required sources, and templates for each package manager you wish for them to support.
+1. Developers of cross-platform applications that have to ship on Unix-based systems
+1. Developers of Unix-based systems that want to implement automatic peneration of packages
+1. QA and devops engineers that work with cross-platform applications, that want to implement robust testing and updates in their CI/CD pipelines
+
+## How does pkggen work?
+pkggen gets fed a description of your packages with their required sources, and templates for each package manager you wish for them to support.
 
 You describe your packages in YAML format. Example:
 ```yaml
@@ -60,12 +62,17 @@ Inside the current working director create a folder for each package manager. We
 1. Void templates - `void`
 1. Homebrew formulae - `brew`
 
-Inside each folder, create a `templates` folder and place Jinja templates for each package with its name.
+Inside each folder, create a `templates` folder and place Jinja-like templates for each package with its name.
 
 You can then set up a `distro.yaml` config with specific variables for each distribution folder. For example, you can set your AUR username there for Arch Linux
 
-After all that setup is done, you can then run `metatools` in the root project directory. This will generate all the packages in parrallel.
+After all that setup is done, you can run `pkggen` in the root project directory. This will generate all the packages in parrallel.
 
-With commands like `metatools test`, you can spin up LXD/Incus containers that you can use to test, if all these packages compile and install correctly.
+With commands like `pkggen test`, you can spin up LXD/Incus containers that you can use to test, if all these packages compile and install correctly.
 
-With commands like `metatools upload`, you can upload your packages to an external repository. For example, the AUR, or a PPA.
+With commands like `pkggen upload`, you can upload your packages to an external repository. For example, the AUR, or a PPA.
+
+### Generators - the core of pkggen
+As seen in the above example, to get the latest version of an application, a generator for GitHub is used. But what is a generator? 
+
+A generator is simply a shell command that accepts and outputs YAML! That's right, you can write a generator in any of your favourite programming languages! Fortunately, you don't even need to write your own generator in most cases, as we provide generators for popular platforms, such as GitHub.
