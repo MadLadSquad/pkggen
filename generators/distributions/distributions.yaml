@@ -1,0 +1,30 @@
+distributions:
+  - rpm-based:
+    # This list contains the exact names of the latest supported releases
+    # for the given distributions.
+    rp-names: 
+      # Rawhide and the latest 2 releases
+      - "fedora_rawhide"
+      - "fedora_42"
+      - "fedora_41"
+
+      # openSUSE tumbleweed and the last release
+      - "opensuse_tumbleweed"
+      - "opensuse_leap_15_6"
+
+      # open mandriva lx rolling and the last release
+      - "openmandriva_rolling"
+      - "openmandriva_6_0"
+
+      - "pclinuxos"
+
+    # Allows for searching for older releases.
+    rp-names-wildcards:
+      - "fedora"
+      - "opensuse"
+      - "openmandriva"
+      - "pclinuxos"
+  - arch:
+    rp-names: [ "arch" ]
+  - gentoo:
+    rp-names: [ "gentoo"]
