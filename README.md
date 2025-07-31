@@ -1,19 +1,30 @@
 # pkggen
-A distribution-agnostic way to automatically generate new package versions for your desktop applications.
 
-This project is inspired by [funtoo-metatools](https://www.funtoo.org/Funtoo:Metatools) and users of it will find using it really similar, though it's greatly simplitied in many cases.
+[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
+[![trello](https://img.shields.io/badge/Trello-UDE-blue])](https://trello.com/b/HmfuRY2K/untitleddesktop)
+[![Discord](https://img.shields.io/discord/717037253292982315.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/4wgH8ZE)
 
-## Who should use this package
+A distribution-agnostic application suite to automatically generate new package versions for your desktop applications.
+
+This project is inspired by [funtoo-metatools](https://www.funtoo.org/Funtoo:Metatools).
+
+## Who should use these applications
 Developers that deal with the following should consider using pkggen in their development process:
 
 1. Developers of cross-platform applications that have to ship on Unix-based systems
 1. Developers of Unix-based systems that want to implement automatic peneration of packages
-1. QA and devops engineers that work with cross-platform applications, that want to implement robust testing and updates in their CI/CD pipelines
+1. QA and DevOps engineers that work with cross-platform applications, that want to implement robust testing and updates in their CI/CD pipelines
 
 ## How does pkggen work?
-pkggen gets fed a description of your packages with their required sources, and templates for each package manager you wish for them to support.
+pkggen is easy to work with and understand:
 
-You describe your packages in YAML format. Example:
+1. Create folders for each distribution you plan to support and jinja-like templates of your packages there
+1. Create a `pkggen.yaml` file that describes how your packages will be generated
+1. In a terminal, run `pkggen`. This command generates all packages automatically
+1. Once the command above is successful, run `pkggen test`. This command spins up docker containers and virtual machines to test your packages
+1. Finally, when everything runs successfully, run `pkggen deploy`. This command deploys each package to its corresponding distribution's repository
+
+A `pkggen.yaml` file looks like this:
 ```yaml
 packages:
   generator: github
@@ -53,26 +64,65 @@ packages:
         query: tags
         select: "^\d+\.\d+\.\d+$"
 ```
-Inside the current working directory, create a folder for each package manager. We currently support the following:
+When `pkggen` is run, a script called a template generator uses package metadata from the `pkggen.yaml` file and executes a number of instructions. It then
+prints out a JSON object containing the required data to fill the template. The pkggen application then proceeds to fill the template and exits successfully.
 
-1. Arch Linux PKGBUILDs - `arch`
-1. Gentoo & Funtoo EBUILDs - `ebuild`
-1. DEBs - `debian`
-1. RPMs - `rpm`
-1. Void templates - `void`
-1. Homebrew formulae - `brew`
+When `pkggen test` is run, pkggen launches docker containers and virtual machines for each distribution. It then copies over the current environment and runs
+a testing generator, which runs the required tests for each packaging format.
 
-Inside each folder, create a `templates` folder and place Jinja-like templates for each package with its name.
+Finally, when `pkggen deploy` is run all the generated and tested files are given to a deployment generator, which deploys your packages to a repository using
+your credentials.
 
-You can then set up a `distro.yaml` config with specific variables for each distribution folder. For example, you can set your AUR username there for Arch Linux
+Since each type of generator is a simple application that communicates with the pkggen utility through STDIN and STDOUT, it's easy to write custom generators
+for any type of distribution, application, testing, deployment or query method.
 
-After all that setup is done, you can run `pkggen` in the root project directory. This will generate all the packages in parrallel.
+## Features
+### Distribution and format support
+We currently support the following distributions and packaging formats:
 
-With commands like `pkggen test`, you can spin up LXD/Incus containers that you can use to test, if all these packages compile and install correctly.
+1. RedHat, Fedora and other RPM-based(RPMs) 🚧
+   - Generating packages 🚧
+   - Testing packages 🚧
+   - Deploying packages 🚧
+1. Arch Linux(PKGBUILDs) 🚧
+   - Generating packages 🚧
+   - Testing packages 🚧
+   - Deploying packages 🚧
+1. Gentoo Linux(Ebuilds) 🚧
+   - Generating packages 🚧
+   - Testing packages 🚧
+   - Deploying packages 🚧
 
-With commands like `pkggen upload`, you can upload your packages to an external repository. For example, the AUR, or a PPA.
+Planned future support:
 
-### Generators - the core of pkggen
-As seen in the above example, to get the latest version of an application, a generator for GitHub is used. But what is a generator? 
+1. macOS:
+   - Homebrew
+   - MacPorts
+1. Linux:
+   - Debian/Ubuntu(debs)
+   - Void(templates)
+   - Alpine(apks)
+1. BSD:
+   - FreeBSD(pkgs)
+   - OpenBSD(ports)
 
-A generator is simply a shell command that accepts and outputs YAML! That's right, you can write a generator in any of your favourite programming languages! Fortunately, you don't even need to write your own generator in most cases, as we provide generators for popular platforms, such as GitHub.
+### Easy dependency resolution
+With the `pkggen repology` command and its subcommands you can query the [repology database](https://repology.org) to get information about a dependency, its package names, versions
+and more across all the distributions you are targeting.
+
+This is also integrated directly into the `pkggen.yaml` file through the dependencies field which allows you to easily declare and set dependencies.
+
+### Battle-tested
+All [MadLadSquad](https://madladsquad.com) and [Heapforge](https://heapforge.com) applications are already distributed using the pkggen system. In fact, pkggen bootstraps its own
+packages when a new release is created.
+
+### Extensive documentation
+Though making packages with pkggen is easy and we provide documentation on anything related to the tools that pkggen provides, we also offer many pages on tips for making packages
+for every distribution that is officially supported by pkggen. This allows for faster and smoother development without the lost time trying to find the exact thing you're looking
+for in each distribution's documentation.
+
+We also provide traditional packaging examples in the form of our current and legacy package repositories so that packaging is as fast and as clear a process as possible.
+
+## Getting started and learning
+Get started by navigating [to our documentation](https://github.com/MadLadSquad/pkggen/wiki/Home).
+
