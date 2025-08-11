@@ -37,3 +37,53 @@ cmake-build-*/
 .idea/
 .vs-code/
 .DS_Store
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+*.egg-info/
+*.egg
+.eggs/
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Setuptools distribution metadata
+.installed.cfg
+*.egg-link
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# MyPy
+.mypy_cache/
+
+# VS Code and other editor settings
+.vscode/
+*.swp
+
+# macOS / Linux / Windows garbage
+Thumbs.db

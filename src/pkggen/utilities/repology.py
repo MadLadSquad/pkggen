@@ -6,8 +6,10 @@ import argparse
 import requests
 from packaging.version import parse as parse_version
 
-def main(package, is_raw, include_outdated):
-    generators_path = os.getenv("PKGGEN_GENERATORS_PATH", os.getcwd())
+GENERATORS_PATH = os.getcwd()
+
+def query_repology(package, is_raw, include_outdated):
+    generators_path = os.getenv("PKGGEN_GENERATORS_PATH", GENERATORS_PATH)
     with open(os.path.join(generators_path, "distributions", "distributions.yaml"), "r") as stream:
         try:
             distributions = yaml.safe_load(stream)["distributions"]
@@ -76,16 +78,16 @@ def main(package, is_raw, include_outdated):
                 max_width = 0
 
                 def strings_do(f):
-                    for item in output:
+                    for i in output:
                         lines = [
-                            f"Distribution: {item['distribution']}",
-                            f"Distribution support state: {item['distribution_type']}",
-                            f"Repository: {item['repository']}",
-                            f"Source package name: {item['srcname']}",
-                            f"Binary package name: {item['binname']}",
-                            f"Version: {item['version']}",
-                            f"Status: {item['status']}",
-                            f"Summary: {item['summary']}"
+                            f"Distribution: {i['distribution']}",
+                            f"Distribution support state: {i['distribution_type']}",
+                            f"Repository: {i['repository']}",
+                            f"Source package name: {i['srcname']}",
+                            f"Binary package name: {i['binname']}",
+                            f"Version: {i['version']}",
+                            f"Status: {i['status']}",
+                            f"Summary: {i['summary']}"
                         ]
                         f(lines)
                
@@ -119,16 +121,3 @@ def main(package, is_raw, include_outdated):
         except yaml.YAMLError as exception:
             print("YAML parsing error: ")
             print(exception)
-
-
-parser = argparse.ArgumentParser(
-    prog="pkggen repology", 
-    description="A utility script to query the repology API for dependency information across distributions",
-    epilog="Copyright (c) MadLadSquad. Licensed under the terms of the MIT license."
-)
-parser.add_argument("package")
-parser.add_argument("-j", "--json", help="Print the result of the query as a JSON object", action="store_true")
-parser.add_argument("-i", "--include-outdated", help="Include versions in outdated distribution releases", action="store_true")
-
-arguments = parser.parse_args()
-main(arguments.package, arguments.json, arguments.include_outdated)

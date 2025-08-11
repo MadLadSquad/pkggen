@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import argparse
+import version
+
+from utilities.repology import query_repology
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="pkggen",
+        description="Automatically generate desktop packages for multiple distributions",
+        epilog="Copyright (c) MadLadSquad. Licensed under the terms of the MIT license."
+    )
+    parser.add_argument("-v", "--version", action="version", version=f"pkggen version {version.PKGGEN_VERSION}")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    generate_parser = subparsers.add_parser("generate", help="Generate desktop packages")
+    generate_parser.add_argument("-o", "--output", help="Set the output directory")
+
+    test_parser = subparsers.add_parser("test", help="Launch testing environments for each package")
+    test_parser.add_argument("-i", "--input", help="Set the input directory")
+
+    deploy_parser = subparsers.add_parser("deploy", help="Deploy the generated packages")
+    deploy_parser.add_argument("-i", "--input", help="Set the input directory")
+
+    repology_parser = subparsers.add_parser("repology", help="Query for dependencies using the repology database")
+    repology_parser.add_argument("package")
+    repology_parser.add_argument("-j", "--json", help="Print the result of the query as a JSON object", action="store_true")
+    repology_parser.add_argument("-i", "--include-outdated", help="Include versions in outdated distribution releases", action="store_true")
+
+    subparsers.add_parser("version")
+
+    args = parser.parse_args()
+    if args.command == "generate":
+        print("This command is not currently implemented.")
+    elif args.command == "test":
+        print("This command is not currently implemented.")
+    elif args.command == "deploy":
+        print("This command is not currently implemented.")
+    elif args.command == "repology":
+        query_repology(args.package, args.json, args.include_outdated)
+    elif args.command == "version":
+        print(f"pkggen version {version.PKGGEN_VERSION}")
+
+if __name__ == "__main__":
+    main()
