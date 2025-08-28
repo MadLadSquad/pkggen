@@ -1,8 +1,11 @@
 # pkggen
-
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
 [![trello](https://img.shields.io/badge/Trello-UDE-blue])](https://trello.com/b/HmfuRY2K/untitleddesktop)
 [![Discord](https://img.shields.io/discord/717037253292982315.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/4wgH8ZE)
+
+<img src="https://github.com/user-attachments/assets/6b7a6a14-fa42-4f16-9dc7-5f8cc2227af7" width="256px" height="256px">
+
+*<sub>Logo designed and created by <a href="https://www.instagram.com/_.insekhta._/">insekhta</a>.</sub>*
 
 A distribution-agnostic application suite to automatically generate new package versions for your desktop applications.
 
