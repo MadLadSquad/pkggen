@@ -9,11 +9,9 @@
 > [!CAUTION]
 > pkggen is still not ready for use with many core features currently missing.
 
-A suite of software utilities that allows you to ship updates for your desktop packges in a robust manner.
+A drop-in replacement for your entire desktop packaging and deployment pipeline
 
-## But what does it actually do?
-Simply put, pkggen is a drop-in replacement for your entire desktop packaging and deployment pipeline.
-
+## Why should I use pkggen?
 Currently, there is no universal way to automate package updating, dependency resolution, testing and deployment across multiple Unix distributions
 and multiple versions of the same OS distribution at the same time. And due to distributions having completely different package managers, packaging formats
 and package versions for your dependencies, a successful attempt at automating this process while completely covering all popular Unix platforms is simply
@@ -21,11 +19,12 @@ impossible without you also getting a desktop packaging PhD along the way.
 
 Here is how pkggen solves all your package deployment pain points:
 
-1. Designed for both small and large repositories - pkggen is so robust, it can literally be used to deploy everything from a single-app repository to an entire bleeding edge distribution
+1. Designed for both small and large repositories - pkggen is so robust, it can be used to deploy everything from a single-app repository to an entire bleeding edge distribution
 1. Completely automates away version bumps - it automatically fetches the latest release of your applications, downloads all sources, fetches checksums and verifies source integrity
 1. Templatize everything - pkggen pre-processes all your packages with Jinja 2, ships with many default variables and allows you to plug your own too
 1. Skip per-distribution boilerplate - pkggen automatically handles all distribution-specific setup logic so that you never have to worry about your development environment
-1. Develop once, test everywhere - pkggen allows you to automatically test all your packages and repositories on multiple versions of any operating system or distribution
+1. Dependency helpers - pkggen can help you add the correct dependencies for your package by cross-referencing with APIs like repology
+1. Develop once, test everywhere - pkggen allows you to automatically test all your packages and repositories on multiple operating systems in parallel
 1. Zero-click deployments - pkggen allows you to go through the entire package update, testing and deployment phases without any user interaction
 1. Modular design - whether you want to use your own scripts instead of the built-in ones, or you want to add a completely new platform, our modular design allows you to extend pkggen to fit any of your deployment needs
 1. Fully documented including additional packaging tips and platform-specific resources
