@@ -6,25 +6,32 @@
 
 *<sub>Logo designed and created by <a href="https://www.instagram.com/_.insekhta._/">insekhta</a>.</sub>*
 
-A distribution-agnostic application suite to automatically generate new package versions for your desktop applications.
+> [!CAUTION]
+> pkggen is still not ready for use with many core features currently missing.
 
-## Who should use these applications
-Developers that deal with the following should consider using pkggen in their development process:
+A suite of software utilities that allows you to ship updates for your desktop packges in a robust manner.
 
-1. Developers of cross-platform applications that have to ship on Unix-based systems
-1. Developers of Unix-based systems and distributions that want to implement automatic generation of packages
-1. QA and DevOps engineers that work with cross-platform applications, that want to implement robust testing and updates in their CI/CD pipelines
+## But what does it actually do?
+Simply put, pkggen is a drop-in replacement for your entire desktop packaging and deployment pipeline.
 
-## How does pkggen work?
-pkggen is simple:
+Currently, there is no universal way to automate package updating, dependency resolution, testing and deployment across multiple Unix distributions
+and multiple versions of the same OS distribution at the same time. And due to distributions having completely different package managers, packaging formats
+and package versions for your dependencies, a successful attempt at automating this process while completely covering all popular Unix platforms is simply
+impossible without you also getting a desktop packaging PhD along the way.
 
-1. Create folders for each packaging format you are planning to support. Each folder is then filled with jinja templates in your package manager's language
-1. Create a `pkggen.yaml` file that describes how your packages will be generated
-1. In a terminal, run `pkggen`. This command generates all packages automatically
-1. Once successful, run `pkggen test`. This command spins up containers and virtual machines to test your packages
-1. Finally, when everything runs successfully, run `pkggen deploy`. This command deploys each package to its corresponding distribution's repository
+Here is how pkggen solves all your package deployment pain points:
 
-A `pkggen.yaml` file looks like this:
+1. Designed for both small and large repositories - pkggen is so robust, it can literally be used to deploy everything from a single-app repository to an entire bleeding edge distribution
+1. Completely automates away version bumps - it automatically fetches the latest release of your applications, downloads all sources, fetches checksums and verifies source integrity
+1. Templatize everything - pkggen pre-processes all your packages with Jinja 2, ships with many default variables and allows you to plug your own too
+1. Skip per-distribution boilerplate - pkggen automatically handles all distribution-specific setup logic so that you never have to worry about your development environment
+1. Develop once, test everywhere - pkggen allows you to automatically test all your packages and repositories on multiple versions of any operating system or distribution
+1. Zero-click deployments - pkggen allows you to go through the entire package update, testing and deployment phases without any user interaction
+1. Modular design - whether you want to use your own scripts instead of the built-in ones, or you want to add a completely new platform, our modular design allows you to extend pkggen to fit any of your deployment needs
+1. Fully documented including additional packaging tips and platform-specific resources
+
+## The workflow
+You write a `pkggen.yaml` file that details all common metadata for the packages in your repository:
 ```yaml
 packages:
   generator: github
@@ -44,40 +51,22 @@ packages:
         repo: "UntitledExec"
         query: "releases"
         tarballs: [ "{{ pkgname }}.tar.gz" ]
-    - untitled-game-system-manager:
-      github:
-        user: "MadLadSquad"
-        repo: "UntitledGameSystemManager"
-        query: "releases"
-        tarballs: [ "{{ pkgname }}.tar.gz" ]
-        subrepos:
-          - untitled-imgui-framework:
-            github:
-              user: "MadLadSquad"
-              repo: "UntitledImGuiFramework"
-              query: "releases"
-              tarballs: [ "{{ pkgname }}.tar.gz" ]
-    - ibus-anthy:
-      github:
-        user: ibus
-        repo: ibus-anthy
-        query: tags
-        select: "^\d+\.\d+\.\d+$"
 ```
-When `pkggen` is run, a script called a template generator uses package metadata from the `pkggen.yaml` file and fetches all required data. It then
-prints out a JSON object containing all the needed data to fill the template. The pkggen application then proceeds to fill the template and exits successfully.
+When declaring a package, you specify a fetch generator, which is the script that will fetch the sources for it. Each generator has its own additional configuration that is parsed in its own code.
+We include pre-installed generators for integrating with popular platforms like GitHub, however if a generator does not exist for your use case, you can write one in python.
 
-When `pkggen test` is run, pkggen launches containers and virtual machines for each distribution. It then copies over the current environment and runs
-a testing generator, which runs the required tests for each packaging format.
+Then, in a folder for every distribution, you write a templated version for your packages, where each variable is defined by the given generator that you are using.
 
-Finally, when `pkggen deploy` is run, all the generated and tested files are given to a deployment generator, which deploys your packages to a repository using
-your credentials.
+Finally, to generate your repositories, run `pkggen`. This will generate all repositories in the `pkggen-build` directory. Just like the fetch generator, each distribution has its own repository
+generator in the form of a shell script, which allows you to easily introduce support for platforms we may not currently support.
 
-Since each type of generator is a simple application that communicates with the pkggen utility through STDIN and STDOUT, it's easy to write custom generators
-for any type of distribution, application, testing, deployment or query method.
+Once successful, you can run `pkggen test`, which will spin up containers and virtual machines to test out your package automatically. After the default testing round, you can also run your own
+testing generator as a shell script, which will be executed inside every container and virtual machine.
 
-## Features
-### Distribution and format support
+And if all tests pass, run `pkggen deploy` to automatically deploy your packages to all repositories. Deployment generators are also provided for popular platforms like the AUR, and you can
+also write your own in python.
+
+## Distribution/package support
 We currently support the following distributions and packaging formats:
 
 1. RedHat, Fedora and other RPM-based(RPMs) 🚧
@@ -105,22 +94,6 @@ Planned future support:
 1. BSD:
    - FreeBSD(pkgs)
    - OpenBSD(ports)
-
-### Easy dependency resolution
-With the `pkggen repology` command and its subcommands you can query the [repology database](https://repology.org) to get information about a dependency across all the distributions you are targeting.
-
-This is also integrated directly into the `pkggen.yaml` file through the dependencies field, which allows you to easily declare and set dependencies.
-
-### Battle-tested
-All [MadLadSquad](https://madladsquad.com) and [Heapforge](https://heapforge.com) applications are already distributed using the pkggen system. In fact, pkggen bootstraps its own
-packages when a new release is created.
-
-### Extensive documentation
-Though making packages with pkggen is easy and we provide documentation on anything related to the tools that pkggen provides, we also offer many pages on tips for making packages
-for every distribution that is officially supported by pkggen. This allows for faster and smoother development without the loss of time that results from trying to find the 
-exact thing you're looking for in each distribution's documentation.
-
-We also provide traditional packaging examples in the form of our current and legacy package repositories so that packaging is as fast and as clear a process as possible.
 
 ## Getting started and learning
 Get started by navigating [to our documentation](https://github.com/MadLadSquad/pkggen/wiki/Home).
