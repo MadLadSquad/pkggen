@@ -9,7 +9,7 @@
 > [!CAUTION]
 > pkggen is still not ready for use with many core features currently missing.
 
-A drop-in replacement for your entire desktop packaging and deployment pipeline
+A drop-in replacement for your entire desktop packaging and deployment pipeline.
 
 ## Why should I use pkggen?
 Currently, there is no universal way to automate package updating, dependency resolution, testing and deployment across multiple Unix distributions
