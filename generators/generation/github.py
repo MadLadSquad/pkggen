@@ -5,6 +5,7 @@ import re
 import json
 from datetime import datetime
 
+
 """
 The pkggen GitHub generator:
 
@@ -403,28 +404,30 @@ def generate(x):
 
 
 
-generate("""
-{
-    "name": "UntitledImGuiFramework",
-    "github": {
-        "_user": "MadLadSquad",
-        "_repo": "UntitledImGuiFramework",
-        "user": "microsoft",
-        "repo": "monaco-editor",
-        "query": "releases",
-        "_select": "^v\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+$",
-        "_version": "v1.3.2.0",
-        "_transforms": [
-            [ "v", "" ]
-        ],
-        "_artifacts": [
-            "untitled-imgui-framework-{version}.tar.xz"
-        ],
-        "include-pre-releases": "true",
-        "include-drafts": "true"
-    }
-}
-""")
+generate(lib.readinput())
+
+#generate("""
+#{
+#    "name": "UntitledImGuiFramework",
+#    "github": {
+#        "_user": "MadLadSquad",
+#        "_repo": "UntitledImGuiFramework",
+#        "user": "microsoft",
+#        "repo": "monaco-editor",
+#        "query": "releases",
+#        "_select": "^v\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+$",
+#        "_version": "v1.3.2.0",
+#        "_transforms": [
+#            [ "v", "" ]
+#        ],
+#        "_artifacts": [
+#            "untitled-imgui-framework-{version}.tar.xz"
+#        ],
+#        "include-pre-releases": "true",
+#        "include-drafts": "true"
+#    }
+#}
+#""")
 
 
 #generate("""

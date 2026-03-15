@@ -1,0 +1,19 @@
+pkggen:
+  generator: "github"
+  packages:
+    - name: "untitled-cli-parser"
+      github:
+        user: "MadLadSquad"
+        repo: "UntitledCLIParser"
+        query: "releases"
+        artifacts: [ "untitled-cli-parser-{version}.tar.xz" ]
+        transforms:
+          - [ "v", "" ]
+    - name: "untitled-imgui-framework"
+      github:
+        user: "MadLadSquad"
+        repo: "UntitledImGuiFramework"
+        query: "releases"
+        artifacts: [ "untitled-imgui-framework-{version}.tar.xz" ]
+        transforms:
+          - [ "v", "" ]

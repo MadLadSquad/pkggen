@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import os
 import yaml
 import json
@@ -6,10 +7,11 @@ import argparse
 import requests
 from packaging.version import parse as parse_version
 
-GENERATORS_PATH = os.getcwd()
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import utils
 
 def query_repology(package, is_raw, include_outdated):
-    generators_path = os.getenv("PKGGEN_GENERATORS_PATH", GENERATORS_PATH)
+    generators_path = utils.get_generators_path()
     with open(os.path.join(generators_path, "distributions", "distributions.yaml"), "r") as stream:
         try:
             distributions = yaml.safe_load(stream)["distributions"]
@@ -119,5 +121,4 @@ def query_repology(package, is_raw, include_outdated):
                 else:
                     print("No such dependency! Response code:", response.status_code)
         except yaml.YAMLError as exception:
-            print("YAML parsing error: ")
-            print(exception)
+            raise utils.GenericError("YAML parsing error: " + exception)

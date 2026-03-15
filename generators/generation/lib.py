@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # This file contains shared utilities that every generator will use
 import hashlib
+import sys
 from tqdm import tqdm
 from io import BytesIO
+
+def readinput():
+    return sys.stdin.buffer.read()
 
 class TinyError(Exception):
     def __init__(self, message):

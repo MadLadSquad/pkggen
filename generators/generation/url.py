@@ -163,20 +163,21 @@ def generate(x):
         raise lib.TinyError(f"Failed to fetch file with URL: {urldata['url']}. HTTP Response: {response.status_code} {response.reason}.")
         
 
-generate("""
-{
-    "name": "untitled-exec",
-    "url-generator":
-    {
-        "url": "https://github.com/MadLadSquad/UImGuiSDL/releases/tag/v1.0.0.0",
-        "headers": {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
-        },
-        "transforms": [
-            [ "https.*tag/v", "" ], 
-            [ "\\\\.", "/" ]
-        ],
-        "size": "363"
-    }
-}
-""")
+generate(lib.readinput())
+#generate("""
+#{
+#    "name": "untitled-exec",
+#    "url-generator":
+#    {
+#        "url": "https://github.com/MadLadSquad/UImGuiSDL/releases/tag/v1.0.0.0",
+#        "headers": {
+#            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
+#        },
+#        "transforms": [
+#            [ "https.*tag/v", "" ], 
+#            [ "\\\\.", "/" ]
+#        ],
+#        "size": "363"
+#    }
+#}
+#""")

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import version
+import generate
+from datetime import datetime
 
 from utilities.repology import query_repology
 
@@ -8,7 +10,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog="pkggen",
         description="Automatically generate desktop packages for multiple distributions",
-        epilog="Copyright (c) MadLadSquad. Licensed under the terms of the MIT license."
+        epilog=f"Copyright (c) MadLadSquad 2024 - {datetime.now().year}. Licensed under the terms of the MIT license."
     )
     parser.add_argument("-v", "--version", action="version", version=f"pkggen version {version.PKGGEN_VERSION}")
 
@@ -32,7 +34,7 @@ def main():
 
     args = parser.parse_args()
     if args.command == "generate":
-        print("This command is not currently implemented.")
+        generate.generate()
     elif args.command == "test":
         print("This command is not currently implemented.")
     elif args.command == "deploy":
