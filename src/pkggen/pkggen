@@ -34,7 +34,7 @@ def main():
 
     args = parser.parse_args()
     if args.command == "generate":
-        generate.generate()
+        print(generate.generate())
     elif args.command == "test":
         print("This command is not currently implemented.")
     elif args.command == "deploy":

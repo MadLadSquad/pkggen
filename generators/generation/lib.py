@@ -2,8 +2,26 @@
 # This file contains shared utilities that every generator will use
 import hashlib
 import sys
+import os
+import yaml
 from tqdm import tqdm
 from io import BytesIO
+
+def load_secrets():
+    if os.name == 'nt':
+        base_dir = os.getenv('APPDATA', os.path.expanduser('~\\AppData\\Roaming'))
+    else:
+        base_dir = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
+    secrets_file = os.path.join(base_dir, 'pkggen', 'secrets.yaml')
+    if not os.path.exists(secrets_file):
+        print("\x1b[33mWarning: secrets.yaml was requested but not found. Creating it automatically.\x1b[0m", file=sys.stderr)
+        config_dir = os.path.join(base_dir, 'pkggen')
+        os.makedirs(config_dir, exist_ok=True)
+        with open(secrets_file, 'w') as f:
+            f.write('')
+    with open(secrets_file, "r") as stream:
+        result = yaml.safe_load(stream)
+        return result if result is not None else {}
 
 def readinput():
     return sys.stdin.buffer.read()

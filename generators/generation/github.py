@@ -177,9 +177,21 @@ class GitHubData:
         self.domain = data["domain"] if "domain" in data else "github.com"
         self.api_domain = data["api-domain"] if "api-domain" in data else "api.github.com"
 
+        secrets = lib.load_secrets()
+        self.github_key = secrets["github_key"] if "github_key" in secrets else None
+
     
 def transform_date(x):
     return datetime.strptime(x, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d")
+
+def get_api_headers(key):
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    if key != None:
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
 
 def generate_artifact_data(tarball_urls, user, repo):
     result = []
@@ -204,7 +216,7 @@ def generate_artifact_data(tarball_urls, user, repo):
 
 def get_exports(github):
     result = {}
-    response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}")
+    response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}", headers=get_api_headers(github.github_key))
     if response.status_code == 200:
         data = response.json()
 
@@ -225,10 +237,7 @@ def get_exports(github):
 
 def generate_commit(github):
     result = {}
-    api_headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
+    api_headers = get_api_headers(github.github_key)
     
     if github.version != None:
         response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}/commits/{github.version}", headers=api_headers, timeout=10)
@@ -272,10 +281,7 @@ def apply_version_transforms(transforms, version):
     return version
 
 def generate_release_or_tag(pkgname, github):
-    api_headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
+    api_headers = get_api_headers(github.github_key)
     page = 1
     result = {}
 

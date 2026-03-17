@@ -33,6 +33,7 @@ def generate_packages(packages, generator):
     return results
 
 def generate():
+    utils.create_secrets_file()
     generators_path = utils.get_generators_path()
     generator_files = os.path.join(generators_path, "generation")
     generators = []
