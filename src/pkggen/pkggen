@@ -18,6 +18,7 @@ def main():
 
     generate_parser = subparsers.add_parser("generate", help="Generate desktop packages")
     generate_parser.add_argument("-o", "--output", help="Set the output directory")
+    generate_parser.add_argument("-p", "--packages", help="Set the packages to generate", nargs='+')
 
     test_parser = subparsers.add_parser("test", help="Launch testing environments for each package")
     test_parser.add_argument("-i", "--input", help="Set the input directory")
@@ -34,7 +35,7 @@ def main():
 
     args = parser.parse_args()
     if args.command == "generate":
-        print(generate.generate())
+        print(generate.generate(args.packages))
     elif args.command == "test":
         print("This command is not currently implemented.")
     elif args.command == "deploy":

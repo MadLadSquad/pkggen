@@ -5,10 +5,15 @@ import json
 import utils
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
-def generate_packages(packages, generator):
+def generate_packages(packages, package_filter, generator):
     results = []
-    for package in packages:
+
+    def worker_task(package, pkg_filter):
+        if pkg_filter != None and package.get("name") not in pkg_filter:
+            return None
+        
         js = json.dumps(package)
 
         result = subprocess.run(
@@ -17,22 +22,26 @@ def generate_packages(packages, generator):
             text=True,
             capture_output = True
         )
+
         if result.returncode != 0:
             print("Error encountered when running the generator!")
 
-            print("Failed generator stdin:")
+            print("Failed generator stdout: ")
             print(result.stdout)
 
-            print("Failed generator stderr:")
+            print("Failed generator stderr: ")
             print(result.stderr)
 
-            raise GenericError("Errors encountered when runnning the generator!")
+            raise utils.GenericError("Errors encountered when running the generator!")
 
-        results.append(result.stdout)
+        return result.stdout
 
-    return results
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(lambda x: worker_task(x, package_filter), packages))
+    
+    return [res for res in results if res is not None] 
 
-def generate():
+def generate(package_filter=None):
     utils.create_secrets_file()
     generators_path = utils.get_generators_path()
     generator_files = os.path.join(generators_path, "generation")
@@ -47,6 +56,11 @@ def generate():
     if pkggen != None:
         for key, generation_level in pkggen.items():
             if "generator" in generation_level and "packages" in generation_level:
+                packages = generation_level["packages"]
+                
+                if not packages:
+                    continue
+
                 found_generator = False
                 generator = ""
                 for gen in generators:
@@ -57,10 +71,10 @@ def generate():
                         
                 # TODO: Pass ready data
                 if found_generator:
-                    return generate_packages(generation_level["packages"], os.path.join(generator_files, generator))
+                    return generate_packages(packages, package_filter, os.path.join(generator_files, generator))
 
-                raise GenericError("Couldn't find template generator!")
+                raise utils.GenericError("Couldn't find template generator!")
             else:
-                raise GenericError("Couldn't find a generator or packages key in the generator metadata!")
+                raise utils.GenericError("Couldn't find a generator or packages key in the generator metadata!")
     else:
-        raise GenericError("Couldn't load pkggen.yaml from the default path!")
+        raise utils.GenericError("Couldn't load pkggen.yaml from the default path!")
