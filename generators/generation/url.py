@@ -116,7 +116,7 @@ def generate(x):
     size = int(response.headers.get("content-length", 0))
 
     if response.status_code == 200:
-        buf = lib.download_to_buffer(response, size, url)
+        buf = lib.download_to_buffer(response, size, url, position=0)
         
         result = {
             "tarball-urls": [

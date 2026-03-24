@@ -61,10 +61,15 @@ def calculate_hashes(obj, data):
     calculate_hash(obj, data, "blake2s", "blake2s")
 
 
-def download_to_buffer(response, size, url):
+def download_to_buffer(response, size, url, position=0):
     buf = BytesIO()
 
-    with tqdm(total=size if size > 0 else None, unit="B", unit_scale=True, desc=f"Downloading {url}: ") as pbar:
+    # Shorten the URL for the description
+    filename = url.split('/')[-1] if '/' in url else url
+    if len(filename) > 30:
+        filename = filename[:27] + "..."
+
+    with tqdm(total=size if size > 0 else None, unit="B", unit_scale=True, desc=f"Downloading {filename}: ", position=position, leave=False) as pbar:
         for chunk in response.iter_content(chunk_size=1024 * 64):
             if not chunk:
                 continue

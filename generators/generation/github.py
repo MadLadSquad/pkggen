@@ -200,7 +200,7 @@ def generate_artifact_data(tarball_urls, user, repo):
         size = int(tarball_response.headers.get("content-length", 0))
     
         if tarball_response.status_code == 200:
-            buf = lib.download_to_buffer(tarball_response, size, tarball_url)
+            buf = lib.download_to_buffer(tarball_response, size, tarball_url, position=0)
             result.append({
                 "url": tarball_url,
                 "checksums": {}
@@ -399,6 +399,7 @@ def generate(x):
     data = json.loads(x)
 
     pkgname = data["name"]
+
     if "github" not in data:
         raise lib.TinyError(f"No object named \"github\" found inside the \"{pkgname}\" package's metadata!")
    

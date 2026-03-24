@@ -8,36 +8,44 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 def generate_packages(packages, package_filter, generator):
-    results = []
+    # Pre-filter packages
+    if package_filter is not None:
+        packages = [p for p in packages if p.get("name") in package_filter]
 
-    def worker_task(package, pkg_filter):
-        if pkg_filter != None and package.get("name") not in pkg_filter:
-            return None
-        
+    if not packages:
+        return []
+
+    def worker_task(package, position):
+        # Inject position for the progress bar
+        package["position"] = position
         js = json.dumps(package)
 
+        # We capture stdout to get the result, but let stderr go to sys.stderr 
+        # so that tqdm progress bars are visible and correctly positioned.
         result = subprocess.run(
             [ sys.executable, generator ],
             input=js,
             text=True,
-            capture_output = True
+            stdout=subprocess.PIPE,
+            stderr=sys.stderr
         )
 
         if result.returncode != 0:
-            print("Error encountered when running the generator!")
-
-            print("Failed generator stdout: ")
-            print(result.stdout)
-
-            print("Failed generator stderr: ")
-            print(result.stderr)
-
-            raise utils.GenericError("Errors encountered when running the generator!")
+            error_msg = (
+                f"\nError encountered when running the generator for package: {package.get('name', 'unknown')}\n"
+                f"Generator: {generator}\n"
+                f"Exit code: {result.returncode}\n"
+            )
+            print(error_msg, file=sys.stderr)
+            raise utils.GenericError(f"Errors encountered when running the generator for {package.get('name')}!")
 
         return result.stdout
 
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(lambda x: worker_task(x, package_filter), packages))
+    # Using a limited number of workers to avoid overwhelming the system and network
+    with ThreadPoolExecutor(max_workers=min(len(packages), 10)) as executor:
+        # Use list comprehension with enumerate to pass position
+        futures = [executor.submit(worker_task, pkg, i) for i, pkg in enumerate(packages)]
+        results = [f.result() for f in futures]
     
     return [res for res in results if res is not None] 
 
