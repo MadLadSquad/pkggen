@@ -2,6 +2,7 @@
 import argparse
 import version
 import generate
+import gen_repo
 from datetime import datetime
 
 from utilities.repology import query_repology
@@ -17,8 +18,15 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     generate_parser = subparsers.add_parser("generate", help="Generate desktop packages")
-    generate_parser.add_argument("-o", "--output", help="Set the output directory")
     generate_parser.add_argument("-p", "--packages", help="Set the packages to generate", nargs='+')
+
+    gen_repo_parser = subparsers.add_parser("gen-repo", help="Generate repository folder structures")
+    gen_repo_parser.add_argument("-o", "--output", help="Set the output directory for the generator")
+    gen_repo_subparsers = gen_repo_parser.add_subparsers(dest="distribution", required=True)
+    
+    distributions = gen_repo.get_distributions()
+    for dist in distributions:
+        dist_parser = gen_repo_subparsers.add_parser(dist, help=f"Generate repository for {dist}")
 
     test_parser = subparsers.add_parser("test", help="Launch testing environments for each package")
     test_parser.add_argument("-i", "--input", help="Set the input directory")
@@ -36,6 +44,8 @@ def main():
     args = parser.parse_args()
     if args.command == "generate":
         print(generate.generate(args.packages))
+    elif args.command == "gen-repo":
+        print(gen_repo.gen_repo(args.distribution, args.output))
     elif args.command == "test":
         print("This command is not currently implemented.")
     elif args.command == "deploy":

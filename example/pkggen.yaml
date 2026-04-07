@@ -1,3 +1,29 @@
+repos:
+  gentoo: 
+    name: "untitled-desktop-overlay"
+    description: "An overlay containing Gentoo ebuilds and autogens for the applications and libraries part of the UntitledDesktop project"
+    homepage: https://github.com/MadLadSquad/UntitledDesktopOverlay.git
+    quality: experimental
+    status: unofficial
+    feed: https://github.com/MadLadSquad/UntitledDesktopOverlay.git
+    priority: 10
+    owners:
+      - name: MadLadSquad
+        email: contact@madladsquad.com
+    source:
+      type: git
+      url: https://github.com/MadLadSquad/UntitledDesktopOverlay.git
+    copyright:
+      years: "2022 - 2025"
+      owner: MadLadSquad
+      license: MIT License
+    thin-manifests: true
+    sign-manifests: false
+    masters: gentoo
+    categories:
+      - ude-base
+      - ude-apps
+      - ude-misc
 pkggen:
   generator: "github"
   packages:
