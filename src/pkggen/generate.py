@@ -63,6 +63,10 @@ def generate(package_filter=None):
     pkggen = utils.get_pkggen_config()
     if pkggen != None:
         for key, generation_level in pkggen.items():
+            # Skip repositories
+            if key == "repositories":
+                continue
+
             if "generator" in generation_level and "packages" in generation_level:
                 packages = generation_level["packages"]
                 

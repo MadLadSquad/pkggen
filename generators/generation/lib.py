@@ -45,17 +45,17 @@ def calculate_hashes(obj, data):
 
     calculate_hash(obj, data, "sha1", "sha1")
 
-    calculate_hash(obj, data, "sha224", "sha2-224")
-    calculate_hash(obj, data, "sha3_224", "sha3-224")
+    calculate_hash(obj, data, "sha224", "sha2_224")
+    calculate_hash(obj, data, "sha3_224", "sha3_224")
 
-    calculate_hash(obj, data, "sha256", "sha2-256")
-    calculate_hash(obj, data, "sha3_256", "sha3-256")
+    calculate_hash(obj, data, "sha256", "sha2_256")
+    calculate_hash(obj, data, "sha3_256", "sha3_256")
     
-    calculate_hash(obj, data, "sha384", "sha2-384")
-    calculate_hash(obj, data, "sha3_384", "sha3-384")
+    calculate_hash(obj, data, "sha384", "sha2_384")
+    calculate_hash(obj, data, "sha3_384", "sha3_384")
 
-    calculate_hash(obj, data, "sha512", "sha2-512")
-    calculate_hash(obj, data, "sha3_512", "sha3-512")
+    calculate_hash(obj, data, "sha512", "sha2_512")
+    calculate_hash(obj, data, "sha3_512", "sha3_512")
 
     calculate_hash(obj, data, "blake2b", "blake2b")
     calculate_hash(obj, data, "blake2s", "blake2s")

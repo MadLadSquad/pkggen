@@ -109,10 +109,10 @@ def main():
         print(f"Error parsing YAML: {e}", file=sys.stderr)
         sys.exit(1)
 
-    if not data or 'repos' not in data or 'gentoo' not in data['repos']:
+    if not data or 'repositories' not in data or 'gentoo' not in data['repositories']:
         return
 
-    gentoo = data['repos']['gentoo']
+    gentoo = data['repositories']['gentoo']
     
     name = gentoo.get('name')
     if not name:

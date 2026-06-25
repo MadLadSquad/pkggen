@@ -63,22 +63,22 @@ Input:
     
 Output:
     {
-        "tarball-urls": [
+        "tarball_urls": [
             { 
                 "url": "pkgname-version.tar.xz",
                 "size": "1234",
                 "checksums": {
-                    "sha2-512": "hash",
-                    "sha3-512": "hash",
+                    "sha2_512": "hash",
+                    "sha3_512": "hash",
                     
-                    "sha2-384": "hash",
-                    "sha3-384": "hash",
+                    "sha2_384": "hash",
+                    "sha3_384": "hash",
 
-                    "sha2-256": "hash",
-                    "sha3-256": "hash",
+                    "sha2_256": "hash",
+                    "sha3_256": "hash",
 
-                    "sha2-224": "hash",
-                    "sha3-224": "hash",
+                    "sha2_224": "hash",
+                    "sha3_224": "hash",
 
                     "sha1": "hash",
 
@@ -92,17 +92,17 @@ Output:
                 "url": "resources.tar.xz",
                 "size": "1234",
                 "checksums": {
-                    "sha2-512": "hash",
-                    "sha3-512": "hash",
+                    "sha2_512": "hash",
+                    "sha3_512": "hash",
 
-                    "sha2-384": "hash",
-                    "sha3-384": "hash",
+                    "sha2_384": "hash",
+                    "sha3_384": "hash",
 
-                    "sha2-256": "hash",
-                    "sha3-256": "hash",
+                    "sha2_256": "hash",
+                    "sha3_256": "hash",
 
-                    "sha2-224": "hash",
-                    "sha3-224": "hash",
+                    "sha2_224": "hash",
+                    "sha3_224": "hash",
 
                     "sha1": "hash",
 
@@ -245,7 +245,7 @@ def generate_commit(github):
             data = response.json()
 
             result["version"] = transform_date(data["commit"]["committer"]["date"])
-            result["tarball-urls"] = generate_artifact_data(
+            result["tarball_urls"] = generate_artifact_data(
                 [
                     f"https://{github.domain}/{github.user}/{github.repo}/archive/{data['sha']}.tar.gz"
                 ],
@@ -259,7 +259,7 @@ def generate_commit(github):
         if response.status_code == 200:
             data = response.json()[0]
             result["version"] = transform_date(data["commit"]["committer"]["date"])
-            result["tarball-urls"] = generate_artifact_data(
+            result["tarball_urls"] = generate_artifact_data(
                 [
                     f"https://{github.domain}/{github.user}/{github.repo}/archive/{data['sha']}.tar.gz"
                 ],
@@ -352,7 +352,7 @@ def generate_release_or_tag(pkgname, github):
 
 
             if github.query == "tags":
-                result["tarball-urls"] = generate_artifact_data(
+                result["tarball_urls"] = generate_artifact_data(
                     [
                         obj["tarball_url"]
                     ],
@@ -361,7 +361,7 @@ def generate_release_or_tag(pkgname, github):
                 )
             elif github.query == "releases":
                 if github.artifacts == None:
-                    result["tarball-urls"] = generate_artifact_data(
+                    result["tarball_urls"] = generate_artifact_data(
                         [
                             obj["tarball_url"]
                         ],
@@ -385,7 +385,7 @@ def generate_release_or_tag(pkgname, github):
                             if artifact == asset["name"]:
                                 urls.append(asset["browser_download_url"])
 
-                    result["tarball-urls"] = generate_artifact_data(urls, github.user, github.repo)
+                    result["tarball_urls"] = generate_artifact_data(urls, github.user, github.repo)
 
             result["exports"] = get_exports(github)
             return result

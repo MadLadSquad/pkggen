@@ -50,18 +50,18 @@ Output:
                 "size": "1234", //Optional
                 "checksums":
                 {
-                    "sha2-512": "hash",
-                    "sha3-512": "hash",
+                    "sha2_512": "hash",
+                    "sha3_512": "hash",
 
-                    "sha2-384": "hash",
-                    "sha3-384": "hash",
+                    "sha2_384": "hash",
+                    "sha3_384": "hash",
 
-                    "sha2-256": "hash",
-                    "sha3-256": "hash",
+                    "sha2_256": "hash",
+                    "sha3_256": "hash",
 
 
-                    "sha2-224": "hash",
-                    "sha3-224": "hash",
+                    "sha2_224": "hash",
+                    "sha3_224": "hash",
 
                     "sha1": "hash",
             

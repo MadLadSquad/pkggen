@@ -54,6 +54,9 @@ def main():
         query_repology(args.package, args.json, args.include_outdated)
     elif args.command == "version":
         print(f"pkggen version {version.PKGGEN_VERSION}")
+    elif args.command == "full-generate":
+        print(generate.generate(args.packages))
+        print(f"This command is not currently implemented.")
 
 if __name__ == "__main__":
     main()

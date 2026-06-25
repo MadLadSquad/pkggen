@@ -1,4 +1,4 @@
-repos:
+repositories:
   gentoo: 
     name: "untitled-desktop-overlay"
     description: "An overlay containing Gentoo ebuilds and autogens for the applications and libraries part of the UntitledDesktop project"
