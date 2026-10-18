@@ -1,128 +1,131 @@
 #!/usr/bin/env python3
-import os
-import sys
-import yaml
+# Creates a Gentoo overlay skeleton from `repositories.gentoo` in pkggen.yaml.
+from xml.sax.saxutils import escape, quoteattr
 import lib
 
+QUALITIES = ("core", "stable", "testing", "experimental", "graveyard")
+STATUSES = ("official", "unofficial")
+OWNER_TYPES = ("person", "project")
+
+
 def build_copyright(gentoo):
-    copyright_obj = gentoo.get('copyright')
-
-    if copyright_obj:
-        years = copyright_obj.get('years', '')
-        owner = copyright_obj.get('owner', '')
-
-        license = copyright_obj.get('license', '')
-
-        with open('COPYRIGHT.txt', 'w') as f:
-            f.write(f"Copyright {years} {owner}. Distributed under the terms of the {license}.\n")
-
-def build_profiles(gentoo):
-    os.makedirs('profiles', exist_ok=True)
-
-    # Write custom categories if any
-    categories = gentoo.get('categories')
-    if categories:
-        with open('profiles/categories', 'w') as f:
-            for cat in categories:
-                f.write(f"{cat}\n")
-
-    # Standard Gentoo overlays need to have a repo_name file with the name of the repo
-    with open('profiles/repo_name', 'w') as f:
-        f.write(f"{gentoo["name"]}\n")
-
-def build_metadata(gentoo):
-    os.makedirs('metadata', exist_ok=True)
-
-    def to_bool_str(val, default):
-        if val is None:
-            return default
-        return str(val).lower()
-
-    thin = to_bool_str(gentoo.get('thin-manifests'), 'true')
-    sign = to_bool_str(gentoo.get('sign-manifests'), 'false')
-    masters = gentoo.get('masters')
-    if masters is None:
-        masters = 'gentoo'
-
-    layout_conf = f"""repo-name = {gentoo["name"]}
-thin-manifests = {thin}
-sign-manifests = {sign}
-profile-formats = portage-2
-cache-formats = md5-dics
-masters = {masters}
-"""
-    with open('metadata/layout.conf', 'w') as f:
-        f.write(layout_conf)
-
-def build_repositories_xml(gentoo):
-    repo_xml = ['<repositories encoding="unicode" version="1.1">']
-
-    priority = gentoo.get('priority')
-    quality = gentoo.get('quality')
-
-    repo_tag = '  <repo'
-    if priority is not None:
-        repo_tag += f' priority="{priority}"'
-    if quality is not None:
-        repo_tag += f' quality="{quality}"'
-    repo_tag += '>'
-    repo_xml.append(repo_tag)
-
-    repo_xml.append(f'    <name>{gentoo["name"]}</name>')
-
-    description = gentoo.get('description')
-    if description:
-        repo_xml.append(f'    <description>{description}</description>')
-
-    owners = gentoo.get('owners', [])
-    for owner in owners:
-        o_name = owner.get('name')
-        o_email = owner.get('email')
-        if o_name or o_email:
-            repo_xml.append('    <owner>')
-            if o_name:
-                repo_xml.append(f'      <name>{o_name}</name>')
-            if o_email:
-                repo_xml.append(f'      <email>{o_email}</email>')
-            repo_xml.append('    </owner>')
-
-    source = gentoo.get('source')
-    if source:
-        s_type = source.get('type')
-        s_url = source.get('url')
-        if s_type and s_url:
-            repo_xml.append(f'    <source type="{s_type}">{s_url}</source>')
-
-    repo_xml.append('  </repo>')
-    repo_xml.append('</repositories>')
-
-    with open('repositories.xml', 'w') as f:
-        f.write('\n'.join(repo_xml) + '\n')
-
-def main():
-    try:
-        input_data = lib.readinput()
-        if not input_data:
-            return
-        data = yaml.safe_load(input_data)
-    except Exception as e:
-        print(f"Error parsing YAML: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    if not data or 'repositories' not in data or 'gentoo' not in data['repositories']:
+    copyright_obj = gentoo.get("copyright")
+    if not copyright_obj:
         return
 
-    gentoo = data['repositories']['gentoo']
-    
-    name = gentoo.get('name')
-    if not name:
-        print("Error: gentoo repository name is missing", file=sys.stderr)
-        sys.exit(1)
+    missing = [key for key in ("years", "owner", "license") if not copyright_obj.get(key)]
+    if missing:
+        lib.fail(f"'repositories.gentoo.copyright' is missing: {', '.join(missing)}")
+
+    lib.write_file("COPYRIGHT.txt", f"""\
+Copyright {copyright_obj['years']} {copyright_obj['owner']}. \
+Distributed under the terms of the {copyright_obj['license']}.
+""")
+
+
+def build_profiles(gentoo, name):
+    categories = lib.as_list(gentoo.get("categories"))
+    if categories:
+        lib.write_file("profiles/categories", lib.lines(*categories))
+
+    # Every overlay needs profiles/repo_name with the repository name
+    lib.write_file("profiles/repo_name", f"""\
+{name}
+""")
+
+
+def build_metadata(gentoo, name):
+    def bool_str(key, default):
+        return str(lib.to_bool(gentoo.get(key), default)).lower()
+
+    def joined(key, default=None):
+        values = lib.as_list(gentoo.get(key))
+        return " ".join(str(v) for v in values) if values else default
+
+    entries = [
+        f"repo-name = {name}",
+        f"masters = {joined('masters', 'gentoo')}",
+        f"thin-manifests = {bool_str('thin-manifests', True)}",
+        f"sign-manifests = {bool_str('sign-manifests', False)}",
+        f"profile-formats = {joined('profile-formats', 'portage-2')}",
+        f"cache-formats = {joined('cache-formats', 'md5-dict')}",
+    ]
+
+    # Optional keys, only written when set
+    for key in ("manifest-hashes", "manifest-required-hashes", "eapis-banned", "eapis-deprecated"):
+        value = joined(key)
+        if value:
+            entries.append(f"{key} = {value}")
+
+    lib.write_file("metadata/layout.conf", lib.lines(*entries))
+
+
+def build_repositories_xml(gentoo, name):
+    quality = gentoo.get("quality")
+    status = gentoo.get("status")
+    if quality is not None and quality not in QUALITIES:
+        lib.warn(f"unknown gentoo quality '{quality}', expected one of: {', '.join(QUALITIES)}")
+    if status is not None and status not in STATUSES:
+        lib.warn(f"unknown gentoo status '{status}', expected one of: {', '.join(STATUSES)}")
+
+    attrs = ""
+    for attr, value in (("priority", gentoo.get("priority")), ("quality", quality), ("status", status)):
+        if value is not None:
+            attrs += f" {attr}={quoteattr(str(value))}"
+
+    xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<!DOCTYPE repositories SYSTEM "https://www.gentoo.org/dtd/repositories.dtd">',
+        '<repositories xmlns="" version="1.0">',
+        f"  <repo{attrs}>",
+        f"    <name>{escape(name)}</name>",
+    ]
+
+    for key in ("description", "homepage"):
+        value = gentoo.get(key)
+        if value:
+            xml.append(f"    <{key}>{escape(str(value))}</{key}>")
+
+    for owner in lib.as_list(gentoo.get("owners")):
+        o_name = owner.get("name")
+        o_email = owner.get("email")
+        o_type = owner.get("type")
+        if not o_name and not o_email:
+            continue
+        if not o_email:
+            lib.warn(f"gentoo owner '{o_name}' has no email, which repositories.dtd requires")
+        if o_type is not None and o_type not in OWNER_TYPES:
+            lib.warn(f"unknown gentoo owner type '{o_type}', expected one of: {', '.join(OWNER_TYPES)}")
+
+        xml.append(f"    <owner type={quoteattr(o_type)}>" if o_type else "    <owner>")
+        if o_email:
+            xml.append(f"      <email>{escape(str(o_email))}</email>")
+        if o_name:
+            xml.append(f"      <name>{escape(str(o_name))}</name>")
+        xml.append("    </owner>")
+
+    for source in lib.as_list(gentoo.get("source")):
+        s_type = source.get("type")
+        s_url = source.get("url")
+        if s_type and s_url:
+            xml.append(f"    <source type={quoteattr(str(s_type))}>{escape(str(s_url))}</source>")
+
+    for feed in lib.as_list(gentoo.get("feed")):
+        xml.append(f"    <feed>{escape(str(feed))}</feed>")
+
+    xml += ["  </repo>", "</repositories>"]
+    lib.write_file("repositories.xml", lib.lines(*xml))
+
+
+def main():
+    gentoo = lib.load_repo_config("gentoo", required=("name",))
+    name = gentoo["name"]
 
     build_copyright(gentoo)
-    build_profiles(gentoo)
-    build_metadata(gentoo)
-    build_repositories_xml(gentoo)
+    build_profiles(gentoo, name)
+    build_metadata(gentoo, name)
+    build_repositories_xml(gentoo, name)
+
 
 if __name__ == "__main__":
     main()

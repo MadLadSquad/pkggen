@@ -17,7 +17,24 @@ def create_secrets_file():
     return secrets_file
 
 def get_generators_path():
-    return os.getenv("PKGGEN_GENERATORS_PATH", os.getcwd())
+    # Absolute, so generators still resolve when run from another working directory
+    return os.path.abspath(os.getenv("PKGGEN_GENERATORS_PATH", os.getcwd()))
+
+def load_distributions():
+    dist_file = os.path.join(get_generators_path(), "distributions", "distributions.yaml")
+    try:
+        with open(dist_file, "r") as stream:
+            data = yaml.safe_load(stream) or {}
+    except FileNotFoundError:
+        raise GenericError(f"Couldn't find the distributions list at {dist_file}! Is PKGGEN_GENERATORS_PATH set?")
+    except yaml.YAMLError as e:
+        raise GenericError(f"Couldn't parse {dist_file}: {e}")
+
+    distributions = data.get("distributions") or []
+    for dist in distributions:
+        if not isinstance(dist, dict) or "name" not in dist:
+            raise GenericError(f"Every entry in {dist_file} needs a 'name' key!")
+    return distributions
 
 def get_pkggen_config():
     pkggen_path = os.getenv("PKGGEN_RUN_PATH", os.getcwd())

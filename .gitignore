@@ -87,3 +87,6 @@ coverage.xml
 
 # macOS / Linux / Windows garbage
 Thumbs.db
+graphify-out/
+.claude/
+.agents/

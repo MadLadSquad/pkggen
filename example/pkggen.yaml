@@ -10,11 +10,12 @@ repositories:
     owners:
       - name: MadLadSquad
         email: contact@madladsquad.com
+        type: project
     source:
       type: git
       url: https://github.com/MadLadSquad/UntitledDesktopOverlay.git
     copyright:
-      years: "2022 - 2025"
+      years: "2022 - 2027"
       owner: MadLadSquad
       license: MIT License
     thin-manifests: true
@@ -24,6 +25,26 @@ repositories:
       - ude-base
       - ude-apps
       - ude-misc
+  rpm-based:
+    name: "untitled-desktop-rpm"
+    description: "RPM packages for the UntitledDesktop project"
+    baseurl: https://rpms.madladsquad.com/
+    gpgkey: https://rpms.madladsquad.com/rpmkey.pub
+  debian:
+    name: "untitled-desktop-deb"
+    origin: MadLadSquad
+    label: UntitledDesktopDEB
+    description: "Debian packages for the UntitledDesktop project"
+    architectures: [ amd64, arm64, source ]
+    components: [ main ]
+    sign-with: default
+    suites:
+      - codename: trixie
+        suite: stable
+      - codename: noble
+    url: https://debs.madladsquad.com/
+    keyring: /usr/share/keyrings/untitled-desktop.gpg
+  arch: {}
 pkggen:
   generator: "github"
   packages:

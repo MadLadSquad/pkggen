@@ -1,39 +1,23 @@
 #!/usr/bin/env python3
 import os
-import yaml
 import json
 import utils
 import subprocess
 import sys
 
+def get_repo_generators_path():
+    return os.path.join(utils.get_generators_path(), "repositories")
+
 def get_distributions():
-    generators_path = utils.get_generators_path()
-    repo_generators_path = os.path.join(generators_path, "repositories")
-    dist_file = os.path.join(generators_path, "distributions", "distributions.yaml")
+    # Only offer distributions that also have a repository generator
+    repo_generators_path = get_repo_generators_path()
+    return [
+        dist["name"] for dist in utils.load_distributions()
+        if os.path.exists(os.path.join(repo_generators_path, f"{dist['name']}.py"))
+    ]
 
-    if not os.path.exists(dist_file):
-        return []
-
-    with open(dist_file, "r") as stream:
-        try:
-            data = yaml.safe_load(stream)
-            distributions_list = data.get("distributions", [])
-            valid_dists = []
-            
-            for dist_dict in distributions_list:
-                dist_name = list(dist_dict.keys())[0]
-                if os.path.exists(os.path.join(repo_generators_path, f"{dist_name}.py")):
-                    valid_dists.append(dist_name)
-            return valid_dists
-        except yaml.YAMLError:
-            return []
-
-def gen_repo(distribution, output_dir=None):
-    generators_path = utils.get_generators_path()
-    
-    repo_generators_path = os.path.join(generators_path, "repositories")
-    generator_path = os.path.join(repo_generators_path, f"{distribution}.py")
-    
+def gen_repo(distribution, output_dir=None, force=False):
+    generator_path = os.path.join(get_repo_generators_path(), f"{distribution}.py")
     if not os.path.exists(generator_path):
         raise utils.GenericError(f"Couldn't find repository generator for {distribution}!")
 
@@ -41,22 +25,18 @@ def gen_repo(distribution, output_dir=None):
     if pkggen is None:
         raise utils.GenericError("Couldn't load pkggen.yaml from the default path!")
 
-    # Set working directory if output_dir is provided
     cwd = output_dir if output_dir else os.getcwd()
-    if output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(cwd, exist_ok=True)
 
-    js = json.dumps(pkggen)
-    
+    # Generators report progress on stderr, so stdout is not captured
     result = subprocess.run(
         [sys.executable, generator_path],
-        input=js,
+        input=json.dumps(pkggen),
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr,
-        cwd=cwd
+        cwd=cwd,
+        env={**os.environ, "PKGGEN_FORCE": "1" if force else "0"},
     )
-    
+
     if result.returncode != 0:
         error_msg = (
             f"\nError encountered when running the repository generator for {distribution}\n"
@@ -65,5 +45,3 @@ def gen_repo(distribution, output_dir=None):
         )
         print(error_msg, file=sys.stderr)
         raise utils.GenericError(f"Errors encountered when running the generator for {distribution}!")
-    
-    return result.stdout

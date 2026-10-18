@@ -1,12 +1,14 @@
 distributions:
-  - rpm-based:
-    # This list contains the exact names of the latest supported releases
+  # `name` must match a generator in repositories/<name>.py and the
+  # `repositories.<name>` key in pkggen.yaml.
+  - name: rpm-based
+    # This list contains the exact repology names of the latest supported releases
     # for the given distributions.
-    rp-names: 
+    rp-names:
       # Rawhide and the latest 2 releases
       - "fedora_rawhide"
-      - "fedora_42"
-      - "fedora_41"
+      - "fedora_44"
+      - "fedora_43"
 
       # openSUSE tumbleweed and the last release
       - "opensuse_tumbleweed"
@@ -24,7 +26,23 @@ distributions:
       - "opensuse"
       - "openmandriva"
       - "pclinuxos"
-  - arch:
+  - name: debian
+    rp-names:
+      # Debian unstable, testing and the last 2 stable releases
+      - "debian_unstable"
+      - "debian_14"
+      - "debian_13"
+      - "debian_12"
+
+      # The latest Ubuntu release and the supported LTS releases
+      - "ubuntu_26_10"
+      - "ubuntu_26_04"
+      - "ubuntu_24_04"
+      - "ubuntu_22_04"
+    rp-names-wildcards:
+      - "debian"
+      - "ubuntu"
+  - name: arch
     rp-names: [ "arch" ]
-  - gentoo:
-    rp-names: [ "gentoo"]
+  - name: gentoo
+    rp-names: [ "gentoo" ]
