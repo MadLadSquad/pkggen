@@ -372,6 +372,14 @@ def test_keep(generators, project, fake_engine, capsys):
     assert "Containers were kept: remove them with `podman rm -f -v $(podman ps -aq --filter label=pkggen.session=" in err
 
 
+def test_keep_names_the_connection(generators, project, fake_engine, capsys):
+    project(test={"connection": "pkggen-root"})
+    assert testing.test(target_filter=["a1"], keep=True) == 0
+    err = strip_ansi(capsys.readouterr().err)
+    assert ("remove them with `podman --connection pkggen-root rm -f -v $(podman --connection pkggen-root ps -aq "
+            "--filter label=pkggen.session=") in err
+
+
 def test_jobs(generators, project, fake_engine, capsys):
     project(test={"jobs": 2, "cpus": 4, "memory": "4G"})
     assert testing.test(jobs=1) == 0

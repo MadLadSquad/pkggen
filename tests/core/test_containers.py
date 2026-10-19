@@ -341,11 +341,31 @@ def test_other_running_machine_on_macos_is_used(fake_engine, on):
     assert not any(c[1] == "init" for c in fake_engine.calls("machine"))
 
 
+WSL_WARNING = ("Podman machines that use WSL share the resources set in .wslconfig, so 'test.cpus' and "
+               "'test.memory' only limit the containers, not the VM")
+
+
 def test_wsl_machines_warn(fake_engine, on):
     on("windows")
     fake_engine.configure(machines=[{"Name": "pkggen", "State": "stopped", "Rootful": True, "VMType": "wsl",
-                                     "Resources": {"CPUs": 4, "Memory": 4096}}])
-    warnings, _ = containers.prepare_host(containers.Engine.detect(), settings(cpus=4, memory=4096), print)
-    assert ["machine", "start", "pkggen"] in fake_engine.calls("machine")
-    assert warnings == ["Podman machines that use WSL share the resources set in .wslconfig, so 'test.cpus' and "
-                        "'test.memory' only limit the containers, not the VM"]
+                                     "Resources": {"CPUs": 2, "Memory": 2048}}])
+    values = settings(cpus=4, memory=4096)
+    warnings, whole = containers.prepare_host(containers.Engine.detect(), values, print)
+    # `machine set` can't resize a WSL machine: it's only started
+    assert [c[1] for c in fake_engine.calls("machine")] == ["list", "inspect", "start"]
+    assert warnings == [WSL_WARNING]
+    # The VM isn't the budget, so it still limits the containers
+    assert whole and (values["cpus"], values["memory"]) == (4, 4096)
+
+
+def test_new_wsl_machine_keeps_the_budget(fake_engine, on, monkeypatch):
+    on("windows")
+    monkeypatch.setattr(containers.os, "cpu_count", lambda: 24)
+    monkeypatch.setattr(containers, "host_memory", lambda: 32768)
+    fake_engine.configure(vm_type="wsl")
+    values = settings(cpus=4, memory=16384)
+    warnings, whole = containers.prepare_host(containers.Engine.detect(), values, print)
+    assert warnings == [WSL_WARNING]
+    assert whole and (values["cpus"], values["memory"]) == (4, 16384)
+    plan = containers.plan_resources(values, 5, dict(INFO, cpus=24, memory=15950), whole_machine=whole)
+    assert (plan["jobs"], plan["cpus"]) == (2, 2.0)

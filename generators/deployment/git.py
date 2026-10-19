@@ -117,9 +117,15 @@ def auth_env(job, url, default_key=None, hint=None):
 
 # --- Running git -------------------------------------------------------------------
 
+# Push the tested files as they are: Git for Windows sets core.autocrlf=true system-wide,
+# which would rewrite line endings, and without core.longpaths it can't add files whose
+# path is over 260 characters, like createrepo_c's repodata/<sha256>-filelists.xml.zst
+GIT_OPTIONS = ["-c", "core.autocrlf=false", "-c", "core.longpaths=true"]
+
+
 def git(args, cwd=None, env=None, allow_failure=False):
     """Run git and return its stdout. Failures raise GitError with git's last lines."""
-    process = subprocess.run(["git", *args], cwd=cwd, env={**os.environ, **(env or {})}, capture_output=True,
+    process = subprocess.run(["git", *GIT_OPTIONS, *args], cwd=cwd, env={**os.environ, **(env or {})}, capture_output=True,
                              text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
     if process.returncode != 0 and not allow_failure:
         lines = [line.strip() for line in process.stderr.strip().splitlines() if line.strip()]

@@ -301,7 +301,8 @@ def ensure_machine(engine, cpus, memory, disk, say):
 
     cpus and memory (MiB) are the total budget; the machine gets exactly that,
     capped by machine_budget(). sized is False when another machine that's
-    already running is used as it is.
+    already running is used as it is, and for WSL machines, which get their
+    resources from .wslconfig.
     """
     warnings = []
     machines = engine.machine_list()
@@ -330,6 +331,11 @@ def ensure_machine(engine, cpus, memory, disk, say):
             args += ["--disk-size", disk]
         engine.run(*args, MACHINE_NAME, remote=False, capture=False)
         details = engine.machine_inspect(MACHINE_NAME) or {}
+        # Only `machine list` says which VM type the new machine got
+        vm_type = vm_type or next((_get(m, "VMType") for m in engine.machine_list()
+                                   if _get(m, "Name") == MACHINE_NAME), None)
+    elif str(vm_type).lower() == "wsl":
+        pass  # WSL machines get their resources from .wslconfig, `machine set` can't change them
     else:
         resources = _get(details, "Resources") or {}
         if _get(resources, "CPUs") != cpus or _get(resources, "Memory") != memory:
@@ -343,10 +349,12 @@ def ensure_machine(engine, cpus, memory, disk, say):
         say(f"Starting the '{MACHINE_NAME}' Podman machine")
         engine.run("machine", "start", MACHINE_NAME, remote=False, capture=False)
 
+    engine.connection = connection_name(MACHINE_NAME, _get(details, "Rootful") is not False)
     if str(vm_type).lower() == "wsl":
+        # The VM isn't the budget, so the containers keep it
         warnings.append("Podman machines that use WSL share the resources set in .wslconfig, so "
                         "'test.cpus' and 'test.memory' only limit the containers, not the VM")
-    engine.connection = connection_name(MACHINE_NAME, _get(details, "Rootful") is not False)
+        return warnings, False
     return warnings, True
 
 

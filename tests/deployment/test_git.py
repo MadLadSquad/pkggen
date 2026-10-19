@@ -251,6 +251,40 @@ def test_commits_arent_signed_unless_asked(git_generator, make_job, upstream, tm
         git_generator.main(job)
 
 
+def test_files_are_pushed_byte_for_byte(git_generator, make_job, upstream, tmp_path, isolated_env):
+    # Git for Windows sets core.autocrlf=true system-wide
+    with open(isolated_env / "gitconfig", "a", encoding="utf-8") as f:
+        f.write("[core]\n\tautocrlf = true\n")
+    up = upstream()
+    out = tmp_path / "test" / "t1"
+    out.mkdir(parents=True)
+    (out / "run.bat").write_bytes(b"echo hi\r\n")
+    (out / "PKGBUILD").write_bytes(b"pkgname=foo\npkgver=1\n")
+    deploy(git_generator, make_job, config(up.url), [target(out)])
+
+    def blob(name):
+        return subprocess.run(["git", "--git-dir", up.url, "show", f"main:{name}"], capture_output=True,
+                              check=True).stdout
+    assert blob("t1/run.bat") == b"echo hi\r\n"
+    assert blob("t1/PKGBUILD") == b"pkgname=foo\npkgver=1\n"
+    # The work clone's checkout isn't converted either, so a rerun has nothing to commit
+    job = deploy(git_generator, make_job, config(up.url), [target(out)])
+    assert job.unchanged == ["dist-gen"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="the 260 character path limit is Windows' own")
+def test_paths_over_260_characters(git_generator, make_job, upstream, tmp_path):
+    up = upstream()
+    name = "/".join(["RPMS"] + ["d" * 40] * 4 + ["0" * 64 + "-filelists.xml.zst"])
+    try:
+        out = built(tmp_path, "t1", {name: "x"})
+    except OSError:
+        pytest.skip("long paths aren't enabled in Windows (LongPathsEnabled)")
+    assert len(str(tmp_path / "work" / "t1" / name)) > 260
+    deploy(git_generator, make_job, config(up.url), [target(out)])
+    assert up.files() == {f"t1/{name}": "x"}
+
+
 def test_upstream_moving_during_the_push_is_retried(git_generator, make_job, upstream, tmp_path, monkeypatch):
     up = upstream()
     up.commit(tmp_path, {"README.md": "v1"})

@@ -2,7 +2,8 @@
 
 It keeps its state in the folder named by PKGGEN_FAKE_ENGINE:
   calls.jsonl         every command line (without the program), one JSON list per line
-  config.json         optional: {"info": {...}, "fail_images": [...], "machines": [...]}
+  calls.lock          locked while a line is appended to calls.jsonl
+  config.json         optional: {"info": {...}, "fail_images": [...], "machines": [...], "vm_type": "wsl"}
   containers/<name>/  each container: meta.json and fs/, its file system
 
 Steps (`exec ... sh -exc <script>`) aren't really run. A script that contains
@@ -13,6 +14,7 @@ import json
 import os
 import shutil
 import sys
+import time
 
 STATE = os.environ["PKGGEN_FAKE_ENGINE"]
 CONTAINERS = os.path.join(STATE, "containers")
@@ -166,7 +168,7 @@ def machine(args):
     name = positional[-1]
     if command == "init":
         machines.append({"Name": name, "State": "stopped", "Rootful": "--rootful" in options,
-                         "VMType": "applehv",
+                         "VMType": config().get("vm_type", "applehv"),
                          "Resources": {"CPUs": int(options["--cpus"][0]), "Memory": int(options["--memory"][0])}})
         save_machines(machines)
         return 0
@@ -189,10 +191,42 @@ def machine(args):
     return 0
 
 
+def log(args):
+    """Append one line to calls.jsonl.
+
+    Several fakes run at once. On Windows an append isn't atomic (the C runtime
+    seeks to the end, then writes), so two lines could overwrite each other:
+    hold a lock on calls.lock and write the line in one go.
+    """
+    line = (json.dumps(args) + "\n").encode("utf-8")
+    lock = os.open(os.path.join(STATE, "calls.lock"), os.O_RDWR | os.O_CREAT)
+    try:
+        if os.name == "nt":
+            import msvcrt
+            while True:
+                try:
+                    msvcrt.locking(lock, msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.005)
+        else:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        out = os.open(os.path.join(STATE, "calls.jsonl"),
+                      os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0))
+        try:
+            os.write(out, line)
+        finally:
+            os.close(out)
+        if os.name == "nt":  # Windows may release the locks of a closed file only later
+            msvcrt.locking(lock, msvcrt.LK_UNLCK, 1)
+    finally:
+        os.close(lock)
+
+
 def main():
     args = sys.argv[1:]
-    with open(os.path.join(STATE, "calls.jsonl"), "a", encoding="utf-8") as f:
-        f.write(json.dumps(args) + "\n")
+    log(args)
     while args and args[0] in ("--connection", "--context"):
         args = args[2:]
     command, rest = args[0], args[1:]

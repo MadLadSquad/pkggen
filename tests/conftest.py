@@ -18,7 +18,7 @@ sys.path.insert(0, str(paths.SRC))
 SOURCE_DATE_EPOCH = "1792411200"
 
 # The user's settings that isolated_env hides, for the tests that use a real container engine
-REAL_ENV = {var: os.environ.get(var) for var in ("XDG_CONFIG_HOME", "CONTAINER_HOST", "DOCKER_HOST")}
+REAL_ENV = {var: os.environ.get(var) for var in ("XDG_CONFIG_HOME", "APPDATA", "CONTAINER_HOST", "DOCKER_HOST")}
 
 
 def pytest_addoption(parser):
@@ -186,12 +186,20 @@ def real_engine(isolated_env, monkeypatch):
     for var in ("CONTAINER_HOST", "DOCKER_HOST"):
         if REAL_ENV[var]:
             monkeypatch.setenv(var, REAL_ENV[var])
-    real = os.path.join(REAL_ENV["XDG_CONFIG_HOME"] or os.path.expanduser(os.path.join("~", ".config")), "containers")
+    if os.name == "nt":  # podman's config dir on Windows is %APPDATA%
+        config_dir = REAL_ENV["APPDATA"] or os.path.expanduser(os.path.join("~", "AppData", "Roaming"))
+    else:
+        config_dir = REAL_ENV["XDG_CONFIG_HOME"] or os.path.expanduser(os.path.join("~", ".config"))
+    real = os.path.join(config_dir, "containers")
     os.makedirs(real, exist_ok=True)  # podman would create it; it can't through a dangling link
     try:
         os.symlink(real, isolated_env / "containers", target_is_directory=True)
-    except OSError as e:  # Windows without the symlink privilege
-        pytest.skip(f"can't link the podman configuration into the test's config folder: {e}")
+    except OSError as e:
+        if os.name != "nt":
+            pytest.skip(f"can't link the podman configuration into the test's config folder: {e}")
+        # Symlinks need Developer Mode or admin rights on Windows, junctions don't
+        import _winapi
+        _winapi.CreateJunction(real, str(isolated_env / "containers"))
 
 
 @pytest.fixture

@@ -630,6 +630,8 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
         say(f"{YELLOW}Warning: couldn't write {utils.display_path(results_path())}: {e}. "
             f"`pkggen deploy` needs it{RESET}")
     if keep:
-        say(f"Containers were kept: remove them with `{engine.kind} rm -f -v $({engine.kind} ps -aq "
+        # The machine's connection may not be the default one (macOS, Windows)
+        cli = " ".join([engine.kind] + engine.command(remote=True)[len(engine.argv):])
+        say(f"Containers were kept: remove them with `{cli} rm -f -v $({cli} ps -aq "
             f"--filter label={containers.SESSION_LABEL}={runner.session})`")
     return 1 if pipeline.failures or any(not r.ok for r in results) else 0
