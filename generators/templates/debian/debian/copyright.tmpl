@@ -5,5 +5,5 @@ Upstream-Name: {{ name }}
 Source: {{ homepage | default(source.url) }}
 
 Files: *
-Copyright: {{ dist.copyright | default(date.year ~ " " ~ (maintainer.name | default("the upstream authors"))) }}
+Copyright: {{ dist.copyright | default(date.year ~ " " ~ (author | default("the upstream authors"))) }}
 License: {{ license | default("unknown") | debian_license }}

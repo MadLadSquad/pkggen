@@ -5,9 +5,11 @@ import os
 import lib
 
 REQUIRED = ["debian/control.tmpl", "debian/rules.tmpl", "debian/changelog.tmpl"]
+ARCHITECTURES = {"amd64": "amd64", "arm64": "arm64"}
 
 
 def main(job):
+    job.context["arches"] = lib.architectures(job, ARCHITECTURES, ["any"])
     lib.ensure_templates(job, REQUIRED)
     out = os.path.join(job.repository_path, "packages", job.name)
     job.output = out

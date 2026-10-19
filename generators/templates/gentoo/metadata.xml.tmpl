@@ -1,18 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
 <pkgmetadata>
-{# The package's maintainer, or the overlay owners when it has none #}
-{% for owner in ([maintainer] if maintainer.email is defined else repository.owners | default([])) %}
+{# The package's maintainer, or the overlay owners when it has none. Gentoo needs an email #}
+{% if maintainer is defined and maintainer | person_email %}
+{% set owners = [{"name": maintainer | person_name, "email": maintainer | person_email}] %}
+{% else %}
+{% set owners = repository.owners | default([]) %}
+{% endif %}
+{% for owner in owners %}
 	<maintainer type="{{ owner.type | default("person") }}">
 		<email>{{ owner.email | e }}</email>
-{% if owner.name is defined %}
+{% if owner.name is defined and owner.name %}
 		<name>{{ owner.name | e }}</name>
 {% endif %}
 	</maintainer>
 {% endfor %}
-{% if github is defined %}
+{% if author is defined or github is defined %}
 	<upstream>
+{% if author is defined %}
+		<maintainer>
+			<name>{{ (author | person_name or author) | e }}</name>
+{% if author | person_email %}
+			<email>{{ author | person_email | e }}</email>
+{% endif %}
+		</maintainer>
+{% endif %}
+{% if github is defined %}
 		<remote-id type="github">{{ github.user | e }}/{{ github.repo | e }}</remote-id>
+{% endif %}
 	</upstream>
 {% endif %}
 </pkgmetadata>

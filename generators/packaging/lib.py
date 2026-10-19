@@ -28,6 +28,8 @@ import jinja2
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
 TEMPLATE_SUFFIX = ".tmpl"
 IGNORED_FILES = {".gitkeep", ".DS_Store", "Thumbs.db"}
+# Used when a package has no `architectures`
+DEFAULT_ARCHITECTURES = ["amd64", "arm64"]
 
 
 class PackagingError(Exception):
@@ -54,8 +56,7 @@ class Job:
 
         self.context.setdefault("distribution", self.distribution)
         self.context.setdefault("repository", self.repository)
-        # Optional values templates commonly read with `| default(...)`
-        self.context.setdefault("maintainer", {})
+        self.context.setdefault("architectures", list(DEFAULT_ARCHITECTURES))
         # The package's own `<distribution>:` block, e.g. `arch: { depends: [...] }`
         dist = self.context.get(self.distribution)
         self.context["dist"] = dist if isinstance(dist, dict) else {}
@@ -118,6 +119,58 @@ def filter_rpmdate(value):
     """RPM %changelog date: 'Mon Oct 19 2026' (always English, unlike strftime)."""
     date = parse_date(value) or source_date()
     return f"{DAYS[date.weekday()]} {MONTHS[date.month - 1]} {date.day:02d} {date.year}"
+
+
+# --- People and architectures --------------------------------------------
+
+PERSON_RE = re.compile(r"^(.*?)\s*<([^<>]*)>$")
+
+
+def split_person(value):
+    """'Jane Doe <jane@example.com>' -> ('Jane Doe', 'jane@example.com').
+
+    A bare address gives ('', address) and a bare name (name, '').
+    """
+    text = str(value).strip()
+    match = PERSON_RE.match(text)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
+    if "@" in text and not any(c.isspace() for c in text):
+        return "", text
+    return text, ""
+
+
+def filter_person_name(value):
+    return split_person(value)[0]
+
+
+def filter_person_email(value):
+    return split_person(value)[1]
+
+
+def architectures(job, names, any_value, other=None):
+    """The package's `architectures`, translated to this format's names.
+
+    `architectures` is "any" or a list of pkggen names. "any" returns any_value.
+    Names in `names` (e.g. {"amd64": "x86_64"}) are translated. Other names are
+    passed to other(name), which returns the format's name or None to drop
+    them; without `other` they're dropped. Fails if no architecture is left.
+    """
+    value = job.context["architectures"]
+    if value == "any":
+        return any_value
+    if not isinstance(value, list) or not value or not all(isinstance(a, str) and a for a in value):
+        raise PackagingError(f"'architectures' of {job.name} must be \"any\" or a list of names, got {value!r}")
+
+    result = []
+    for arch in value:
+        native = names.get(arch) or (other(arch) if other else None)
+        if native and native not in result:
+            result.append(native)
+    if not result:
+        raise PackagingError(f"none of the architectures of {job.name} ({', '.join(value)}) can be packaged for "
+                             f"{job.distribution}, which supports {', '.join(names)} or \"any\"")
+    return result
 
 
 # --- Licenses and versions -------------------------------------------------
@@ -187,6 +240,8 @@ FILTERS = {
     "pkgver": filter_pkgver,
     "shquote": filter_shquote,
     "dquote": filter_dquote,
+    "person_name": filter_person_name,
+    "person_email": filter_person_email,
 }
 
 

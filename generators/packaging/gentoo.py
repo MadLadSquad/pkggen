@@ -12,6 +12,13 @@ REQUIRED = ["ebuild.tmpl"]
 # Gentoo version syntax (PMS 3.2)
 VERSION_RE = re.compile(r"^\d+(\.\d+)*[a-z]?((_alpha|_beta|_pre|_rc|_p)\d*)*(-r\d+)?$")
 CATEGORY_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9+_.-]*$")
+KEYWORD_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+# Gentoo uses pkggen's names, plus many niche ones (ppc64, riscv, ...) that are
+# passed through as they are. "any" means every main Gentoo architecture.
+ARCHITECTURES = {"amd64": "amd64", "arm64": "arm64"}
+ALL_ARCHITECTURES = ["alpha", "amd64", "arm", "arm64", "hppa", "loong", "m68k", "mips",
+                     "ppc", "ppc64", "riscv", "s390", "sparc", "x86"]
 
 # Manifest hash name -> checksum key from the fetch generator
 MANIFEST_HASHES = {
@@ -51,6 +58,14 @@ def get_category(job):
     return category
 
 
+def keyword(job, arch):
+    if KEYWORD_RE.match(arch):
+        return arch
+    job.warn(f"'{arch}' in 'architectures' of {job.name} isn't a valid Gentoo keyword, so it was left out. "
+             "Write the arch name without a leading '~'")
+    return None
+
+
 def write_manifest(job, out):
     names = [name.upper() for name in as_list(job.repository.get("manifest-hashes"))] or DEFAULT_MANIFEST_HASHES
     unknown = [name for name in names if name not in MANIFEST_HASHES]
@@ -86,6 +101,8 @@ def main(job):
         raise lib.PackagingError(f"version '{job.version}' of {job.name} isn't a valid Gentoo version. "
                                  "Adjust the fetch generator's 'transforms' so it produces one (e.g. 1.2.3, 1.2.3_rc1)")
 
+    job.context["arches"] = lib.architectures(job, ARCHITECTURES, ALL_ARCHITECTURES,
+                                              other=lambda arch: keyword(job, arch))
     lib.ensure_templates(job, REQUIRED)
     out = os.path.join(job.repository_path, get_category(job), job.name)
 

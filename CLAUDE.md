@@ -115,18 +115,22 @@ Template folders live next to `pkggen.yaml` in `packages/<dist>/<package>/`. If 
 `pkggen generate` loads every package group (every top-level key except `repositories`, `test`, `deployment`), validates them all up front, then runs the fetch generators in a thread pool (up to 10). As each fetch finishes, it builds the template context and submits one packaging job per target distribution to a second pool (`os.cpu_count()` workers), so packaging overlaps with downloads. Targets are distributions that have a packaging generator **and** a `repositories.<dist>` block; a missing repository directory is reported with a hint to run `gen-repo`. Failures never cancel other jobs; a summary lists them at the end and the exit code is 1.
 
 ### Config files
-- **`pkggen.yaml`** (project root) — defines package groups and repository metadata. Top-level keys other than `repositories`, `test` and `deployment` are package groups, each requiring a `generator` name and a `packages` list. Other keys of a group (e.g. `maintainer`) are defaults for its packages, deep-merged under each package's own keys.
+- **`pkggen.yaml`** (project root) — defines package groups and repository metadata. Top-level keys other than `repositories`, `test` and `deployment` are package groups, each requiring a `generator` name and a `packages` list. Other keys of a group are defaults for its packages, deep-merged under each package's own keys, except `maintainer` and `author`, which can only be set per package (a group that sets them is an error). Optional package fields every packaging generator reads (checked up front by `check_package()` in `generate.py`):
+  - `maintainer`: string, `"Name <email>"`. The packager: Debian `Maintainer:` and changelog trailer, PKGBUILD `# Maintainer:` header, RPM `%changelog`, Gentoo `metadata.xml` `<maintainer>` (needs the email, else the overlay `owners` are used).
+  - `author`: string, `"Name <email>"` or just a name. Upstream author: Debian `copyright` `Copyright:` field, Gentoo `metadata.xml` `<upstream><maintainer>`.
+  - `architectures`: `"any"` (builds on every architecture) or a list of names, default `[amd64, arm64]`. Each packaging generator translates it with `lib.architectures(job, names, any_value, other=None)` into the template variable `arches`: arch → `x86_64`/`aarch64`, `any` → `['any']`; debian → `amd64`/`arm64`, `any` → `any`; rpm-based → `ExclusiveArch: x86_64 aarch64`, `any` → no `ExclusiveArch`; gentoo → `~<arch>` keywords, other names passed through, `any` → every main Gentoo arch. Names a generator doesn't know are dropped; if none is left it fails. Packages without compiled code override it per distribution (`debian: { architecture: all }`, `arch: { arch: [any] }`, `BuildArch: noarch` in the spec).
 - **`$XDG_CONFIG_HOME/pkggen/secrets.yaml`** (default `~/.config/pkggen/secrets.yaml`; `%APPDATA%\pkggen\secrets.yaml` on Windows) — API keys. Currently used key: `github_key` for authenticated GitHub API requests.
 
 ### Template context
-Templates see the package's own `pkggen.yaml` keys at the top level (`name`, `github.user`, `maintainer.name`, …), plus:
+Templates see the package's own `pkggen.yaml` keys at the top level (`name`, `github.user`, `maintainer`, …), plus:
 - `version`, `date` (datetime), `tag`, `commit`, `artifacts` (fetch output), `source` (= `artifacts[0]`)
 - `description`, `license`, `homepage` (package value, else fetch `exports`)
 - `distribution`, `repository` (its `repositories.<dist>` block), `now`
 - `dist`: the package's own `<distribution>:` block, e.g. `arch: { depends: [glibc] }` → `dist.depends`
-- `maintainer` defaults to `{}` so `maintainer.name | default(...)` works
+- `architectures` (default `[amd64, arm64]`) and `arches`, its translation for this distribution
+- `maintainer` and `author` are undefined when not set: use `maintainer | default("Your Name <you@example.com>")`
 
-Filters: `pkgver` (`-`, `:`, `/`, whitespace → `_`), `spdx` (deprecated GitHub SPDX ids → current ones), `debian_license`, `gentoo_license`, `rfc2822`, `rpmdate`, `shquote`, `dquote`.
+Filters: `pkgver` (`-`, `:`, `/`, whitespace → `_`), `spdx` (deprecated GitHub SPDX ids → current ones), `debian_license`, `gentoo_license`, `rfc2822`, `rpmdate`, `shquote`, `dquote`, `person_name`/`person_email` (`"Jane <j@x.org>"` → `Jane` / `j@x.org`).
 
 ### Adding a new fetch generator
 1. Create `generators/generation/<name>.py`: define `generate(package) -> dict` returning the output contract above and end with `lib.run(generate)`. Log only to stderr.
@@ -137,7 +141,7 @@ Filters: `pkgver` (`-`, `:`, `/`, whitespace → `_`), `spdx` (deprecated GitHub
 2. Add `- name: <name>` to `generators/distributions/distributions.yaml` with its repology `rp-names` (and optional `rp-names-wildcards`).
 
 ### Adding a new packaging generator
-1. Create `generators/packaging/<name>.py`: call `lib.ensure_templates(job, REQUIRED)`, set `job.output`, call `lib.render_tree(job, place)` with a `place(rel) -> absolute path` mapping, and end with `lib.run(main)`.
+1. Create `generators/packaging/<name>.py`: set `job.context["arches"] = lib.architectures(job, {"amd64": ..., "arm64": ...}, <any value>)`, call `lib.ensure_templates(job, REQUIRED)`, set `job.output`, call `lib.render_tree(job, place)` with a `place(rel) -> absolute path` mapping, and end with `lib.run(main)`.
 2. Add the default templates in `generators/templates/<name>/`. Keep them language-neutral: no build-system-specific build/install steps or build dependencies (pkggen packages projects in any language), keep the build functions as empty, commented-out stubs (e.g. `#build() {` / `#}`).
 
 ## graphify

@@ -4,7 +4,7 @@ pkgbase = {{ name }}
 	pkgver = {{ version | pkgver }}
 	pkgrel = {{ dist.pkgrel | default(1) }}
 	url = {{ homepage | default(source.url) }}
-{% for a in dist.arch | default(["x86_64", "aarch64"]) %}
+{% for a in dist.arch | default(arches) %}
 	arch = {{ a }}
 {% endfor %}
 	license = {{ license | default("LicenseRef-unknown") | spdx }}

@@ -1,10 +1,13 @@
 {#- Default pkggen template. Distribution specific values come from the
     package's `debian:` block in pkggen.yaml (`dist` here), e.g.
-      debian: { section: libs, build-depends: [ libfoo-dev ], depends: [ libfoo1 ] } -#}
+      debian: { section: libs, build-depends: [ libfoo-dev ], depends: [ libfoo1 ] }
+    `arches` is the package's `architectures` in Debian's names (amd64, arm64
+    or any). Set `architecture: all` in the `debian:` block for packages
+    without compiled code. -#}
 Source: {{ name }}
 Section: {{ dist.section | default("misc") }}
 Priority: optional
-Maintainer: {{ maintainer.name | default("Your Name") }} <{{ maintainer.email | default("you@example.com") }}>
+Maintainer: {{ maintainer | default("Your Name <you@example.com>") }}
 Build-Depends: {{ (["debhelper-compat (= 13)"] + dist["build-depends"] | default([])) | join(", ") }}
 Standards-Version: 4.7.2
 {% if homepage is defined %}
@@ -13,7 +16,7 @@ Homepage: {{ homepage }}
 Rules-Requires-Root: no
 
 Package: {{ name }}
-Architecture: {{ dist.architecture | default("any") }}
+Architecture: {{ dist.architecture | default(arches | join(" ")) }}
 Depends: {{ (["${shlibs:Depends}", "${misc:Depends}"] + dist.depends | default([])) | join(", ") }}
 Description: {{ description | default(name) }}
  {{ dist["long-description"] | default(description) | default(name) }}

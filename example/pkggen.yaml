@@ -49,6 +49,11 @@ pkggen:
   generator: "github"
   packages:
     - name: "untitled-cli-parser"
+      maintainer: "MadLadSquad <contact@madladsquad.com>"
+      author: "MadLadSquad <contact@madladsquad.com>"
+      # "any", or a list of architectures. amd64 and arm64 work everywhere, other
+      # names (ppc64, riscv, ...) are only used by distributions that know them, like Gentoo
+      architectures: [ amd64, arm64 ]
       github:
         user: "MadLadSquad"
         repo: "UntitledCLIParser"
@@ -57,6 +62,8 @@ pkggen:
         transforms:
           - [ "v", "" ]
     - name: "untitled-imgui-framework"
+      maintainer: "MadLadSquad <contact@madladsquad.com>"
+      author: "MadLadSquad <contact@madladsquad.com>"
       github:
         user: "MadLadSquad"
         repo: "UntitledImGuiFramework"

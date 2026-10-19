@@ -4,4 +4,4 @@
 
   * New upstream release {{ version }}.
 
- -- {{ maintainer.name | default("Your Name") }} <{{ maintainer.email | default("you@example.com") }}>  {{ date | rfc2822 }}
+ -- {{ maintainer | default("Your Name <you@example.com>") }}  {{ date | rfc2822 }}

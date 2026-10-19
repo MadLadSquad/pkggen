@@ -34,10 +34,10 @@ You write a `pkggen.yaml` file that details all common metadata for the packages
 ```yaml
 packages:
   generator: github
-  # Keys next to `generator` are defaults for every package in the group
-  maintainer: { name: "MadLadSquad", email: "contact@madladsquad.com" }
   packages:
     - name: untitled-cli-parser
+      maintainer: "MadLadSquad <contact@madladsquad.com>"   # who packages it (control file, PKGBUILD header, changelogs)
+      author: "MadLadSquad <contact@madladsquad.com>"       # who wrote it (Debian copyright, Gentoo upstream metadata)
       github:
         user: "MadLadSquad"
         repo: "UntitledCLIParser"
@@ -48,6 +48,7 @@ packages:
       description: "C/C++ cross-platform wrapper for launching applications as separate processes"
       homepage: "https://github.com/MadLadSquad/UntitledExec"
       license: "MIT"
+      architectures: any               # or a list, by default [ amd64, arm64 ]
       arch: { depends: [ "glibc" ] }   # distribution-specific values, available as `dist` in templates
       github:
         user: "MadLadSquad"

@@ -22,6 +22,8 @@ import utils
 RESERVED_KEYS = {"repositories", "test", "deployment"}
 # Keys of a package group that aren't defaults for its packages
 GROUP_KEYS = {"generator", "packages"}
+# Package keys that can't be set as group defaults: they differ per package
+PACKAGE_ONLY_KEYS = ("maintainer", "author")
 # Package keys exported by fetch generators when the package doesn't set them
 EXPORTED_KEYS = ("description", "license", "homepage")
 
@@ -75,6 +77,22 @@ def deep_merge(base, override):
     return result
 
 
+def check_package(package):
+    """Problems with the optional fields every packaging generator reads."""
+    name = package["name"]
+    errors = []
+    for key in PACKAGE_ONLY_KEYS:
+        if key in package and not (isinstance(package[key], str) and package[key].strip()):
+            errors.append(f"'{key}' of package '{name}' must be a string like \"Jane Doe <jane@example.com>\"")
+    if "architectures" in package:
+        value = package["architectures"]
+        if value != "any" and not (isinstance(value, list) and value
+                                   and all(isinstance(arch, str) and arch.strip() for arch in value)):
+            errors.append(f"'architectures' of package '{name}' must be \"any\" or a list of names "
+                          "like [ amd64, arm64 ]")
+    return errors
+
+
 def load_packages(config, package_filter):
     """Collect every package from every group, with group defaults applied.
 
@@ -106,6 +124,10 @@ def load_packages(config, package_filter):
                                 f"{generators_dir} (available: {', '.join(available) or 'none'})")
         if not isinstance(entries, list) or not entries:
             group_errors.append(f"group '{key}' needs a non-empty 'packages' list")
+        for field in PACKAGE_ONLY_KEYS:
+            if field in group:
+                group_errors.append(f"'{field}' is set on group '{key}', but it can only be set per package: "
+                                    f"move it into each entry of '{key}.packages'")
         if group_errors:
             errors += group_errors
             continue
@@ -121,7 +143,9 @@ def load_packages(config, package_filter):
                 errors.append(f"package '{name}' is defined in both '{seen[name]}' and '{key}'")
                 continue
             seen[name] = key
-            packages.append((deep_merge(defaults, package), script))
+            package = deep_merge(defaults, package)
+            errors += check_package(package)
+            packages.append((package, script))
 
     if package_filter:
         unknown = sorted(set(package_filter) - set(seen))

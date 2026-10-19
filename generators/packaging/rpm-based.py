@@ -6,9 +6,12 @@ import os
 import lib
 
 REQUIRED = ["spec.tmpl"]
+ARCHITECTURES = {"amd64": "x86_64", "arm64": "aarch64"}
 
 
 def main(job):
+    # "any" means no ExclusiveArch line
+    job.context["arches"] = lib.architectures(job, ARCHITECTURES, [])
     lib.ensure_templates(job, REQUIRED)
 
     def place(rel):
