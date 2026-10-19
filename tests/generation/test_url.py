@@ -1,6 +1,5 @@
 import pytest
 
-from tests.generation.test_lib import HTTP_DATE_BUG
 from tests.support.example import checksums
 from tests.support.helpers import load_generator, run_generator
 from tests.support.http_shim.pkggen_test_http import Routes
@@ -67,7 +66,6 @@ def test_hash_locks_mismatch(url_gen, http):
         url_gen.generate(package(url="https://example.com/a.tar.gz", version="1", **{"hash-locks": ["0000"]}))
 
 
-@HTTP_DATE_BUG
 def test_date_from_last_modified(url_gen, http):
     http.add("GET", "https://example.com/a.tar.gz", body=DATA, headers={"Last-Modified": "Fri, 02 Jan 2026 03:04:05 GMT"})
     assert url_gen.generate(package(url="https://example.com/a.tar.gz", version="1"))["date"] == \

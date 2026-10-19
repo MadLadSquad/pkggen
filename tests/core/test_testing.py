@@ -22,11 +22,15 @@ STUB_TESTING = textwrap.dedent("""\
     job = json.loads(sys.stdin.read())
     def step(name, run):
         return {"name": name, "run": run, "user": None, "workdir": None}
-    targets = []
+    targets, skipped, warnings = [], [], ["packages: %d" % len(job["packages"])]
     for rp in job["versions"] or job["rp_names"]:
         if rp == "bad":
             print("\\x1b[31mError: bad version\\x1b[0m", file=sys.stderr)
             sys.exit(1)
+        if rp == "a2" and job["host_arch"] == "arm64":
+            skipped.append({"name": job["distribution"] + "-" + rp, "rp_name": rp})
+            warnings.append(job["distribution"] + "-" + rp + " has no arm64 container image, so it's skipped")
+            continue
         built = []
         for entry in job["packages"]:
             c = entry["context"]
@@ -42,7 +46,7 @@ STUB_TESTING = textwrap.dedent("""\
             "finalize": [step("collect", "cp -rL /pkggen/repo /pkggen/out")],
             "post_setup": job["test"]["post-setup"], "collect": "/pkggen/out",
         })
-    print(json.dumps({"targets": targets, "warnings": ["packages: %d" % len(job["packages"])]}))
+    print(json.dumps({"targets": targets, "skipped": skipped, "warnings": warnings}))
 """)
 
 
@@ -256,6 +260,23 @@ def test_target_filter(generators, project, fake_engine, capsys):
     assert "packaging for beta\n" in strip_ansi(capsys.readouterr().err)
     with pytest.raises(utils.GenericError, match=r"Unknown test target\(s\): zz \(available: alpha-a1, alpha-a2, beta-b1\)"):
         testing.test(target_filter=["zz"])
+
+
+def test_target_filter_with_targets_this_host_cant_run(generators, project, fake_engine, capsys):
+    project()
+    fake_engine.configure(info={"host": {"arch": "arm64", "cpus": 8, "memTotal": 16 * 1024 ** 3,
+                                         "cgroupControllers": ["cpu", "memory"], "os": "linux"}})
+    # A release without an image for this host is known, so it's skipped with a warning, not an error
+    assert testing.test(target_filter=["alpha-a2", "b1"]) == 0
+    err = strip_ansi(capsys.readouterr().err)
+    assert "Warning: alpha: alpha-a2 has no arm64 container image, so it's skipped" in err
+    assert "Testing 1 target" in err
+    assert [c[-2] for c in fake_engine.calls("run")] == ["example.org/b1:1"]
+    with pytest.raises(utils.GenericError, match="Nothing to test: no target can run on this machine"):
+        testing.test(target_filter=["a2"])
+    assert "alpha-a2 has no arm64 container image" in strip_ansi(capsys.readouterr().err)
+    with pytest.raises(utils.GenericError, match=r"Unknown test target\(s\): zz \(available: alpha-a1, beta-b1\)"):
+        testing.test(target_filter=["zz", "a2"])
 
 
 @pytest.mark.parametrize("dists, message", [

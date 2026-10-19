@@ -3,6 +3,10 @@
 It needs podman or docker and the network: it fetches the first example
 package from GitHub (set GITHUB_TOKEN to avoid the rate limit), pulls the
 images and builds the package with templates that install its README.
+The engine sees the user's own setup (CONTAINER_HOST/DOCKER_HOST and Podman's
+machines and connections), so on macOS/Windows it reuses the 'pkggen' Podman
+machine, resized to the example's budget. Arch Linux has no arm64 image, so
+it's skipped with a warning on arm64 hosts.
 Environment variables:
   PKGGEN_TEST_CONTAINERS_TARGETS  the releases to test (default: one per family, `all`: every release)
   PKGGEN_TEST_CONTAINERS_ENGINE   podman or docker (default: whichever is installed, podman first)
@@ -55,7 +59,7 @@ def github_secrets(secrets):
         secrets({"github_key": token})
 
 
-def test_build_and_install_in_containers(example_project, github_secrets):
+def test_build_and_install_in_containers(example_project, github_secrets, real_engine):
     one_file_templates(example_project)
     for dist in DISTRIBUTIONS:
         assert run_cli("gen-repo", dist).code == 0

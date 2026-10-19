@@ -214,6 +214,9 @@ def messages():
 def on(monkeypatch):
     def set_platform(name):
         monkeypatch.setattr(containers, "host_platform", lambda: name)
+    # The same host everywhere, so the VM budget isn't capped by the machine the tests run on
+    monkeypatch.setattr(containers.os, "cpu_count", lambda: 8)
+    monkeypatch.setattr(containers, "host_memory", lambda: 16384)
     return set_platform
 
 
@@ -267,6 +270,35 @@ def test_podman_machine_is_created(fake_engine, on):
     assert fake_engine.raw_calls()[-1][:2] == ["--connection", "pkggen-root"]
 
 
+def test_podman_machine_is_the_budget(fake_engine, on):
+    # pkggen sized the machine, so the containers share all of it: no warning that its
+    # kernel keeps some of the RAM
+    on("macos")
+    values = settings(cpus=4, memory=4096)
+    containers.prepare_host(containers.Engine.detect(), values, print)
+    assert values["cpus"] is None and values["memory"] is None
+    plan = containers.plan_resources(values, 1, dict(INFO, cpus=4, memory=3950), whole_machine=True)
+    assert (plan["cpus"], plan["memory"], plan["warnings"]) == (4.0, 3950, [])
+
+
+def test_podman_machine_budget_is_capped(fake_engine, on):
+    on("macos")
+    warnings, _ = containers.prepare_host(containers.Engine.detect(), settings(cpus=16, memory=16384), print)
+    # The host keeps a quarter of its RAM
+    assert ["machine", "init", "--rootful", "--cpus", "8", "--memory", "12288", "pkggen"] in fake_engine.calls("machine")
+    assert warnings == ["'test.cpus' is 16, but this machine only has 8 CPUs, so the 'pkggen' Podman machine gets 8",
+                        "'test.memory' is 16384 MiB, but this machine only has 16384 MiB, so the 'pkggen' Podman "
+                        "machine gets 12288 MiB and the rest is left to the host"]
+
+
+@pytest.mark.parametrize("total, memory, expected", [(8192, 8192, 6144), (4096, 4096, 2048), (2048, 4096, 2048),
+                                                     (65536, 49152, 49152), (None, 65536, 65536)])
+def test_machine_budget_memory(monkeypatch, total, memory, expected):
+    monkeypatch.setattr(containers.os, "cpu_count", lambda: 8)
+    monkeypatch.setattr(containers, "host_memory", lambda: total)
+    assert containers.machine_budget(4, memory)[1] == expected
+
+
 def test_podman_machine_defaults(fake_engine, on, monkeypatch):
     on("windows")
     monkeypatch.setattr(containers.os, "cpu_count", lambda: 12)
@@ -300,8 +332,11 @@ def test_other_running_machine_on_macos_is_used(fake_engine, on):
     fake_engine.configure(machines=[{"Name": "podman-machine-default", "State": "running", "Rootful": True,
                                      "Resources": {"CPUs": 2, "Memory": 2048}}])
     engine = containers.Engine.detect()
-    warnings, whole = containers.prepare_host(engine, settings(cpus=4), print)
+    values = settings(cpus=4)
+    warnings, whole = containers.prepare_host(engine, values, print)
     assert whole and engine.connection == "podman-machine-default-root"
+    # Not pkggen's machine, so the budget still applies
+    assert values["cpus"] == 4
     assert "'podman-machine-default' is already running" in warnings[0]
     assert not any(c[1] == "init" for c in fake_engine.calls("machine"))
 

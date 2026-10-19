@@ -25,7 +25,7 @@ TABLE = {
 def test_select_targets_defaults_to_every_rp_name(lib):
     j = job(lib)
     assert [rp for rp, _ in lib.select_targets(j, TABLE)] == ["a_1", "a_2"]
-    assert j.warnings == []
+    assert j.warnings == [] and j.skipped == []
 
 
 def test_select_targets_warns_about_rp_names_without_image(lib):
@@ -49,6 +49,7 @@ def test_select_targets_skips_other_host_architectures(lib):
     j = job(lib, host_arch="arm64")
     assert [rp for rp, _ in lib.select_targets(j, TABLE)] == ["a_1"]
     assert j.warnings == ["a-2 has no arm64 container image, so it's skipped"]
+    assert j.skipped == [{"name": "a-2", "rp_name": "a_2"}]
 
 
 @pytest.mark.parametrize("architectures, kept", [(["amd64"], False), (["arm64", "riscv"], True), ("any", True)])
@@ -116,4 +117,5 @@ def test_run_reports_testing_errors():
 def test_run_prints_targets_and_warnings():
     result = run_generator("testing", "arch", {"distribution": "arch", "rp_names": ["arch"], "host_arch": "arm64"})
     assert result.code == 0, result.err
-    assert result.json == {"targets": [], "warnings": ["arch has no arm64 container image, so it's skipped"]}
+    assert result.json == {"targets": [], "skipped": [{"name": "arch", "rp_name": "arch"}],
+                           "warnings": ["arch has no arm64 container image, so it's skipped"]}

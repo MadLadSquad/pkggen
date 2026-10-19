@@ -205,7 +205,7 @@ def select_distributions(config, available, distribution_filter):
 # --- Testing generators ------------------------------------------------------------
 
 def describe(dist, payload):
-    """Run a testing generator and return its {targets, warnings}."""
+    """Run a testing generator and return its {targets, skipped, warnings}."""
     script = os.path.join(testing_dir(), f"{dist}.py")
     # The child writes UTF-8 even where the locale's code page isn't (Windows)
     process = subprocess.run([sys.executable, script], input=json.dumps(payload), text=True,
@@ -223,8 +223,12 @@ def describe(dist, payload):
                                                 for t in targets):
         raise RuntimeError(f"{os.path.basename(script)} returned no 'targets' list, or a target without a "
                            "'name' and 'image'")
-    for t in targets:
+    skipped = result.get("skipped") or []
+    if not isinstance(skipped, list) or not all(isinstance(t, dict) and t.get("name") for t in skipped):
+        raise RuntimeError(f"{os.path.basename(script)} returned a 'skipped' entry without a 'name'")
+    for t in targets + skipped:
         t["distribution"] = dist
+    result["skipped"] = skipped
     return result
 
 
@@ -459,7 +463,7 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
         raise utils.GenericError(f"The container engine isn't usable: {e}")
 
     def describe_all(names):
-        matrix, found = [], []
+        matrix, skipped, found = [], [], []
         for dist in names:
             try:
                 described = describe(dist, payload(dist, config, settings, available[dist], info["arch"]))
@@ -467,22 +471,26 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
                 raise utils.GenericError(f"The {dist} testing generator failed: {e}")
             found += [f"{dist}: {w}" for w in described.get("warnings") or []]
             matrix += described["targets"]
-        return matrix, found
+            skipped += described["skipped"]
+        return matrix, skipped, found
 
     # Ask every testing generator for its targets
-    matrix, found = describe_all(dists)
+    matrix, skipped, found = describe_all(dists)
     if target_filter:
-        names = {t["name"] for t in matrix} | {t.get("rp_name") for t in matrix}
+        # Releases that can't run on this host are known: they're skipped with a warning
+        known = matrix + skipped
+        names = {t["name"] for t in known} | {t.get("rp_name") for t in known}
         unknown = sorted(set(target_filter) - names)
         if unknown:
             raise utils.GenericError(f"Unknown test target(s): {', '.join(unknown)} "
                                      f"(available: {', '.join(t['name'] for t in matrix) or 'none'})")
-        chosen = [t for t in matrix if t["name"] in target_filter or t.get("rp_name") in target_filter]
+        chosen = [t for t in known if t["name"] in target_filter or t.get("rp_name") in target_filter]
         # Ask again for only these releases, so the warnings are about them too
         dists = [d for d in dists if any(t["distribution"] == d for t in chosen)]
         for dist in dists:
-            settings["distributions"][dist]["versions"] = [t["rp_name"] for t in chosen if t["distribution"] == dist]
-        matrix, found = describe_all(dists)
+            settings["distributions"][dist]["versions"] = [t.get("rp_name") or t["name"] for t in chosen
+                                                           if t["distribution"] == dist]
+        matrix, _, found = describe_all(dists)
     warnings += found
     for warning in warnings:
         say(f"{YELLOW}Warning: {warning}{RESET}")

@@ -5,10 +5,6 @@ import textwrap
 import pytest
 import requests
 
-# iso_date() treats any value containing "T" as ISO 8601, and every HTTP date ends in "GMT"
-HTTP_DATE_BUG = pytest.mark.xfail(reason="lib.iso_date() parses HTTP dates as ISO 8601 because 'GMT' contains "
-                                         "a 'T', so Last-Modified dates are always dropped")
-
 from tests.support.example import checksums
 from tests.support.helpers import load_generator, run
 
@@ -53,12 +49,14 @@ def test_apply_transforms_errors(lib, transforms, message):
     ("2026-01-02T03:04:05Z", "2026-01-02T03:04:05+00:00"),
     ("2026-01-02T05:04:05+02:00", "2026-01-02T03:04:05+00:00"),
     ("2026-01-02T03:04:05", "2026-01-02T03:04:05+00:00"),
-    pytest.param("Fri, 02 Jan 2026 03:04:05 GMT", "2026-01-02T03:04:05+00:00", marks=HTTP_DATE_BUG),
-    pytest.param("Fri, 02 Jan 2026 05:04:05 +0200", "2026-01-02T03:04:05+00:00"),
+    ("Fri, 02 Jan 2026 03:04:05 GMT", "2026-01-02T03:04:05+00:00"),
+    ("Thu, 01 Oct 2026 03:04:05 GMT", "2026-10-01T03:04:05+00:00"),
+    ("Fri, 02 Jan 2026 05:04:05 +0200", "2026-01-02T03:04:05+00:00"),
     ("not a date", None),
     ("Tnope", None),
     ("", None),
     (None, None),
+    (20260102, None),
 ])
 def test_iso_date(lib, value, expected):
     assert lib.iso_date(value) == expected
@@ -164,7 +162,6 @@ def test_download_and_hash(lib, http):
     assert sent["Authorization"] == "Bearer t"
 
 
-@HTTP_DATE_BUG
 def test_download_reports_last_modified(lib, http):
     http.add("GET", URL, body=DATA, headers={"Last-Modified": "Fri, 02 Jan 2026 03:04:05 GMT"})
     assert lib.download_and_hash(requests.Session(), URL)["last_modified"] == "2026-01-02T03:04:05+00:00"

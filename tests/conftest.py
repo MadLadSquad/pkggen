@@ -17,6 +17,9 @@ sys.path.insert(0, str(paths.SRC))
 # A fixed date for reproducible output: 2026-10-19 12:00:00 UTC
 SOURCE_DATE_EPOCH = "1792411200"
 
+# The user's settings that isolated_env hides, for the tests that use a real container engine
+REAL_ENV = {var: os.environ.get(var) for var in ("XDG_CONFIG_HOME", "CONTAINER_HOST", "DOCKER_HOST")}
+
 
 def pytest_addoption(parser):
     parser.addoption("--live", action="store_true",
@@ -162,6 +165,25 @@ def fake_engine(tmp_path_factory, monkeypatch):
                                                                              "fake_engine.py")]))
     monkeypatch.setenv("PKGGEN_FAKE_ENGINE", str(state))
     return FakeEngine(state)
+
+
+@pytest.fixture
+def real_engine(isolated_env, monkeypatch):
+    """Let a real podman/docker see the user's setup, while pkggen still gets the isolated config.
+
+    Podman keeps its machines, connections and registries in <config dir>/containers. Without
+    the user's, pkggen finds no machine on macOS/Windows, and `podman machine init` overwrites
+    the disk image of the user's existing 'pkggen' machine, which lives outside that folder.
+    """
+    for var in ("CONTAINER_HOST", "DOCKER_HOST"):
+        if REAL_ENV[var]:
+            monkeypatch.setenv(var, REAL_ENV[var])
+    real = os.path.join(REAL_ENV["XDG_CONFIG_HOME"] or os.path.expanduser(os.path.join("~", ".config")), "containers")
+    os.makedirs(real, exist_ok=True)  # podman would create it; it can't through a dangling link
+    try:
+        os.symlink(real, isolated_env / "containers", target_is_directory=True)
+    except OSError as e:  # Windows without the symlink privilege
+        pytest.skip(f"can't link the podman configuration into the test's config folder: {e}")
 
 
 @pytest.fixture

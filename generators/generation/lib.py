@@ -130,15 +130,16 @@ def http_error(response, what, secret_hint="a 'github_key'"):
 
 def iso_date(value):
     """Normalise an ISO 8601 or HTTP date to an ISO 8601 UTC string, or None."""
-    if not value:
+    if not value or not isinstance(value, str):
         return None
+    # HTTP dates can contain a "T" too (GMT, Tue, Thu, Oct), so try ISO 8601 first
     try:
-        if "T" in value:
-            date = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        else:
+        date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        try:
             date = parsedate_to_datetime(value)
-    except (TypeError, ValueError):
-        return None
+        except (TypeError, ValueError):
+            return None
     if date.tzinfo is None:
         date = date.replace(tzinfo=timezone.utc)
     return date.astimezone(timezone.utc).isoformat()

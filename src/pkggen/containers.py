@@ -274,10 +274,34 @@ def connection_name(name, rootful):
     return f"{name}-root" if rootful else name
 
 
-def ensure_machine(engine, cpus, memory, disk, say):
-    """Create, resize and start the pkggen Podman machine. Returns warnings.
+def machine_budget(cpus, memory):
+    """Cap a VM budget to what this machine can give. Returns (cpus, memory, warnings).
 
-    cpus and memory (MiB) are the total budget; the machine gets exactly that.
+    The VM gets at most every CPU, and the host keeps a quarter of its RAM
+    (at least 2 GiB), so it doesn't swap while the containers build.
+    """
+    warnings = []
+    host_cpus = os.cpu_count()
+    if host_cpus and cpus > host_cpus:
+        warnings.append(f"'test.cpus' is {cpus}, but this machine only has {host_cpus} CPUs, so the "
+                        f"'{MACHINE_NAME}' Podman machine gets {host_cpus}")
+        cpus = host_cpus
+    total = host_memory()
+    if total:
+        limit = max(2048, total - max(2048, total // 4))
+        if memory > limit:
+            warnings.append(f"'test.memory' is {memory} MiB, but this machine only has {total} MiB, so the "
+                            f"'{MACHINE_NAME}' Podman machine gets {limit} MiB and the rest is left to the host")
+            memory = limit
+    return cpus, memory, warnings
+
+
+def ensure_machine(engine, cpus, memory, disk, say):
+    """Create, resize and start the pkggen Podman machine. Returns (warnings, sized).
+
+    cpus and memory (MiB) are the total budget; the machine gets exactly that,
+    capped by machine_budget(). sized is False when another machine that's
+    already running is used as it is.
     """
     warnings = []
     machines = engine.machine_list()
@@ -293,8 +317,10 @@ def ensure_machine(engine, cpus, memory, disk, say):
                         f"to let pkggen manage its own '{MACHINE_NAME}' machine")
         details = engine.machine_inspect(name) or {}
         engine.connection = connection_name(name, bool(_get(details, "Rootful")))
-        return warnings
+        return warnings, False
 
+    cpus, memory, capped = machine_budget(cpus, memory)
+    warnings += capped
     details = engine.machine_inspect(MACHINE_NAME)
     if details is None:
         say(f"Creating the '{MACHINE_NAME}' Podman machine ({cpus} CPUs, {memory} MiB RAM). "
@@ -321,14 +347,17 @@ def ensure_machine(engine, cpus, memory, disk, say):
         warnings.append("Podman machines that use WSL share the resources set in .wslconfig, so "
                         "'test.cpus' and 'test.memory' only limit the containers, not the VM")
     engine.connection = connection_name(MACHINE_NAME, _get(details, "Rootful") is not False)
-    return warnings
+    return warnings, True
 
 
 def prepare_host(engine, settings, say):
     """Make sure the engine can run Linux containers. Returns (warnings, whole_machine).
 
     whole_machine is True when the containers get a machine of their own (a
-    VM), so the default budget is all of it instead of half the host.
+    VM), so the default budget is all of it instead of half the host. When
+    pkggen sizes its own Podman machine to the budget, that machine is the
+    budget: settings' cpus and memory are cleared, so the containers share all
+    of it (its kernel keeps some of the RAM, which isn't worth a warning).
     """
     remote = settings.get("connection") or os.getenv("CONTAINER_HOST") or os.getenv("DOCKER_HOST")
     platform = host_platform()
@@ -339,7 +368,10 @@ def prepare_host(engine, settings, say):
         if engine.kind == "podman":
             cpus = int(math.ceil(settings.get("cpus") or os.cpu_count() or 2))
             memory = settings.get("memory") or max(2048, (host_memory() or 8192) // 2)
-            return ensure_machine(engine, cpus, memory, settings.get("disk"), say), True
+            warnings, sized = ensure_machine(engine, cpus, memory, settings.get("disk"), say)
+            if sized:
+                settings["cpus"] = settings["memory"] = None
+            return warnings, True
         try:
             engine.info()
         except EngineError as e:

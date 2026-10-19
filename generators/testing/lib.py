@@ -15,7 +15,9 @@
 # `output` is where the packaging generator put the package, relative to the
 # repository. `packages` is empty when pkggen only asks for the targets.
 #
-# It prints { "targets": [target, ...], "warnings": [...] } on stdout:
+# It prints { "targets": [target, ...], "skipped": [...], "warnings": [...] } on stdout,
+# `skipped` being the { "name", "rp_name" } of the releases that can't run on
+# this host (no image for its architecture). A target is:
 #   {
 #     "name": "debian-13", "rp_name": "debian_13", "image": "docker.io/library/debian:trixie",
 #     "platform": null,                          // e.g. "linux/amd64" to force one
@@ -77,6 +79,7 @@ class Job:
         self.versions = data.get("versions")
         self.host_arch = data.get("host_arch") or "amd64"
         self.warnings = []
+        self.skipped = []
         self.packages = []
         for entry in data.get("packages") or []:
             package = Package(entry)
@@ -183,6 +186,7 @@ def select_targets(job, table):
         spec = table[rp]
         if job.host_arch not in spec.get("arches", ["amd64", "arm64"]):
             job.warn(f"{spec['name']} has no {job.host_arch} container image, so it's skipped")
+            job.skipped.append({"name": spec["name"], "rp_name": rp})
             continue
         result.append((rp, spec))
     return result
@@ -226,4 +230,4 @@ def run(main):
         print(f"\x1b[31mError: {message}\x1b[0m", file=sys.stderr)
         sys.exit(1)
 
-    sys.stdout.write(json.dumps({"targets": targets, "warnings": job.warnings}) + "\n")
+    sys.stdout.write(json.dumps({"targets": targets, "skipped": job.skipped, "warnings": job.warnings}) + "\n")
