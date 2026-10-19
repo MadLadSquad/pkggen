@@ -102,3 +102,11 @@ Planned future support:
 
 ## Getting started and learning
 Get started by navigating [to our documentation](https://github.com/MadLadSquad/pkggen/wiki/Home).
+
+## Running the tests
+From the repository root:
+```sh
+pip install -r src/requirements-dev.txt
+python -m pytest
+```
+The tests run offline. Add `--live` to also test against the real GitHub and repology APIs.

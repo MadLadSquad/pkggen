@@ -1,0 +1,4 @@
+# Templates are copied or rendered into package files, and the golden test
+# snapshots are compared byte for byte, so both keep LF line endings on every OS
+generators/templates/** text eol=lf
+tests/golden/** text eol=lf

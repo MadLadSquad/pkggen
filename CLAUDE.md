@@ -23,6 +23,22 @@ PKGGEN_GENERATORS_PATH=/path/to/generators pkggen <command>
 
 Available commands: `generate [-p <packages>] [-d <distributions>]`, `gen-repo <distribution> [-o <dir>] [-f]`, `test` (stub), `deploy` (stub), `repology <package>`, `version`.
 
+## Running tests
+
+```sh
+pip install -r src/requirements-dev.txt   # pytest + responses, on top of requirements.txt
+python -m pytest                           # from the repository root; offline, ~20 s
+python -m pytest --live                    # also hit the real GitHub/repology APIs (or PKGGEN_TEST_LIVE=1; GITHUB_TOKEN avoids rate limits)
+python -m pytest --update-golden           # rewrite tests/golden/ after an intended output change
+```
+
+`tests/` mirrors the code: `core/` (CLI, `utils`, `gen_repo`, `generate`, repology), `repositories/`, `generation/`, `packaging/`, `e2e/` (the full `gen-repo` + `generate` pipeline on a copy of `example/`, compared against `tests/golden/example.snapshot`) and `live/`. `.github/workflows/tests.yaml` runs them on Linux, macOS and Windows.
+
+- Tests never touch the user's config or `example/`: an autouse fixture points `XDG_CONFIG_HOME`/`APPDATA` at a temp dir, and `example_project` works on a copy.
+- Generators run either in-process via `tests.support.helpers.load_generator(layer, name)` (swaps in that layer's `lib`), or as real subprocesses via `run_generator()` / `run_cli()`.
+- HTTP is mocked with `responses`: the `http` fixture in-process, `http_subprocess(routes)` for subprocesses (via `tests/support/http_shim/sitecustomize.py`, enabled by `PKGGEN_TEST_HTTP`). Unmatched requests fail, so nothing reaches the network. Canned GitHub data for the example packages is in `tests/support/example.py`.
+- Tests that expose known bugs are marked `xfail(strict=True)` with the reason; fixing the bug makes them fail until the mark is removed.
+
 ## Environment variables
 
 | Variable | Default | Purpose |
