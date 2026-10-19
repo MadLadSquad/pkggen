@@ -1,0 +1,7 @@
+{#- Default pkggen template. Recipes must be indented with tabs.
+    dh runs the default steps of every build stage. Add override_dh_auto_build,
+    override_dh_auto_install, ... targets to replace them. -#}
+#!/usr/bin/make -f
+
+%:
+	dh $@

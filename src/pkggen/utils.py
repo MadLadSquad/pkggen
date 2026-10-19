@@ -36,12 +36,37 @@ def load_distributions():
             raise GenericError(f"Every entry in {dist_file} needs a 'name' key!")
     return distributions
 
-def get_pkggen_config():
-    pkggen_path = os.getenv("PKGGEN_RUN_PATH", os.getcwd())
-    pkggen_config = os.path.join(pkggen_path, "pkggen.yaml")
+def get_run_path():
+    """The directory containing pkggen.yaml."""
+    return os.path.abspath(os.getenv("PKGGEN_RUN_PATH", os.getcwd()))
 
-    with open(pkggen_config, "r") as stream:
-        return yaml.safe_load(stream)
+def get_pkggen_config():
+    pkggen_config = os.path.join(get_run_path(), "pkggen.yaml")
+    try:
+        with open(pkggen_config, "r") as stream:
+            return yaml.safe_load(stream)
+    except FileNotFoundError:
+        raise GenericError(f"Couldn't find {pkggen_config}! Run pkggen from its directory or set PKGGEN_RUN_PATH.")
+    except yaml.YAMLError as e:
+        raise GenericError(f"Couldn't parse {pkggen_config}: {e}")
+
+# Repositories live here unless `repositories.<dist>.path` says otherwise
+DEFAULT_BUILD_DIR = "pkggen-build"
+
+def get_repo_path(distribution, config):
+    """Absolute path of a distribution's repository, relative paths being relative to pkggen.yaml."""
+    block = ((config or {}).get("repositories") or {}).get(distribution)
+    custom = block.get("path") if isinstance(block, dict) else None
+    path = os.path.expanduser(str(custom)) if custom else os.path.join(DEFAULT_BUILD_DIR, distribution)
+    return os.path.abspath(os.path.join(get_run_path(), path))
+
+def display_path(path):
+    """Path relative to the pkggen.yaml directory when it's inside it, for messages."""
+    try:
+        rel = os.path.relpath(path, get_run_path())
+    except ValueError:  # different drive on Windows
+        return path
+    return path if rel.startswith("..") else rel
 
 class GenericError(Exception):
     def __init__(self, message):

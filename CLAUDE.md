@@ -21,7 +21,7 @@ cd src && pip install -e .
 PKGGEN_GENERATORS_PATH=/path/to/generators pkggen <command>
 ```
 
-Available commands: `generate`, `gen-repo <distribution> [-o <dir>] [-f]`, `test` (stub), `deploy` (stub), `repology <package>`, `version`.
+Available commands: `generate [-p <packages>] [-d <distributions>]`, `gen-repo <distribution> [-o <dir>] [-f]`, `test` (stub), `deploy` (stub), `repology <package>`, `version`.
 
 ## Environment variables
 
@@ -29,6 +29,8 @@ Available commands: `generate`, `gen-repo <distribution> [-o <dir>] [-f]`, `test
 |---|---|---|
 | `PKGGEN_GENERATORS_PATH` | `cwd` | Path to the `generators/` directory |
 | `PKGGEN_RUN_PATH` | `cwd` | Directory containing `pkggen.yaml` |
+| `PKGGEN_DEBUG` | unset | `1` makes generators print a traceback with their error |
+| `SOURCE_DATE_EPOCH` | unset | Fallback date for templates when a fetch generator reports no release date |
 
 ## Intended design (target, not yet implemented)
 
@@ -62,44 +64,81 @@ pkggen takes inspiration from funtoo-metatools but extends the idea to the entir
 Secrets are stored in `$XDG_CONFIG_HOME/pkggen/secrets.yaml` (defaults to `~/.config/pkggen/secrets.yaml`), or `%APPDATA%\pkggen\secrets.yaml` on Windows. Loaded by `load_secrets()` in `generators/generation/lib.py`. Today only `github_key` is used. Deployment generators should also accept secrets from environment variables.
 
 ### Current state vs. intended design
-- `generators/packaging/` exists but is empty — no packaging generators yet.
-- `pkggen test` and `pkggen deploy` are stubs; there are no testing or deployment generator directories or `lib.py` files.
-- `generate.py` only skips the `repositories` key, not `test`/`deployment`, and returns after the first package group instead of processing all of them.
+- `pkggen test` and `pkggen deploy` are stubs; `generators/testing/` and `generators/deployment/` only hold a `.gitkeep`.
 
 ## Architecture (current implementation)
 
-pkggen has two distinct generator layers, both invoked as **subprocesses** that communicate via **JSON over stdin/stdout**:
+pkggen has three generator layers. All of them are invoked as **subprocesses** (`sys.executable <script>`) that communicate via **JSON over stdin/stdout**; progress and errors go to stderr. Every layer has a `lib.py` with its shared helpers.
 
-### 1. Fetch generators (`generators/generation/`)
-Resolve package metadata and download artifacts for a given package. Each generator (`github.py`, `url.py`) reads a JSON package descriptor from stdin and prints a JSON result (version string + tarball URLs with checksums) to stdout. `lib.py` is a shared utility for hashing, downloading, and secrets loading.
+### 1. Repository generators (`generators/repositories/`)
+Create distribution-specific repository skeletons: `gentoo.py` (overlay: `profiles/`, `metadata/layout.conf`, `repositories.xml`), `rpm-based.py` (rpmbuild tree + optional dnf/zypper `.repo` file), `debian.py` (reprepro APT layout: `conf/distributions`, `conf/options`, `packages/`, optional deb822 `.sources` file) and `arch.py` (just a `.gitignore`). Each reads the full `pkggen.yaml` as JSON from stdin and writes into its working directory.
 
-`generate.py` reads `pkggen.yaml`, finds the matching generator file, then runs it concurrently (up to 10 threads via `ThreadPoolExecutor`) for all packages in that group.
+The working directory is `-o` if given, otherwise the repository path: `<pkggen.yaml dir>/pkggen-build/<dist>`, or `repositories.<dist>.path` (relative to `pkggen.yaml`) when set. `utils.get_repo_path()` resolves it; `generate` uses the same function to find the repositories.
 
-### 2. Repository generators (`generators/repositories/`)
-Create distribution-specific repository skeletons: `gentoo.py` (overlay: `profiles/`, `metadata/layout.conf`, `repositories.xml`), `rpm-based.py` (rpmbuild tree + optional dnf/zypper `.repo` file), `debian.py` (reprepro APT layout: `conf/distributions`, `conf/options`, `packages/`, optional deb822 `.sources` file) and `arch.py` (just a `.gitignore`). Each reads the full `pkggen.yaml` as JSON from stdin and writes into its working directory (the `-o` output dir).
+Naming convention: generator filename == `name` in `distributions.yaml` == key under `repositories:` in `pkggen.yaml` == packaging generator filename == default template folder (e.g. `rpm-based.py` ↔ `name: rpm-based` ↔ `repositories.rpm-based` ↔ `packaging/rpm-based.py` ↔ `templates/rpm-based/`).
 
-Naming convention: generator filename == `name` in `distributions.yaml` == key under `repositories:` in `pkggen.yaml` (e.g. `rpm-based.py` ↔ `name: rpm-based` ↔ `repositories.rpm-based`).
-
-`lib.py` holds the shared helpers: `load_repo_config(dist, required=...)`, `write_file()` (skips existing files unless `PKGGEN_FORCE=1`, which `gen-repo --force` sets), `make_dirs()`, `lines()`, `as_list()`, `to_bool()`, `warn()`/`fail()`. Generators report progress on stderr; stdout is unused.
+`lib.py` holds the shared helpers: `load_repo_config(dist, required=...)`, `write_file()` (skips existing files unless `PKGGEN_FORCE=1`, which `gen-repo --force` sets; always writes LF), `make_dirs()`, `lines()`, `as_list()`, `to_bool()`, `warn()`/`fail()`. Generators report progress on stderr; stdout is unused.
 
 File contents style: when a file's content is fixed (optionally with f-string values filled in), write it as a `"""\` string literal starting at column 0 and ending with a newline. Use `lib.lines(*entries)` only when the lines are built up in code (conditional appends, loops).
 
 `gen_repo.py` discovers available distributions by cross-referencing `utils.load_distributions()` with the presence of a matching `.py` file in `repositories/`.
 
+### 2. Fetch generators (`generators/generation/`)
+`github.py` and `url.py` read one package (JSON) from stdin and print one JSON result on stdout:
+```json
+{ "version": "1.2.0", "date": "<ISO 8601 UTC, optional>", "tag": "<releases/tags>", "commit": "<commits>",
+  "artifacts": [ { "url": "...", "alias": "pkg-1.2.0.tar.gz", "type": "source|asset",
+                   "directory": "pkg-1.2.0", "size": 1234, "checksums": { "sha2_256": "...", ... } } ],
+  "exports": { "description": "...", "license": "MIT", "homepage": "..." } }
+```
+`alias` is the unique distfile name, `directory` a best guess of the folder the archive extracts to, `checksums` holds md5, sha1, sha2_224…sha2_512, sha3_224…sha3_512, blake2b and blake2s, `exports` only contains keys the package doesn't set itself. The input also carries `position`, the tqdm bar line to use.
+
+`lib.py`: `run(generate)` (reads stdin, prints the JSON result, turns `TinyError`/network errors into one `Error [pkg]: ...` line on stderr and exit code 1), `download_and_hash()` (streams a URL and hashes it in one pass, without decompressing), `http_error()` (messages with URL, status and rate-limit hints), `apply_transforms()`, `to_bool()`, `load_secrets()`, `archive_stem()`.
+
+GitHub release queries with `artifacts` download only the listed assets (a missing one is an error); `include-source: true` also adds GitHub's auto-generated tarball. Auto-generated tarballs use `https://<domain>/<user>/<repo>/archive/<ref>.tar.gz`.
+
+### 3. Packaging generators (`generators/packaging/`)
+`arch.py`, `debian.py`, `gentoo.py`, `rpm-based.py`. Each reads a job from stdin: `{distribution, package (template context), repository (repositories.<dist>), repository_path, templates_path, default_templates_path, run_path}`, and prints `{output, files_written, files_unchanged, warnings}` on stdout.
+
+Template folders live next to `pkggen.yaml` in `packages/<dist>/<package>/`. If a folder is missing or has no `.tmpl` files, the generator copies `generators/templates/<dist>/` into it and warns; if only some required templates are missing, just those are copied (existing files are never overwritten). Then every `*.tmpl` file is rendered with Jinja2 and every other file is copied:
+
+| Generator | Required templates | Output |
+|---|---|---|
+| `arch.py` | `PKGBUILD.tmpl` (default also has `.SRCINFO.tmpl`) | `<repo>/<name>/` |
+| `debian.py` | `debian/control.tmpl`, `debian/rules.tmpl`, `debian/changelog.tmpl` | `<repo>/packages/<name>/debian/…` (`rules` made executable) |
+| `gentoo.py` | `ebuild.tmpl` | `<repo>/<category>/<name>/<name>-<version>.ebuild` + other files, plus a `Manifest` with DIST entries built from `artifacts` (existing entries for other distfiles are kept). `category` comes from the package (or its `gentoo:` block), falling back to the first `repositories.gentoo.categories` entry with a warning. The version must be a valid Gentoo version |
+| `rpm-based.py` | `spec.tmpl` | `spec.tmpl` → `<repo>/SPECS/<name>.spec`, other files → `<repo>/SOURCES/` |
+
+`lib.py`: `Job`, `ensure_templates()`, `render_tree(job, place, executable=())`, `write_output()` (LF endings, only rewrites changed files), `run(main)`. The Jinja environment uses `StrictUndefined` (errors are reported as `<template>:<line>: ...`), `trim_blocks`, `lstrip_blocks` and `keep_trailing_newline`. Avoid `{#` in shell code inside templates: Jinja reads it as a comment.
+
+### Orchestration (`src/pkggen/generate.py`)
+`pkggen generate` loads every package group (every top-level key except `repositories`, `test`, `deployment`), validates them all up front, then runs the fetch generators in a thread pool (up to 10). As each fetch finishes, it builds the template context and submits one packaging job per target distribution to a second pool (`os.cpu_count()` workers), so packaging overlaps with downloads. Targets are distributions that have a packaging generator **and** a `repositories.<dist>` block; a missing repository directory is reported with a hint to run `gen-repo`. Failures never cancel other jobs; a summary lists them at the end and the exit code is 1.
+
 ### Config files
-- **`pkggen.yaml`** (project root) — defines package groups and repository metadata. Top-level keys other than `repositories` are treated as package group definitions, each requiring a `generator` name and a `packages` list.
+- **`pkggen.yaml`** (project root) — defines package groups and repository metadata. Top-level keys other than `repositories`, `test` and `deployment` are package groups, each requiring a `generator` name and a `packages` list. Other keys of a group (e.g. `maintainer`) are defaults for its packages, deep-merged under each package's own keys.
 - **`$XDG_CONFIG_HOME/pkggen/secrets.yaml`** (default `~/.config/pkggen/secrets.yaml`; `%APPDATA%\pkggen\secrets.yaml` on Windows) — API keys. Currently used key: `github_key` for authenticated GitHub API requests.
 
-### Package templates
-Templates (e.g., `example/packages/untitled-cli-parser/PKGBUILD.tmpl`) use Jinja2 `{{ variable }}` syntax. Template variables are populated from the generator output merged with package-level metadata from `pkggen.yaml`. Available variables include `name`, `version`, `description`, `license`, `github.user`, `github.repo`, and `artifacts[i].checksums.*`.
+### Template context
+Templates see the package's own `pkggen.yaml` keys at the top level (`name`, `github.user`, `maintainer.name`, …), plus:
+- `version`, `date` (datetime), `tag`, `commit`, `artifacts` (fetch output), `source` (= `artifacts[0]`)
+- `description`, `license`, `homepage` (package value, else fetch `exports`)
+- `distribution`, `repository` (its `repositories.<dist>` block), `now`
+- `dist`: the package's own `<distribution>:` block, e.g. `arch: { depends: [glibc] }` → `dist.depends`
+- `maintainer` defaults to `{}` so `maintainer.name | default(...)` works
+
+Filters: `pkgver` (`-`, `:`, `/`, whitespace → `_`), `spdx` (deprecated GitHub SPDX ids → current ones), `debian_license`, `gentoo_license`, `rfc2822`, `rpmdate`, `shquote`, `dquote`.
 
 ### Adding a new fetch generator
-1. Create `generators/generation/<name>.py` — read input via `lib.readinput()`, parse JSON, print result JSON to stdout.
+1. Create `generators/generation/<name>.py`: define `generate(package) -> dict` returning the output contract above and end with `lib.run(generate)`. Log only to stderr.
 2. Reference it as `generator: "<name>"` in `pkggen.yaml`.
 
 ### Adding a new repository generator
 1. Create `generators/repositories/<name>.py` — get its config with `lib.load_repo_config("<name>")`, write files into `cwd` with `lib.write_file()`.
 2. Add `- name: <name>` to `generators/distributions/distributions.yaml` with its repology `rp-names` (and optional `rp-names-wildcards`).
+
+### Adding a new packaging generator
+1. Create `generators/packaging/<name>.py`: call `lib.ensure_templates(job, REQUIRED)`, set `job.output`, call `lib.render_tree(job, place)` with a `place(rel) -> absolute path` mapping, and end with `lib.run(main)`.
+2. Add the default templates in `generators/templates/<name>/`. Keep them language-neutral: no build-system-specific build/install steps or build dependencies (pkggen packages projects in any language), keep the build functions as empty, commented-out stubs (e.g. `#build() {` / `#}`).
 
 ## graphify
 

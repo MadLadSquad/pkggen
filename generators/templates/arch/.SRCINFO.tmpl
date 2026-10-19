@@ -1,0 +1,24 @@
+{#- Mirrors PKGBUILD.tmpl, so the repository can be pushed to the AUR as is. -#}
+pkgbase = {{ name }}
+	pkgdesc = {{ description | default(name) }}
+	pkgver = {{ version | pkgver }}
+	pkgrel = {{ dist.pkgrel | default(1) }}
+	url = {{ homepage | default(source.url) }}
+{% for a in dist.arch | default(["x86_64", "aarch64"]) %}
+	arch = {{ a }}
+{% endfor %}
+	license = {{ license | default("LicenseRef-unknown") | spdx }}
+{% for d in dist.makedepends | default([]) %}
+	makedepends = {{ d }}
+{% endfor %}
+{% for d in dist.depends | default([]) %}
+	depends = {{ d }}
+{% endfor %}
+{% for a in artifacts %}
+	source = {{ a.alias }}::{{ a.url }}
+{% endfor %}
+{% for a in artifacts %}
+	sha256sums = {{ a.checksums.sha2_256 }}
+{% endfor %}
+
+pkgname = {{ name }}

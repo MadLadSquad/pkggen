@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+{# The package's maintainer, or the overlay owners when it has none #}
+{% for owner in ([maintainer] if maintainer.email is defined else repository.owners | default([])) %}
+	<maintainer type="{{ owner.type | default("person") }}">
+		<email>{{ owner.email | e }}</email>
+{% if owner.name is defined %}
+		<name>{{ owner.name | e }}</name>
+{% endif %}
+	</maintainer>
+{% endfor %}
+{% if github is defined %}
+	<upstream>
+		<remote-id type="github">{{ github.user | e }}/{{ github.repo | e }}</remote-id>
+	</upstream>
+{% endif %}
+</pkgmetadata>

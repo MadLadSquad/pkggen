@@ -1,0 +1,46 @@
+{#- Default pkggen template, rendered to SPECS/<name>.spec. Other files in this
+    folder (patches, desktop files, ...) are copied to SOURCES/. Distribution
+    specific values come from the package's `rpm-based:` block in pkggen.yaml
+    (`dist` here), e.g.
+      rpm-based: { build-requires: [ "pkgconfig(foo)" ], requires: [ foo ], release: 1 }
+    In RPM comments, write macros as %% so they aren't expanded. -#}
+Name:           {{ name }}
+Version:        {{ version | pkgver }}
+Release:        {{ dist.release | default(1) }}%{?dist}
+Summary:        {{ description | default(name) }}
+License:        {{ license | default("LicenseRef-Unknown") | spdx }}
+URL:            {{ homepage | default(source.url) }}
+{% for a in artifacts %}
+Source{{ loop.index0 }}:        {{ a.url }}#/{{ a.alias }}
+{% endfor %}
+{% if dist["build-requires"] is defined or dist.requires is defined %}
+
+{% endif %}
+{% for d in dist["build-requires"] | default([]) %}
+BuildRequires:  {{ d }}
+{% endfor %}
+{% for d in dist.requires | default([]) %}
+Requires:       {{ d }}
+{% endfor %}
+
+%description
+{{ dist["long-description"] | default(description) | default(name) }}
+
+%prep
+%autosetup -n {{ source_dir | default(source.directory) }}
+
+%build
+# Build the package here, if it needs to be compiled
+
+%install
+# Install the package's files into %%{buildroot} here
+
+%files
+# List every file the package installs, for example:
+# %%{_bindir}/%%{name}
+# %%{_libdir}/lib%%{name}.so*
+# %%{_includedir}/%%{name}/
+
+%changelog
+* {{ date | rpmdate }} {{ maintainer.name | default("Your Name") }} <{{ maintainer.email | default("you@example.com") }}> - {{ version | pkgver }}-{{ dist.release | default(1) }}
+- Update to {{ version }}

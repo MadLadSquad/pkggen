@@ -1,183 +1,126 @@
 #!/usr/bin/env python3
-
 """
-The pkggen URL generator:
+The pkggen URL fetch generator.
 
-Input:
+Input (one package from pkggen.yaml, as JSON on stdin):
     {
         "name": "pkgname",
         "url-generator":
         {
-            // The URL to fetch. It supports template parameters with the following syntax {parameter}
-            // 
-            // Acceptable template parameters: 
-            // 1. pkgname
-            // 2. version(only if the version field is already defined)
-            "url": "https://example.com/",
+            // The URL to fetch. Placeholders: {pkgname}, and {version} when "version" is set
+            "url": "https://example.com/{pkgname}-{version}.tar.gz",
 
-            // A list of accepted hashes for locked artifacts
-            "hash-locks": [ "hash", "hash", "hash" ],
-
-            // Optional: A version for artifacts that are not updated frequently but don't have a 
-            // version in the URL. Must not be defined while "transforms" is also defined.
-            // Make sure to lock the version with the "hash-locks" field for strict version-locking
+            // Exactly one of "version" or "transforms" is required:
+            //
+            // A fixed version, for artifacts that are rarely updated and have no version in
+            // their URL. Pair it with "hash-locks" for strict version locking.
             "version": "1.0.0.0",
-            
-            // Optional: An array of regex replace pairs to extract the version from a URL.
-            // The first element of a pair is the search regex, while the second is the replace string.
-            // These instructions are applied sequentially. Must not be defined while "transforms"
-            // is also defined.
-            "transforms": [
-                [ "https.*tag/v", "" ],
-                [ "", "" ]
-            ],
-            
-            // HTTP headers to be applied when fetching
-            "headers":
-            {
-                "User-Agent": "My user agent",
-            }
+            //
+            // Or [pattern, replacement] regex pairs, applied in order to the URL to
+            // extract the version from it.
+            "transforms": [ [ "https.*tag/v", "" ] ],
+
+            // Optional: accepted checksums (any algorithm). The download must match one.
+            "hash-locks": [ "hash", "hash" ],
+
+            // Optional: distfile name. Placeholders: {pkgname}, {version}.
+            // Defaults to the last part of the URL path.
+            "alias": "{pkgname}-{version}.tar.gz",
+
+            // Optional: extra HTTP headers, merged over the defaults
+            "headers": { "User-Agent": "My user agent" }
         }
     }
 
-Output:
+Output (JSON on stdout):
     {
-        version: "1.0.0.0",
-        "tarball-urls": 
-        [
+        "version": "1.0.0.0",
+        "date": "2026-01-01T00:00:00+00:00",   // from Last-Modified, when the server sends it
+        "artifacts": [
             {
-                "url": "https://example.com",
-                "size": "1234", //Optional
-                "checksums":
-                {
-                    "sha2_512": "hash",
-                    "sha3_512": "hash",
-
-                    "sha2_384": "hash",
-                    "sha3_384": "hash",
-
-                    "sha2_256": "hash",
-                    "sha3_256": "hash",
-
-
-                    "sha2_224": "hash",
-                    "sha3_224": "hash",
-
-                    "sha1": "hash",
-            
-                    "md5": "hash",
-
-                    "blake2s": "hash",
-                    "blake2b": "hash",
-                }
+                "url": "https://example.com/...",
+                "alias": "pkgname-1.0.0.0.tar.gz",
+                "type": "source",
+                "directory": "pkgname-1.0.0.0",   // folder it most likely extracts to
+                "size": 1234,
+                "checksums": { "md5", "sha1", "sha2_224" ... "sha3_512", "blake2b", "blake2s" }
             }
-        ]
+        ],
+        "exports": {}
     }
-
 """
+import posixpath
+from urllib.parse import unquote, urlparse
 
-import json
 import requests
-import re
+
 import lib
 
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15",
+}
 
-def generate(x):
-    data = json.loads(x)
-    
-    pkgname = data["name"]
 
-    if "url-generator" not in data:
-        raise lib.TinyError(f"No object named \"url-generator\" found inside the \"{pkgname}\" package's metadata!")
-    urldata = data["url-generator"]
+def fill(template, key, **values):
+    try:
+        return str(template).format(**values)
+    except (KeyError, IndexError) as e:
+        allowed = ", ".join("{" + name + "}" for name in values)
+        raise lib.TinyError(f"'{key}' uses an unknown placeholder {e}. Allowed: {allowed}")
 
-    if "url" not in urldata:
-        raise lib.TinyError(f"No string entry named \"url\" found inside the \"{pkgname}\" package's metadata!")
-    
-    locks = urldata["hash-locks"] if "hash-locks" in urldata else None
 
-    version = urldata["version"] if "version" in urldata else None
-    transforms = urldata["transforms"] if "transforms" in urldata else None
+def generate(package):
+    pkgname = package["name"]
+    config = package.get("url-generator")
+    if not isinstance(config, dict):
+        raise lib.TinyError("no 'url-generator' block found in the package metadata")
+    if not config.get("url"):
+        raise lib.TinyError("'url-generator' has no 'url'")
 
-    url = urldata["url"].format(pkgname=pkgname, version=version if version != None else "")
+    version = config.get("version")
+    transforms = config.get("transforms")
+    if version is not None and transforms is not None:
+        raise lib.TinyError("'version' and 'transforms' can't be used together")
+    if version is None and transforms is None:
+        raise lib.TinyError("set either 'version' or 'transforms' so the package gets a version")
+    if version is None and "{version}" in str(config["url"]):
+        raise lib.TinyError("the URL uses {version}, which needs a fixed 'version'")
 
-    if transforms != None and version != None:
-        raise lib.TinyError(f"The URL generator does not support having both \"version\" and \"transform\" keys at the same time.")
-
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15',
-    }
-    headers = urldata["headers"] if "headers" in urldata else headers
-    
-    print(f"URL generator - Generating package: {pkgname}")
-
-    response = requests.get(url, headers=headers, timeout=10, stream=True)
-    response.raise_for_status()
-    size = int(response.headers.get("content-length", 0))
-
-    if response.status_code == 200:
-        buf = lib.download_to_buffer(response, size, url, position=0)
-        
-        result = {
-            "tarball-urls": [
-                {
-                    "url": url,
-                    "checksums": {}
-                }
-            ]
-        }
-        lib.calculate_hashes(result["tarball-urls"][0]["checksums"], buf.getvalue())
-        
-        if locks != None:
-            is_matching_lock = False
-            for val in result["tarball-urls"][0]["checksums"].values():
-                for h in locks:
-                    if val == h:
-                        is_matching_lock = True
-                        break
-
-                if is_matching_lock:
-                    break
-
-            if not is_matching_lock:
-                raise lib.TinyError(f"Checksums calculated for URL({urldata['url']}) do not match any locked checksums!")
-
-        if version != None:
-            result["version"] = version
-        elif transforms != None:
-            urltmp = url
-
-            for transform in transforms:
-                if type(transform) == list and len(transform) >= 2:
-                    urltmp = re.sub(transform[0], transform[1], urltmp)
-                else:
-                    raise lib.TinyError(f"Elements of the transforms array must be arrays with 2 elements!")
-
-            result["version"] = urltmp
-
-        if size != 0:
-            result["tarball-urls"][0]["size"] = size
-
-        print(result)
+    if version is not None:
+        version = str(version)
+        url = fill(config["url"], "url", pkgname=pkgname, version=version)
     else:
-        raise lib.TinyError(f"Failed to fetch file with URL: {urldata['url']}. HTTP Response: {response.status_code} {response.reason}.")
-        
+        url = fill(config["url"], "url", pkgname=pkgname)
+        version = lib.apply_transforms(transforms, url)
+        if not version:
+            raise lib.TinyError(f"the transforms turned {url} into an empty version")
 
-generate(lib.readinput())
-#generate("""
-#{
-#    "name": "untitled-exec",
-#    "url-generator":
-#    {
-#        "url": "https://github.com/MadLadSquad/UImGuiSDL/releases/tag/v1.0.0.0",
-#        "headers": {
-#            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0.1 Safari/605.1.15"
-#        },
-#        "transforms": [
-#            [ "https.*tag/v", "" ], 
-#            [ "\\\\.", "/" ]
-#        ],
-#        "size": "363"
-#    }
-#}
-#""")
+    if config.get("alias"):
+        alias = fill(config["alias"], "alias", pkgname=pkgname, version=version)
+    else:
+        alias = posixpath.basename(unquote(urlparse(url).path)) or f"{pkgname}-{version}"
+
+    headers = {**DEFAULT_HEADERS, **(config.get("headers") or {})}
+    artifact = lib.download_and_hash(requests.Session(), url, headers=headers,
+                                     position=int(package.get("position", 0)), label=alias)
+
+    locks = config.get("hash-locks")
+    if locks is not None:
+        locks = {str(h).lower() for h in (locks if isinstance(locks, list) else [locks])}
+        if not locks.intersection(artifact["checksums"].values()):
+            raise lib.TinyError(f"{url} doesn't match any of the 'hash-locks' "
+                                f"(its sha2_256 is {artifact['checksums']['sha2_256']})")
+
+    date = artifact.pop("last_modified", None)
+    result = {
+        "version": version,
+        "artifacts": [{"url": url, "alias": alias, "type": "source", "directory": lib.archive_stem(alias), **artifact}],
+        "exports": {},
+    }
+    if date:
+        result["date"] = date
+    return result
+
+
+if __name__ == "__main__":
+    lib.run(generate)

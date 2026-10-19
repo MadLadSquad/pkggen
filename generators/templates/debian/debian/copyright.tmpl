@@ -1,0 +1,9 @@
+{#- DEP-5 copyright file. Licenses that aren't in /usr/share/common-licenses
+    (e.g. Expat/MIT) need their full text in a standalone License paragraph. -#}
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: {{ name }}
+Source: {{ homepage | default(source.url) }}
+
+Files: *
+Copyright: {{ dist.copyright | default(date.year ~ " " ~ (maintainer.name | default("the upstream authors"))) }}
+License: {{ license | default("unknown") | debian_license }}

@@ -34,30 +34,35 @@ You write a `pkggen.yaml` file that details all common metadata for the packages
 ```yaml
 packages:
   generator: github
+  # Keys next to `generator` are defaults for every package in the group
+  maintainer: { name: "MadLadSquad", email: "contact@madladsquad.com" }
   packages:
-    - untitled-cli-parser:
+    - name: untitled-cli-parser
       github:
         user: "MadLadSquad"
         repo: "UntitledCLIParser"
         query: "releases"
-        tarballs: [ "{{ pkgname }}.tar.gz" ]
-    - untitled-exec:
+        artifacts: [ "{pkgname}-{version}.tar.xz" ]
+        transforms: [ [ "^v", "" ] ]
+    - name: untitled-exec
       description: "C/C++ cross-platform wrapper for launching applications as separate processes"
       homepage: "https://github.com/MadLadSquad/UntitledExec"
       license: "MIT"
+      arch: { depends: [ "glibc" ] }   # distribution-specific values, available as `dist` in templates
       github:
         user: "MadLadSquad"
         repo: "UntitledExec"
         query: "releases"
-        tarballs: [ "{{ pkgname }}.tar.gz" ]
+        transforms: [ [ "^v", "" ] ]
 ```
 When declaring a package, you specify a fetch generator, which is the script that will fetch the sources for it. Each generator has its own additional configuration that is parsed in its own code.
 We include pre-installed generators for integrating with popular platforms like GitHub, however if a generator does not exist for your use case, you can write one in python.
 
-Then, in a folder for every distribution, you write a templated version for your packages, where each variable is defined by the given generator that you are using.
+Next, create the repository skeleton for every distribution you target with `pkggen gen-repo <distribution>`. Repositories are created in the `pkggen-build` directory
+next to your `pkggen.yaml`. Each distribution has its own repository generator, which allows you to easily introduce support for platforms we may not currently support.
 
-Finally, to generate your repositories, run `pkggen`. This will generate all repositories in the `pkggen-build` directory. Just like the fetch generator, each distribution has its own repository
-generator in the form of a shell script, which allows you to easily introduce support for platforms we may not currently support.
+Finally, run `pkggen generate`. It fetches every package in parallel and renders its Jinja 2 templates from `packages/<distribution>/<package>/` into the repositories.
+If a package has no templates yet, pkggen creates sensible defaults for you to edit and warns you about it.
 
 Once successful, you can run `pkggen test`, which will spin up containers and virtual machines to test out your package automatically. After the default testing round, you can also run your own
 testing generator as a shell script, which will be executed inside every container and virtual machine.

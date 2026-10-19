@@ -62,7 +62,7 @@ def write_file(path, content):
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write(content)
     print(f"{'overwrote' if exists else 'created'} {path}", file=sys.stderr)
 

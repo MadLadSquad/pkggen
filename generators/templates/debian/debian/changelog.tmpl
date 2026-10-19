@@ -1,0 +1,7 @@
+{#- The suite is the first one in repositories.debian.suites. The changelog
+    format is strict: keep the blank lines and the two spaces before the date. -#}
+{{ name }} ({{ version }}-{{ dist.revision | default(1) }}) {{ (repository.suites | default([{"codename": "unstable"}]))[0].codename }}; urgency=medium
+
+  * New upstream release {{ version }}.
+
+ -- {{ maintainer.name | default("Your Name") }} <{{ maintainer.email | default("you@example.com") }}>  {{ date | rfc2822 }}

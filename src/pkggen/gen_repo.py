@@ -25,8 +25,9 @@ def gen_repo(distribution, output_dir=None, force=False):
     if pkggen is None:
         raise utils.GenericError("Couldn't load pkggen.yaml from the default path!")
 
-    cwd = output_dir if output_dir else os.getcwd()
+    cwd = output_dir if output_dir else utils.get_repo_path(distribution, pkggen)
     os.makedirs(cwd, exist_ok=True)
+    print(f"Generating the {distribution} repository in {utils.display_path(cwd)}", file=sys.stderr)
 
     # Generators report progress on stderr, so stdout is not captured
     result = subprocess.run(

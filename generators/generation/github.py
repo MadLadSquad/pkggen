@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-import lib
-import requests
-import re
-import json
-from datetime import datetime
-
-
 """
-The pkggen GitHub generator:
+The pkggen GitHub fetch generator.
 
-Input:
+Input (one package from pkggen.yaml, as JSON on stdin):
     {
         "name": "pkgname",
         "github":
@@ -17,434 +10,305 @@ Input:
             "user": "user",
             "repo": "repo",
 
-            // A query can be one of either: tag, release or commit.
-            // Note: version strings are calculated by the release/tag name when querying for releases
-            // or tags. Versions strings for commits are formatted in a date format like this: YYYYMMDD.
-            "query": "release",
+            // One of: release(s), tag(s) or commit(s).
+            // Releases and tags take their version from the tag name (after "transforms").
+            // Commits use the committer date as the version, formatted as YYYYMMDD.
+            "query": "releases",
 
-            // Optional: filters tag or release names given a regex pattern
-            "select": "^\\d+\\.\\d+\\.\\d+$"
+            // Optional: only accept tag names matching this regex
+            "select": "^v\\d+\\.\\d+\\.\\d+$",
 
-            // Optional: An array of regex replace pairs to extract the version from a tag/release name.
-            // The first element of a pair is the search regex, while the second is the replace string.
-            // These instructions are applied sequentially.
-            "transforms": [
-                [ "v", "" ]
-            ],
+            // Optional: [pattern, replacement] regex pairs applied in order to the
+            // tag name to turn it into a version
+            "transforms": [ [ "^v", "" ] ],
 
-            // Optional: Release queries have access to this field that allows you to select
-            // an array of templated artifacts.
-            //
-            // Acceptable template parameters: version, pkgname, github_user, github_repo
-            "artifacts": [
-                "pkgname-{version}.tar.xz",
-                "resources.tar.xz"
-            ],
+            // Optional, releases only: release assets to download. When set, ONLY these
+            // files are downloaded and a missing one is an error.
+            // Placeholders: {version}, {pkgname}, {github_user}, {github_repo}
+            "artifacts": [ "pkgname-{version}.tar.xz", "resources.tar.xz" ],
 
-            // Optional: Lock package to a release/tag version when querying by tags.
-            // You can also use a commit hash to lock commit-based generators too
+            // Optional, releases only: also download GitHub's auto-generated source
+            // tarball when "artifacts" is set. Defaults to false.
+            "include-source": false,
+
+            // Optional: lock to an exact tag name (releases/tags) or commit hash (commits).
+            // Can't be combined with "select".
             "version": "v1.0.0.0",
 
-            // Optional: Whether to also accept drafts as valid releases. Defaults to false
-            "include-drafts": "true",
+            // Optional: also accept draft releases / pre-releases. Default to false.
+            "include-drafts": false,
+            "include-pre-releases": false,
 
-            // Optional: Whether to also accept pre-releases as valid releases. Defaults to false
-            "include-pre-releases": "true",
-
-            // An optional field for enterprise users which host their own GitHub enterprise
-            // instance under a different domain. Defaults to github.com
+            // Optional, for GitHub Enterprise. Default to github.com and api.github.com
             "domain": "github.com",
-
-            // An optional field for enterprise users which host their own GitHub enterprise
-            // instance under a different domain. Defaults to api.github.com
             "api-domain": "api.github.com"
         }
     }
-    
-Output:
+
+Output (JSON on stdout):
     {
-        "tarball_urls": [
-            { 
-                "url": "pkgname-version.tar.xz",
-                "size": "1234",
-                "checksums": {
-                    "sha2_512": "hash",
-                    "sha3_512": "hash",
-                    
-                    "sha2_384": "hash",
-                    "sha3_384": "hash",
-
-                    "sha2_256": "hash",
-                    "sha3_256": "hash",
-
-                    "sha2_224": "hash",
-                    "sha3_224": "hash",
-
-                    "sha1": "hash",
-
-                    "md5": "hash",
-
-                    "blake2s": "hash",
-                    "blake2b": "hash",
-                }
-            },
-            {
-                "url": "resources.tar.xz",
-                "size": "1234",
-                "checksums": {
-                    "sha2_512": "hash",
-                    "sha3_512": "hash",
-
-                    "sha2_384": "hash",
-                    "sha3_384": "hash",
-
-                    "sha2_256": "hash",
-                    "sha3_256": "hash",
-
-                    "sha2_224": "hash",
-                    "sha3_224": "hash",
-
-                    "sha1": "hash",
-
-                    "md5": "hash",
-
-                    "blake2s": "hash",
-                    "blake2b": "hash",
-                }
-            },
-        ],
         "version": "1.0.0.0",
+        "date": "2026-01-01T00:00:00+00:00",   // release/commit date, ISO 8601 UTC
+        "tag": "v1.0.0.0",            // releases and tags only
+        "commit": "<sha>",            // commits only
+        "artifacts": [
+            {
+                "url": "https://...",
+                "alias": "pkgname-1.0.0.0.tar.gz",   // unique distfile name
+                "type": "source",                    // "source" or "asset"
+                "directory": "repo-1.0.0.0",         // folder it most likely extracts to
+                "size": 1234,
+                "checksums": { "md5", "sha1", "sha2_224" ... "sha3_512", "blake2b", "blake2s" }
+            }
+        ],
+        // Repository metadata from the GitHub API, only fetched for keys the
+        // package doesn't already define
+        "exports": { "description": "...", "license": "MIT", "homepage": "..." }
     }
-
-Additional metadata fetched from the GitHub API(only exported if not defined):
-
-1. pkgdescription
-1. pkglicense
-1. pkghomepage
-
 """
+import re
+from datetime import datetime
+from urllib.parse import quote
 
-class GitHubData:
-    def __init__(self):
-        self.user = ""
-        self.repo = ""
-        self.query = ""
-    
-        self.select = None
-        self.transforms = None
-        self.artifacts = None
-        self.version = None
+import requests
 
-        self.include_drafts = False
-        self.include_pre_releases = False
+import lib
 
-        self.domain = "github.com"
-        self.api_domain = "api.github.com"
+QUERIES = {
+    "release": "releases", "releases": "releases",
+    "tag": "tags", "tags": "tags",
+    "commit": "commits", "commits": "commits",
+}
+PER_PAGE = 100
 
-    def __init__(self, data, pkgname):
-        def sanitise_query(query):
-            result = query
-            if result == "tag":
-                result = "tags"
-            elif result == "release":
-                result = "releases"
-            elif result == "commit":
-                result = "commits"
-    
-            if result != "tags" and result != "commits" and result != "releases":
-                raise lib.TinyError(f"Invalid GitHub query! The query field can only be set to one of the following: \"release\", \"tag\" or \"commit\"")
-            return result
 
-        if "user" not in data:
-            raise lib.TinyError(f"No GitHub user provided for \"{pkgname}\"!")
-        if "repo" not in data:
-            raise lib.TinyError(f"No GitHub repo provided for \"{pkgname}\"!")
-        if "query" not in data:
-            raise lib.TinyError(f"No GitHub query provided for \"{pkgname}\"!")
+class GitHub:
+    def __init__(self, data, pkgname, position):
+        if not isinstance(data, dict):
+            raise lib.TinyError("'github' must be a mapping")
+        for key in ("user", "repo", "query"):
+            if not data.get(key):
+                raise lib.TinyError(f"no GitHub '{key}' provided")
 
+        self.pkgname = pkgname
+        self.position = position
         self.user = data["user"]
         self.repo = data["repo"]
-        self.query = sanitise_query(data["query"])
-        
-        self.select = data["select"] if "select" in data else None
-        self.transforms = data["transforms"] if "transforms" in data else None
-        self.artifacts = data["artifacts"] if "artifacts" in data else None
-        self.version = data["version"] if "version" in data else None
+        self.slug = f"{self.user}/{self.repo}"
 
-        self.include_drafts = data["include-drafts"] if "include-drafts" in data else False
-        self.include_pre_releases = data["include-pre-releases"] if "include-pre-releases" in data else False
+        self.query = QUERIES.get(str(data["query"]).lower())
+        if self.query is None:
+            raise lib.TinyError(f"invalid GitHub query {data['query']!r}, expected one of: release, tag, commit")
 
-        self.domain = data["domain"] if "domain" in data else "github.com"
-        self.api_domain = data["api-domain"] if "api-domain" in data else "api.github.com"
+        self.version = data.get("version")
+        self.transforms = data.get("transforms")
+        self.artifacts = data.get("artifacts")
+        if self.artifacts is not None and not isinstance(self.artifacts, list):
+            raise lib.TinyError("'artifacts' must be a list of file names")
+        if self.artifacts is not None and self.query != "releases":
+            lib.warn(f"'artifacts' only works with release queries, ignoring it for {self.query}")
+            self.artifacts = None
 
-        secrets = lib.load_secrets()
-        self.github_key = secrets["github_key"] if "github_key" in secrets else None
+        self.select = None
+        if data.get("select") is not None:
+            if self.version is not None:
+                raise lib.TinyError("'version' and 'select' can't be used together")
+            try:
+                self.select = re.compile(data["select"])
+            except re.error as e:
+                raise lib.TinyError(f"invalid 'select' regex {data['select']!r}: {e}")
 
-    
-def transform_date(x):
-    return datetime.strptime(x, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d")
+        self.include_drafts = lib.to_bool(data.get("include-drafts"))
+        self.include_pre_releases = lib.to_bool(data.get("include-pre-releases"))
+        self.include_source = lib.to_bool(data.get("include-source"))
 
-def get_api_headers(key):
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
-    if key != None:
-        headers["Authorization"] = f"Bearer {key}"
-    return headers
+        self.domain = data.get("domain") or "github.com"
+        self.api_domain = data.get("api-domain") or "api.github.com"
 
-def generate_artifact_data(tarball_urls, user, repo):
-    result = []
-    for tarball_url in tarball_urls:
-        tarball_response = requests.get(tarball_url, timeout=10, stream=True)
-        size = int(tarball_response.headers.get("content-length", 0))
-    
-        if tarball_response.status_code == 200:
-            buf = lib.download_to_buffer(tarball_response, size, tarball_url, position=0)
-            result.append({
-                "url": tarball_url,
-                "checksums": {}
-            })
+        self.headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        key = lib.load_secrets().get("github_key")
+        # Sent to GitHub only: requests drops it on redirects to other hosts
+        self.auth = {"Authorization": f"Bearer {key}"} if key else {}
+        self.session = requests.Session()
 
-            lib.calculate_hashes(result[-1]["checksums"], buf.getvalue())
-            if size != 0:
-                result[-1]["size"] = size
-        else:
-            raise lib.TinyError(f"Invalid git commit hash for GitHub repository {user}/{repo}!")
+    def api(self, path, what, **params):
+        url = f"https://{self.api_domain}/repos/{self.user}/{self.repo}{path}"
+        response = self.session.get(url, headers={**self.headers, **self.auth}, params=params, timeout=lib.TIMEOUT)
+        if response.status_code != 200:
+            raise lib.http_error(response, what)
+        return response.json()
 
-    return result
+    def download(self, url, alias, kind, directory):
+        result = lib.download_and_hash(self.session, url, headers=self.auth, position=self.position, label=alias)
+        result.pop("last_modified", None)
+        return {"url": url, "alias": alias, "type": kind, "directory": directory, **result}
 
-def get_exports(github):
-    result = {}
-    response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}", headers=get_api_headers(github.github_key))
-    if response.status_code == 200:
-        data = response.json()
-
-        description = data["description"] if "description" in data and data["description"] else None
-        if description != None:
-            result["description"] = description
-
-        license_str = data["license"]["spdx_id"] if "license" in data and data["license"] != None and "spdx_id" in data["license"] else None
-        if license_str != None:
-            result["license"] = license_str
-
-        homepage = data["homepage"] if "homepage" in data and data["homepage"] != None and data["homepage"] != "" else None
-        if homepage != None:
-            result["homepage"] = homepage
-
-        return result
+    def source_archive(self, ref, version):
+        """URL, alias and top-level folder of GitHub's auto-generated tarball for ref."""
+        url = f"https://{self.domain}/{self.user}/{self.repo}/archive/{quote(ref, safe='/')}.tar.gz"
+        # GitHub names the folder <repo>-<ref>, without "refs/tags/", with a leading "v" before
+        # a digit dropped and with "/" turned into "-"
+        name = ref.removeprefix("refs/tags/")
+        if re.match(r"v\d", name):
+            name = name[1:]
+        return url, f"{self.pkgname}-{version}.tar.gz", f"{self.repo}-{name.replace('/', '-')}"
 
 
-def generate_commit(github):
-    result = {}
-    api_headers = get_api_headers(github.github_key)
-    
-    if github.version != None:
-        response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}/commits/{github.version}", headers=api_headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
+def to_date_version(date):
+    return datetime.fromisoformat(date).strftime("%Y%m%d")
 
-            result["version"] = transform_date(data["commit"]["committer"]["date"])
-            result["tarball_urls"] = generate_artifact_data(
-                [
-                    f"https://{github.domain}/{github.user}/{github.repo}/archive/{data['sha']}.tar.gz"
-                ],
-                github.user,
-                github.repo
-            )
-        else:
-            raise lib.TinyError(f"Invalid git commit hash for GitHub repository {github.user}/{github.repo}!")
+
+def generate_commit(gh):
+    if gh.version is not None:
+        commit = gh.api(f"/commits/{gh.version}", f"find commit {gh.version!r} in {gh.slug}")
     else:
-        response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}/commits", headers=api_headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()[0]
-            result["version"] = transform_date(data["commit"]["committer"]["date"])
-            result["tarball_urls"] = generate_artifact_data(
-                [
-                    f"https://{github.domain}/{github.user}/{github.repo}/archive/{data['sha']}.tar.gz"
-                ],
-                github.user,
-                github.repo
-            )
-        else:
-            raise lib.TinyError(f"Invalid git commit hash for GitHub repository {github.user}/{github.repo}!")
-    result["exports"] = get_exports(github)
+        commits = gh.api("/commits", f"list commits of {gh.slug}", per_page=1)
+        if not commits:
+            raise lib.TinyError(f"{gh.slug} has no commits")
+        commit = commits[0]
+
+    sha = commit["sha"]
+    date = lib.iso_date(commit["commit"]["committer"]["date"])
+    version = to_date_version(date)
+    url, alias, directory = gh.source_archive(sha, version)
+    return {
+        "version": version,
+        "date": date,
+        "commit": sha,
+        "artifacts": [gh.download(url, alias, "source", directory)],
+    }
+
+
+def release_allowed(gh, release):
+    if release.get("draft") and not gh.include_drafts:
+        return False
+    if release.get("prerelease") and not gh.include_pre_releases:
+        return False
+    return True
+
+
+def find_tag_or_release(gh):
+    # Releases have a free-form title in "name"; the tag is in "tag_name"
+    key = "tag_name" if gh.query == "releases" else "name"
+    page = 1
+    while True:
+        entries = gh.api(f"/{gh.query}", f"list {gh.query} of {gh.slug}", page=page, per_page=PER_PAGE)
+        for entry in entries:
+            tag = entry.get(key) or ""
+            if gh.version is not None:
+                if tag == gh.version:
+                    return entry, tag
+                continue
+            if gh.query == "releases" and not release_allowed(gh, entry):
+                continue
+            if gh.select is not None and not gh.select.search(tag):
+                continue
+            return entry, tag
+
+        if len(entries) < PER_PAGE:
+            break
+        page += 1
+
+    kind = gh.query[:-1]
+    if gh.version is not None:
+        criteria = f"named {gh.version!r}"
+    else:
+        parts = []
+        if gh.select is not None:
+            parts.append(f"matching {gh.select.pattern!r}")
+        if gh.query == "releases":
+            if not gh.include_drafts:
+                parts.append("excluding drafts")
+            if not gh.include_pre_releases:
+                parts.append("excluding pre-releases")
+        criteria = ", ".join(parts) or "at all"
+    raise lib.TinyError(f"no {kind} found in {gh.slug} {criteria}")
+
+
+def format_artifact(gh, pattern, version):
+    try:
+        return pattern.format(pkgname=gh.pkgname, version=version, github_user=gh.user, github_repo=gh.repo)
+    except (KeyError, IndexError) as e:
+        raise lib.TinyError(f"artifact pattern {pattern!r} uses an unknown placeholder {e}. "
+                            "Allowed: {version}, {pkgname}, {github_user}, {github_repo}")
+
+
+def generate_tag_or_release(gh):
+    entry, tag = find_tag_or_release(gh)
+    version = lib.apply_transforms(gh.transforms, tag)
+    if not version:
+        raise lib.TinyError(f"the transforms turned tag {tag!r} into an empty version")
+
+    downloads = []
+    if gh.artifacts is None or gh.include_source:
+        url, alias, directory = gh.source_archive(f"refs/tags/{tag}", version)
+        downloads.append((url, alias, "source", directory))
+
+    if gh.artifacts is not None:
+        assets = {asset["name"]: asset for asset in entry.get("assets", [])}
+        wanted = [format_artifact(gh, pattern, version) for pattern in gh.artifacts]
+        missing = [name for name in wanted if name not in assets]
+        if missing:
+            available = ", ".join(sorted(assets)) or "none"
+            raise lib.TinyError(f"release {tag!r} of {gh.slug} has no asset named {', '.join(missing)} "
+                                f"(available: {available})")
+        # Listed artifacts come first, so artifacts[0] is the first file the user asked for
+        downloads = [(assets[name]["browser_download_url"], name, "asset", lib.archive_stem(name))
+                     for name in wanted] + downloads
+
+    if gh.query == "releases":
+        date = lib.iso_date(entry.get("published_at") or entry.get("created_at"))
+    else:
+        # Tag entries carry no date, so use the date of the commit they point to
+        sha = entry["commit"]["sha"]
+        commit = gh.api(f"/commits/{sha}", f"look up commit {sha} of tag {tag!r} in {gh.slug}")
+        date = lib.iso_date(commit["commit"]["committer"]["date"])
+
+    result = {
+        "version": version,
+        "tag": tag,
+        "artifacts": [gh.download(*download) for download in downloads],
+    }
+    if date:
+        result["date"] = date
     return result
 
-def apply_version_transforms(transforms, version):
-    if transforms != None:
-        for transform in transforms:
-            if type(transform) == list and len(transform) >= 2:
-                version = re.sub(transform[0], transform[1], version)
-            else:
-                raise lib.TinyError(f"Elements of the transforms array must be arrays with 2 elements!")
-    return version
 
-def generate_release_or_tag(pkgname, github):
-    api_headers = get_api_headers(github.github_key)
-    page = 1
-    result = {}
+def get_exports(gh, package):
+    wanted = [key for key in ("description", "license", "homepage") if not package.get(key)]
+    if not wanted:
+        return {}
 
-    while True:
-        response = requests.get(f"https://{github.api_domain}/repos/{github.user}/{github.repo}/{github.query}?page={page}&per_page=100", headers=api_headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if len(data) == 0:
-                raise lib.TinyError(f"Unable to find compatible version or the URL is invalid for GitHub repository {github.user}/{github.repo}")
+    try:
+        data = gh.api("", f"fetch repository metadata of {gh.slug}")
+    except (lib.TinyError, requests.RequestException) as e:
+        lib.warn(f"[{gh.pkgname}] {e}. Continuing without exported metadata")
+        return {}
 
-            obj = {}
+    license_id = (data.get("license") or {}).get("spdx_id")
+    found = {
+        "description": data.get("description"),
+        "license": license_id if license_id and license_id != "NOASSERTION" else None,
+        "homepage": data.get("homepage") or data.get("html_url"),
+    }
+    return {key: found[key] for key in wanted if found[key]}
 
 
-            if github.select != None:
-                if github.version != None:
-                    raise lib.TinyError(f"Cannot have both a \"version\" and a \"select\" key when generating a tag/release!")
+def generate(package):
+    if "github" not in package:
+        raise lib.TinyError("no 'github' block found in the package metadata")
 
-                regex_filter = re.compile(github.select)
-
-                def filter_fun(f, regex_filter, github):
-                    result = True
-                    if github.query == "releases":
-                        if (not github.include_drafts and f["draft"]) or (not github.include_pre_releases and f["prerelease"]):
-                            result = False
-                    return result and regex_filter.search(f["name"])
-
-                filtered = [f for f in data if filter_fun(f, regex_filter, github)]
-                
-                if len(filtered) > 0:
-                    obj = filtered[0]
-                    result["version"] = apply_version_transforms(github.transforms, obj["name"])
-                else:
-                    page += 1
-                    continue
-            else:
-                if github.version == None:
-                    if github.query == "releases":
-                        is_compatible = True
-                        for release in data:
-                            if (not github.include_drafts and release["draft"]) or (not github.include_pre_releases and release["prerelease"]):
-                                is_compatible = False
-                            else:
-                                is_compatible = True
-                            
-                            if is_compatible:
-                                obj = release
-                                break
-
-                        if is_compatible == False:
-                            page += 1
-                            continue
-                    else:
-                        obj = data[0]
-
-                    result["version"] = apply_version_transforms(github.transforms, obj["name"])
-                else:
-                    found_version = False
-                    for d in data:
-                        if github.version == d["name"]:
-                            found_version = True
-                            obj = d
-                            result["version"] = apply_version_transforms(github.transforms, d["name"])
-                            break
-
-                    if found_version == False:
-                        page += 1
-                        continue
+    gh = GitHub(package["github"], package["name"], int(package.get("position", 0)))
+    if gh.query == "commits":
+        result = generate_commit(gh)
+    else:
+        result = generate_tag_or_release(gh)
+    result["exports"] = get_exports(gh, package)
+    return result
 
 
-            if github.query == "tags":
-                result["tarball_urls"] = generate_artifact_data(
-                    [
-                        obj["tarball_url"]
-                    ],
-                    github.user,
-                    github.repo
-                )
-            elif github.query == "releases":
-                if github.artifacts == None:
-                    result["tarball_urls"] = generate_artifact_data(
-                        [
-                            obj["tarball_url"]
-                        ],
-                        github.user,
-                        github.repo
-                    )
-                else:
-                    new_artifacts = [ 
-                        artifact.format(
-                            pkgname=pkgname,
-                            version=result["version"],
-                            github_user = github.user,
-                            github_repo = github.repo
-                        )
-                        for artifact in github.artifacts
-                    ]
-                    urls = [ obj["tarball_url"] ]
-
-                    for asset in obj["assets"]:
-                        for artifact in new_artifacts:
-                            if artifact == asset["name"]:
-                                urls.append(asset["browser_download_url"])
-
-                    result["tarball_urls"] = generate_artifact_data(urls, github.user, github.repo)
-
-            result["exports"] = get_exports(github)
-            return result
-        else:
-            raise lib.TinyError(f"Unable to find compatible version or the URL is invalid for GitHub repository {github.user}/{github.repo}")
-
-        page += 1
-    
-
-def generate(x):
-    data = json.loads(x)
-
-    pkgname = data["name"]
-
-    if "github" not in data:
-        raise lib.TinyError(f"No object named \"github\" found inside the \"{pkgname}\" package's metadata!")
-   
-    github_data = GitHubData(data["github"], pkgname)
-    if github_data.query == "commits":
-        print(generate_commit(github_data))
-    elif github_data.query == "tags" or github_data.query == "releases":
-        print(generate_release_or_tag(pkgname, github_data))
-
-
-
-generate(lib.readinput())
-
-#generate("""
-#{
-#    "name": "UntitledImGuiFramework",
-#    "github": {
-#        "_user": "MadLadSquad",
-#        "_repo": "UntitledImGuiFramework",
-#        "user": "microsoft",
-#        "repo": "monaco-editor",
-#        "query": "releases",
-#        "_select": "^v\\\\d+\\\\.\\\\d+\\\\.\\\\d+\\\\.\\\\d+$",
-#        "_version": "v1.3.2.0",
-#        "_transforms": [
-#            [ "v", "" ]
-#        ],
-#        "_artifacts": [
-#            "untitled-imgui-framework-{version}.tar.xz"
-#        ],
-#        "include-pre-releases": "true",
-#        "include-drafts": "true"
-#    }
-#}
-#""")
-
-
-#generate("""
-#{
-#    "name": "UntitledImGuiFramework",
-#    "github": {
-#        "user": "MadLadSquad",
-#        "repo": "UntitledImGuiFramework",
-#        "query": "commits",
-#        "version": "142e73823eb7af3b1e1f743ccb3756c5d3cb7e8b"
-#    }
-#}
-#""")
+if __name__ == "__main__":
+    lib.run(generate)
