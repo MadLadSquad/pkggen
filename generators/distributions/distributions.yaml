@@ -18,14 +18,11 @@ distributions:
       - "openmandriva_rolling"
       - "openmandriva_6_0"
 
-      - "pclinuxos"
-
     # Allows for searching for older releases.
     rp-names-wildcards:
       - "fedora"
       - "opensuse"
       - "openmandriva"
-      - "pclinuxos"
   - name: debian
     rp-names:
       # Debian unstable, testing and the last 2 stable releases

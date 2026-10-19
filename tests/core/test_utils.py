@@ -6,8 +6,30 @@ import utils
 from tests.support import paths
 
 
-def test_generators_path_defaults_to_cwd(monkeypatch, tmp_path):
+def fake_generators(path):
+    (path / "distributions").mkdir(parents=True)
+    (path / "distributions" / "distributions.yaml").write_text("distributions: []\n")
+    return str(path)
+
+
+def test_generators_path_defaults_to_the_checkout(monkeypatch, tmp_path):
     monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
+    monkeypatch.chdir(tmp_path)
+    assert os.path.normcase(utils.get_generators_path()) == os.path.normcase(str(paths.GENERATORS))
+
+
+def test_generators_path_prefers_the_bundled_copy(monkeypatch, tmp_path):
+    monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
+    bundled, checkout = fake_generators(tmp_path / "bundled"), fake_generators(tmp_path / "checkout")
+    monkeypatch.setattr(utils, "BUNDLED_GENERATORS", (bundled, checkout))
+    assert utils.get_generators_path() == bundled
+    monkeypatch.setattr(utils, "BUNDLED_GENERATORS", (str(tmp_path / "missing"), checkout))
+    assert utils.get_generators_path() == checkout
+
+
+def test_generators_path_falls_back_to_cwd(monkeypatch, tmp_path):
+    monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
+    monkeypatch.setattr(utils, "BUNDLED_GENERATORS", (str(tmp_path / "missing"),))
     monkeypatch.chdir(tmp_path)
     assert utils.get_generators_path() == str(tmp_path)
 

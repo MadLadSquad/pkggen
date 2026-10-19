@@ -16,9 +16,20 @@ def create_secrets_file():
             f.write('')
     return secrets_file
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+# Where the generators are when PKGGEN_GENERATORS_PATH isn't set: the copy an
+# installed pkggen ships with, else the checkout's generators/ (editable installs)
+BUNDLED_GENERATORS = (os.path.join(HERE, "generators"), os.path.join(HERE, os.pardir, os.pardir, "generators"))
+
 def get_generators_path():
     # Absolute, so generators still resolve when run from another working directory
-    return os.path.abspath(os.getenv("PKGGEN_GENERATORS_PATH", os.getcwd()))
+    custom = os.getenv("PKGGEN_GENERATORS_PATH")
+    if custom:
+        return os.path.abspath(custom)
+    for path in BUNDLED_GENERATORS:
+        if os.path.isfile(os.path.join(path, "distributions", "distributions.yaml")):
+            return os.path.abspath(path)
+    return os.path.abspath(os.getcwd())
 
 def load_distributions():
     dist_file = os.path.join(get_generators_path(), "distributions", "distributions.yaml")

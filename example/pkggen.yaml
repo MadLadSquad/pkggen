@@ -45,6 +45,14 @@ repositories:
     url: https://debs.madladsquad.com/
     keyring: /usr/share/keyrings/untitled-desktop.gpg
   arch: {}
+test:
+  cpus: 4
+  memory: 16G
+  setup:
+    - "echo 'Setting up the test container'"
+  post-setup:
+    - name: "show the release"
+      run: "cat /etc/os-release"
 pkggen:
   generator: "github"
   packages:

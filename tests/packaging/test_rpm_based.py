@@ -19,7 +19,7 @@ def test_default_template(package_with, tmp_path):
         "License:        MIT",
         "URL:            https://github.com/MadLadSquad/UntitledCLIParser",
         f"Source0:        {a['url']}#/untitled-cli-parser-1.2.0.tar.xz",
-        "ExclusiveArch:  x86_64 aarch64",
+        "ExclusiveArch:  %{?x86_64}%{!?x86_64:x86_64} aarch64",
         "%autosetup -n untitled-cli-parser-1.2.0",
         "* Tue Sep 01 2026 MadLadSquad <contact@madladsquad.com> - 1.2.0-1",
         "- Update to 1.2.0",

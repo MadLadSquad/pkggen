@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import sys
@@ -20,6 +21,8 @@ SOURCE_DATE_EPOCH = "1792411200"
 def pytest_addoption(parser):
     parser.addoption("--live", action="store_true",
                      help="also run tests that talk to the real GitHub and repology APIs")
+    parser.addoption("--containers", action="store_true",
+                     help="also run tests that build packages in real containers (needs podman or docker and the network)")
     parser.addoption("--update-golden", action="store_true",
                      help="rewrite the snapshots in tests/golden instead of comparing against them")
 
@@ -28,13 +31,18 @@ def live_enabled(config):
     return config.getoption("--live") or os.getenv("PKGGEN_TEST_LIVE") == "1"
 
 
+def containers_enabled(config):
+    return config.getoption("--containers") or os.getenv("PKGGEN_TEST_CONTAINERS") == "1"
+
+
 def pytest_collection_modifyitems(config, items):
-    if live_enabled(config):
-        return
-    skip = pytest.mark.skip(reason="live test: run with --live or PKGGEN_TEST_LIVE=1")
+    skip_live = pytest.mark.skip(reason="live test: run with --live or PKGGEN_TEST_LIVE=1")
+    skip_containers = pytest.mark.skip(reason="container test: run with --containers or PKGGEN_TEST_CONTAINERS=1")
     for item in items:
-        if "live" in item.keywords:
-            item.add_marker(skip)
+        if "live" in item.keywords and not live_enabled(config):
+            item.add_marker(skip_live)
+        if "containers" in item.keywords and not containers_enabled(config):
+            item.add_marker(skip_containers)
 
 
 @pytest.fixture(autouse=True)
@@ -49,7 +57,8 @@ def isolated_env(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(paths.GENERATORS))
     monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
     for var in ("PKGGEN_RUN_PATH", "PKGGEN_FORCE", "PKGGEN_DEBUG", "PKGGEN_TEST_HTTP",
-                "PKGGEN_TEST_HTTP_LOG", "SOURCE_DATE_EPOCH"):
+                "PKGGEN_TEST_HTTP_LOG", "SOURCE_DATE_EPOCH", "PKGGEN_TEST_ENGINE", "PKGGEN_FAKE_ENGINE",
+                "CONTAINER_HOST", "DOCKER_HOST"):
         monkeypatch.delenv(var, raising=False)
     return config
 
@@ -57,7 +66,7 @@ def isolated_env(tmp_path_factory, monkeypatch):
 @pytest.fixture(autouse=True)
 def no_network(request, monkeypatch):
     """In-process requests calls fail unless a test mocks them (or is a live test)."""
-    if "live" in request.keywords:
+    if "live" in request.keywords or "containers" in request.keywords:
         return
 
     def blocked(self, request, *args, **kwargs):
@@ -107,6 +116,52 @@ def http_subprocess(tmp_path_factory, monkeypatch):
             return result
         return calls
     return use
+
+
+class FakeEngine:
+    """Controls tests/support/fake_engine.py, which stands in for podman/docker."""
+
+    def __init__(self, state):
+        self.state = state
+
+    def configure(self, **values):
+        path = self.state / "config.json"
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data.update(values)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def calls(self, command=None):
+        """Every command line the fake got, without the connection option, optionally only one command's."""
+        path = self.state / "calls.jsonl"
+        result = []
+        for line in path.read_text(encoding="utf-8").splitlines() if path.exists() else []:
+            args = json.loads(line)
+            while args and args[0] in ("--connection", "--context"):
+                args = args[2:]
+            if command is None or args[:1] == [command]:
+                result.append(args)
+        return result
+
+    def raw_calls(self):
+        path = self.state / "calls.jsonl"
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()] if path.exists() else []
+
+    def containers(self):
+        directory = self.state / "containers"
+        return sorted(p.name for p in directory.iterdir()) if directory.exists() else []
+
+    def scripts(self):
+        """The steps that were run: (container, script) pairs."""
+        return [(args[-4], args[-1]) for args in self.calls("exec") if args[-3:-1] == ["sh", "-exc"]]
+
+
+@pytest.fixture
+def fake_engine(tmp_path_factory, monkeypatch):
+    state = tmp_path_factory.mktemp("engine")
+    monkeypatch.setenv("PKGGEN_TEST_ENGINE", json.dumps([sys.executable, str(paths.REPO / "tests" / "support" /
+                                                                             "fake_engine.py")]))
+    monkeypatch.setenv("PKGGEN_FAKE_ENGINE", str(state))
+    return FakeEngine(state)
 
 
 @pytest.fixture

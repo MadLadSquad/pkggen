@@ -1,7 +1,7 @@
 import pytest
 
 from tests.support import paths
-from tests.support.helpers import run, run_cli
+from tests.support.helpers import run_cli
 
 VERSION = open(paths.SRC / "version.py").read().split('"')[1]
 
@@ -39,9 +39,8 @@ def test_gen_repo_rejects_unknown_distribution():
     assert "invalid choice" in result.err
 
 
-@pytest.mark.parametrize("command", ["test", "deploy"])
-def test_stub_commands(command):
-    result = run_cli(command)
+def test_stub_commands():
+    result = run_cli("deploy")
     assert result.code == 0
     assert result.out.strip() == "This command is not currently implemented."
 
@@ -61,13 +60,3 @@ def test_gen_repo_end_to_end(example_project):
     assert result.code == 0, result.err
     assert (example_project / "pkggen-build" / "gentoo" / "profiles" / "repo_name").is_file()
 
-
-@pytest.mark.xfail(reason="setup.py's entry point is pkggen.pkggen:main, but src/pkggen has no __init__.py "
-                          "and the CLI script has no .py suffix, so `pip install -e src` installs a "
-                          "`pkggen` command that fails with ModuleNotFoundError")
-def test_installed_entry_point_is_importable():
-    # The console script that `pip install` generates runs exactly this import,
-    # with src/ (the editable install's root) on sys.path
-    result = run(["-c", "import sys; sys.path.insert(0, sys.argv[1]); from pkggen.pkggen import main",
-                  paths.REPO / "src"])
-    assert result.code == 0, result.err

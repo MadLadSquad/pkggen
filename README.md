@@ -65,8 +65,19 @@ next to your `pkggen.yaml`. Each distribution has its own repository generator, 
 Finally, run `pkggen generate`. It fetches every package in parallel and renders its Jinja 2 templates from `packages/<distribution>/<package>/` into the repositories.
 If a package has no templates yet, pkggen creates sensible defaults for you to edit and warns you about it.
 
-Once successful, you can run `pkggen test`, which will spin up containers and virtual machines to test out your package automatically. After the default testing round, you can also run your own
-testing generator as a shell script, which will be executed inside every container and virtual machine.
+Once successful, you can run `pkggen test`. It starts a container for every release of every distribution you target (Fedora 43/44/rawhide, openSUSE, OpenMandriva, Debian, Ubuntu,
+Arch and Gentoo) and builds, installs and indexes every package in it, in parallel. The finished repositories land in `pkggen-build/test/<release>/`. It uses Podman (or Docker),
+and on macOS and Windows it starts a Linux VM for the containers itself. The `test` block of your `pkggen.yaml` sets how many CPUs and how much RAM it may use, and the shell
+commands to run in every container before the packages are built and after they're installed:
+```yaml
+test:
+  cpus: 8
+  memory: 16G
+  post-setup: [ "my-app --version" ]
+  distributions:
+    debian:
+      setup: [ "apt-get install -y libfoo-dev" ]
+```
 
 And if all tests pass, run `pkggen deploy` to automatically deploy your packages to all repositories. Deployment generators are also provided for popular platforms like the AUR, and you can
 also write your own in python.
@@ -100,6 +111,14 @@ Planned future support:
    - FreeBSD(pkgs)
    - OpenBSD(ports)
 
+## Installing
+From a clone of this repository:
+```sh
+pip install ./src
+```
+This installs the `pkggen` command, its dependencies and the bundled generators. Use `pip install -e ./src` instead to work on pkggen itself,
+and set `PKGGEN_GENERATORS_PATH` to use your own copy of the `generators` folder.
+
 ## Getting started and learning
 Get started by navigating [to our documentation](https://github.com/MadLadSquad/pkggen/wiki/Home).
 
@@ -109,4 +128,5 @@ From the repository root:
 pip install -r src/requirements-dev.txt
 python -m pytest
 ```
-The tests run offline. Add `--live` to also test against the real GitHub and repology APIs.
+The tests run offline. Add `--live` to also test against the real GitHub and repology APIs, and `--containers` to build packages
+in real containers (needs Podman or Docker). On GitHub Actions, run the Tests workflow by hand to also run the container tests with Podman and Docker.

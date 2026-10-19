@@ -87,6 +87,6 @@ def run_generator(layer, name, payload, cwd=None, env=None):
     return run([paths.GENERATORS / layer / f"{name}.py"], stdin=stdin, cwd=cwd, env=env)
 
 
-def run_cli(*args, cwd=None, env=None):
+def run_cli(*args, cwd=None, env=None, timeout=300):
     """Run `pkggen <args>` straight from the source tree."""
-    return run([paths.CLI, *args], cwd=cwd, env=env)
+    return run([paths.CLI, *args], cwd=cwd, env=env, timeout=timeout)

@@ -10,6 +10,14 @@ on:
         description: "Also run the live tests against the real GitHub and repology APIs"
         type: boolean
         default: false
+      containers:
+        description: "Also build packages in real Podman and Docker containers (pkggen test)"
+        type: boolean
+        default: false
+      targets:
+        description: "Releases for the container tests, space-separated (e.g. fedora-44 ubuntu-24.04), or all. Empty: one per family"
+        type: string
+        default: ""
 
 jobs:
   test:
@@ -54,3 +62,41 @@ jobs:
         run: python -m pytest tests/live --live
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  containers:
+    name: Container tests / ${{ matrix.engine }}
+    if: github.event_name == 'workflow_dispatch' && inputs.containers
+    # Hosted macOS and Windows runners can't run a Linux VM, so containers only work on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [ podman, docker ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+          cache: pip
+          cache-dependency-path: src/requirements*.txt
+      - name: Install dependencies
+        run: python -m pip install -r src/requirements-dev.txt
+      - name: Show the container engine
+        run: ${{ matrix.engine }} version
+      - name: Run container tests
+        run: python -m pytest tests/containers --containers -v
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PKGGEN_TEST_CONTAINERS_ENGINE: ${{ matrix.engine }}
+          PKGGEN_TEST_CONTAINERS_TARGETS: ${{ inputs.targets }}
+          PKGGEN_TEST_CONTAINERS_LOGS: ${{ runner.temp }}/pkggen-logs
+      - name: Upload the build logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: container-logs-${{ matrix.engine }}
+          path: ${{ runner.temp }}/pkggen-logs
+          if-no-files-found: ignore

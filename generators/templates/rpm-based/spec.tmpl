@@ -3,7 +3,7 @@
     specific values come from the package's `rpm-based:` block in pkggen.yaml
     (`dist` here), e.g.
       rpm-based: { build-requires: [ "pkgconfig(foo)" ], requires: [ foo ], release: 1 }
-    `arches` is the package's `architectures` in RPM's names (x86_64, aarch64),
+    `arches` is the package's `architectures` in RPM's names (%{x86_64} or x86_64, aarch64),
     and empty for "any". Add `BuildArch: noarch` for packages without compiled code.
     In RPM comments, write macros as %% so they aren't expanded. -#}
 Name:           {{ name }}

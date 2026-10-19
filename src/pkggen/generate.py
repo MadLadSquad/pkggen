@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 from tqdm import tqdm
 
@@ -307,13 +308,35 @@ def print_summary(stats, total_packages, targets, failures):
             say(f"      {extra}")
 
 
-def generate(package_filter=None, distribution_filter=None):
-    """Run stages 3 and 4. Returns the process exit code."""
+@dataclass
+class PipelineResult:
+    """What run_pipeline() did, for callers that continue with the packages (`pkggen test`)."""
+    packages: list   # (package, fetch generator path), in pkggen.yaml order
+    targets: list    # [Target]
+    contexts: dict   # package name -> template context, for every fetched package
+    packaged: dict   # (distribution, package name) -> packaging generator result
+    failures: list   # [Failure]
+    stats: dict
+
+
+def load_config():
+    """pkggen.yaml as a mapping. Creates the secrets file so generators can rely on it."""
     utils.create_secrets_file()
     config = utils.get_pkggen_config()
     if not isinstance(config, dict):
         raise utils.GenericError("pkggen.yaml is empty or isn't a mapping!")
+    return config
 
+
+def generate(package_filter=None, distribution_filter=None):
+    """Run stages 3 and 4. Returns the process exit code."""
+    result = run_pipeline(load_config(), package_filter, distribution_filter)
+    print_summary(result.stats, len(result.packages), result.targets, result.failures)
+    return 1 if result.failures else 0
+
+
+def run_pipeline(config, package_filter=None, distribution_filter=None):
+    """Fetch every package and package it for every target distribution."""
     packages = load_packages(config, package_filter)
     if not packages:
         raise utils.GenericError("pkggen.yaml defines no packages!")
@@ -334,6 +357,8 @@ def generate(package_filter=None, distribution_filter=None):
 
     stats = {"fetched": 0, "packaged": 0, "jobs": 0}
     stats_lock = threading.Lock()
+    contexts = {}
+    packaged = {}
 
     def on_packaged(future, target, context):
         try:
@@ -345,6 +370,7 @@ def generate(package_filter=None, distribution_filter=None):
             return
         with stats_lock:
             stats["packaged"] += 1
+            packaged[(target.name, context["name"])] = result
         report_packaging(target, context, result)
 
     with ThreadPoolExecutor(max_workers=fetch_workers) as fetch_pool, \
@@ -364,6 +390,7 @@ def generate(package_filter=None, distribution_filter=None):
 
             stats["fetched"] += 1
             context = build_context(package, result)
+            contexts[package["name"]] = context
             say(f"{GREEN}✓{RESET} fetched {package['name']} {context['version']} "
                 f"({plural(len(context['artifacts']), 'artifact')})")
             # Start packaging right away, while other packages are still downloading
@@ -373,5 +400,4 @@ def generate(package_filter=None, distribution_filter=None):
                 job.add_done_callback(lambda f, t=target, c=context: on_packaged(f, t, c))
         # Leaving the `with` block waits for the remaining packaging jobs
 
-    print_summary(stats, len(packages), targets, failures)
-    return 1 if failures else 0
+    return PipelineResult(packages, targets, contexts, packaged, failures, stats)

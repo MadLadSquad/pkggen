@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+# Shared helpers for testing generators.
+#
+# A testing generator describes the containers that test one distribution's
+# packages; pkggen starts them and runs the steps. It reads one job (JSON) on stdin:
+#   {
+#     "distribution": "debian",
+#     "repository": { ...repositories.<dist> from pkggen.yaml... },
+#     "test": { "setup": [steps], "post-setup": [steps] },   // the user's steps, global then per distribution
+#     "rp_names": [ ...rp-names of the distribution in distributions.yaml... ],
+#     "versions": null,                // or the rp-names/target names to test (test.distributions.<dist>.versions)
+#     "host_arch": "amd64",            // architecture of the container host
+#     "packages": [ { "context": { ...template context... }, "output": "packages/foo" } ]
+#   }
+# `output` is where the packaging generator put the package, relative to the
+# repository. `packages` is empty when pkggen only asks for the targets.
+#
+# It prints { "targets": [target, ...], "warnings": [...] } on stdout:
+#   {
+#     "name": "debian-13", "rp_name": "debian_13", "image": "docker.io/library/debian:trixie",
+#     "platform": null,                          // e.g. "linux/amd64" to force one
+#     "data_images": [ { "image": "...", "path": "/var/db/repos/gentoo" } ],  // mounted with --volumes-from
+#     "env": { "DEBIAN_FRONTEND": "noninteractive" },
+#     "repo": "/pkggen/repo",                    // where pkggen copies the repository in
+#     "setup":    [steps],                       // before the repository is copied in
+#     "prepare":  [steps],                       // after it's copied in
+#     "packages": [ { "name": "foo", "build": [steps], "install": [steps] } ],
+#     "finalize": [steps],                       // index the finished repository into `collect`
+#     "post_setup": [steps],
+#     "collect": "/pkggen/out"                   // copied out to pkggen-build/test/<name>/
+#   }
+# A step is { "name": "...", "run": "<sh script>", "user": null, "workdir": null }.
+# Each step runs in its own `sh -exc`, so `cd` and variables don't carry over.
+import json
+import os
+import re
+import sys
+import traceback
+
+DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
+
+# Paths inside the containers
+REPO = "/pkggen/repo"
+OUT = "/pkggen/out"
+WORK = "/pkggen/work"
+STATE = "/pkggen/state"
+
+
+class TestingError(Exception):
+    """An expected error. Reported as a single message, without a traceback."""
+
+
+class Package:
+    def __init__(self, entry):
+        self.context = dict(entry["context"])
+        self.output = (entry.get("output") or "").replace("\\", "/").strip("/")
+        self.name = self.context["name"]
+        self.version = str(self.context["version"])
+        self.artifacts = self.context.get("artifacts") or []
+        self.source = self.context.get("source") or (self.artifacts[0] if self.artifacts else {})
+
+    def block(self, distribution):
+        """The package's own `<distribution>:` block."""
+        value = self.context.get(distribution)
+        return value if isinstance(value, dict) else {}
+
+    def source_dir(self):
+        return self.context.get("source_dir") or self.source.get("directory") or ""
+
+
+class Job:
+    def __init__(self, data):
+        self.distribution = data["distribution"]
+        self.repository = data.get("repository") or {}
+        self.test = data.get("test") or {}
+        self.rp_names = list(data.get("rp_names") or [])
+        self.versions = data.get("versions")
+        self.host_arch = data.get("host_arch") or "amd64"
+        self.warnings = []
+        self.packages = []
+        for entry in data.get("packages") or []:
+            package = Package(entry)
+            if builds_on(package, self.host_arch):
+                self.packages.append(package)
+            else:
+                self.warn(f"{package.name} isn't built for {self.host_arch} (see its 'architectures'), "
+                          f"so it's not tested on {self.distribution}")
+
+    def warn(self, message):
+        if message not in self.warnings:
+            self.warnings.append(message)
+
+
+def builds_on(package, arch):
+    value = package.context.get("architectures", ["amd64", "arm64"])
+    return value == "any" or not isinstance(value, list) or arch in value
+
+
+# --- Steps -------------------------------------------------------------------
+
+def step(name, run, user=None, workdir=None):
+    return {"name": name, "run": run.strip("\n") + "\n", "user": user, "workdir": workdir}
+
+
+def user_steps(job, key):
+    """The user's `setup` or `post-setup` steps, already normalised by pkggen."""
+    return [step(s.get("name") or "user step", s["run"], s.get("user"), s.get("workdir"))
+            for s in job.test.get(key) or []]
+
+
+def shquote(value):
+    """Quote for sh with single quotes: it's -> 'it'\\''s'."""
+    return "'" + str(value).replace("'", "'\\''") + "'"
+
+
+def heredoc(path, content):
+    """Shell code that writes content to path, without expanding anything in it."""
+    marker = "PKGGEN_EOF"
+    while marker in content:
+        marker += "_"
+    return f"cat > {shquote(path)} <<'{marker}'\n{content.rstrip(chr(10))}\n{marker}\n"
+
+
+def download(artifact, directory, name=None):
+    """Shell code that downloads an artifact into directory and checks its SHA-256."""
+    name = name or artifact["alias"]
+    path = f"{directory}/{name}"
+    code = f"curl -fsSL --retry 3 -o {shquote(path)} {shquote(artifact['url'])}\n"
+    sha256 = (artifact.get("checksums") or {}).get("sha2_256")
+    if sha256:
+        code += f"echo {shquote(sha256 + '  ' + path)} | sha256sum -c -\n"
+    return code
+
+
+TARBALL_RE = re.compile(r"\.(tar\.(gz|xz|bz2|zst|lz|lzma)|tgz|tbz2|txz)$")
+
+
+def tarball_extension(name):
+    """'foo-1.0.tar.xz' -> 'tar.xz', None for files that aren't tarballs."""
+    match = TARBALL_RE.search(name)
+    if not match:
+        return None
+    ext = match.group(1)
+    return {"tgz": "tar.gz", "tbz2": "tar.bz2", "txz": "tar.xz"}.get(ext, ext)
+
+
+def collect_step():
+    """The last finalize step: copy the finished repository to OUT, following symlinks."""
+    return step("collect the repository", f"rm -rf {OUT}\ncp -rL {REPO} {OUT}\n")
+
+
+# --- Targets -----------------------------------------------------------------
+
+def select_targets(job, table):
+    """The (rp-name, spec) pairs to test, from a {rp-name: spec} table.
+
+    Every spec has a `name` (the target name), an `image` and the host
+    architectures it runs on (`arches`). Without `versions`, every rp-name
+    of the distribution is tested.
+    """
+    by_name = {spec["name"]: rp for rp, spec in table.items()}
+    if job.versions is None:
+        wanted = []
+        for rp in job.rp_names:
+            if rp in table:
+                wanted.append(rp)
+            else:
+                job.warn(f"{job.distribution} has no container image for {rp}, so it's not tested")
+    else:
+        wanted, unknown = [], []
+        for version in job.versions:
+            rp = version if version in table else by_name.get(version)
+            if rp is None:
+                unknown.append(str(version))
+            elif rp not in wanted:
+                wanted.append(rp)
+        if unknown:
+            raise TestingError(f"unknown {job.distribution} version(s) in 'test.distributions.{job.distribution}"
+                               f".versions': {', '.join(unknown)}. Available: {', '.join(table)}")
+
+    result = []
+    for rp in wanted:
+        spec = table[rp]
+        if job.host_arch not in spec.get("arches", ["amd64", "arm64"]):
+            job.warn(f"{spec['name']} has no {job.host_arch} container image, so it's skipped")
+            continue
+        result.append((rp, spec))
+    return result
+
+
+def target(job, rp_name, spec, *, setup, prepare, packages, finalize, env=None, data_images=None):
+    return {
+        "name": spec["name"],
+        "rp_name": rp_name,
+        "image": spec["image"],
+        "platform": spec.get("platform"),
+        "data_images": data_images or [],
+        "env": env or {},
+        "repo": REPO,
+        "setup": setup + user_steps(job, "setup"),
+        "prepare": [step("create the work folders", f"mkdir -p {WORK} {STATE}\nchmod 777 {WORK} {STATE}\n")] + prepare,
+        "packages": packages,
+        "finalize": finalize,
+        "post_setup": user_steps(job, "post-setup"),
+        "collect": OUT,
+    }
+
+
+# --- Entry point -------------------------------------------------------------
+
+def run(main):
+    """Read the job from stdin, call main(job), which returns the targets, and print them as JSON."""
+    try:
+        data = json.loads(sys.stdin.buffer.read())
+        job = Job(data)
+        targets = main(job)
+    except Exception as e:
+        if DEBUG:
+            traceback.print_exc()
+        if isinstance(e, (TestingError, OSError)):
+            message = str(e)
+        elif isinstance(e, (json.JSONDecodeError, KeyError)):
+            message = f"invalid testing job: {type(e).__name__}: {e}"
+        else:
+            message = f"unexpected {type(e).__name__}: {e} (set PKGGEN_DEBUG=1 for a traceback)"
+        print(f"\x1b[31mError: {message}\x1b[0m", file=sys.stderr)
+        sys.exit(1)
+
+    sys.stdout.write(json.dumps({"targets": targets, "warnings": job.warnings}) + "\n")

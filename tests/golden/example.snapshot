@@ -373,7 +373,7 @@ gpgkey=https://rpms.madladsquad.com/rpmkey.pub
 
 ==> rpm-based/SPECS/.gitkeep (0 bytes)
 
-==> rpm-based/SPECS/untitled-cli-parser.spec (859 bytes)
+==> rpm-based/SPECS/untitled-cli-parser.spec (881 bytes)
 Name:           untitled-cli-parser
 Version:        1.2.0
 Release:        1%{?dist}
@@ -381,7 +381,7 @@ Summary:        A command line argument parser
 License:        MIT
 URL:            https://github.com/MadLadSquad/UntitledCLIParser
 Source0:        https://github.com/MadLadSquad/UntitledCLIParser/releases/download/v1.2.0/untitled-cli-parser-1.2.0.tar.xz#/untitled-cli-parser-1.2.0.tar.xz
-ExclusiveArch:  x86_64 aarch64
+ExclusiveArch:  %{?x86_64}%{!?x86_64:x86_64} aarch64
 
 %description
 A command line argument parser
@@ -405,7 +405,7 @@ A command line argument parser
 * Tue Sep 01 2026 MadLadSquad <contact@madladsquad.com> - 1.2.0-1
 - Update to 1.2.0
 
-==> rpm-based/SPECS/untitled-imgui-framework.spec (901 bytes)
+==> rpm-based/SPECS/untitled-imgui-framework.spec (923 bytes)
 Name:           untitled-imgui-framework
 Version:        1.1.2
 Release:        1%{?dist}
@@ -413,7 +413,7 @@ Summary:        A desktop application framework
 License:        LGPL-3.0-only
 URL:            https://github.com/MadLadSquad/UntitledImGuiFramework
 Source0:        https://github.com/MadLadSquad/UntitledImGuiFramework/releases/download/v1.1.2/untitled-imgui-framework-1.1.2.tar.xz#/untitled-imgui-framework-1.1.2.tar.xz
-ExclusiveArch:  x86_64 aarch64
+ExclusiveArch:  %{?x86_64}%{!?x86_64:x86_64} aarch64
 
 %description
 A desktop application framework

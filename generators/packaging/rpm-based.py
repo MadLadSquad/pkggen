@@ -6,7 +6,9 @@ import os
 import lib
 
 REQUIRED = ["spec.tmpl"]
-ARCHITECTURES = {"amd64": "x86_64", "arm64": "aarch64"}
+# OpenMandriva builds x86_64 packages as znver1, which its %{x86_64} macro includes.
+# openSUSE Leap doesn't define the macro, so fall back to plain x86_64 there
+ARCHITECTURES = {"amd64": "%{?x86_64}%{!?x86_64:x86_64}", "arm64": "aarch64"}
 
 
 def main(job):
