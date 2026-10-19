@@ -39,10 +39,17 @@ def test_gen_repo_rejects_unknown_distribution():
     assert "invalid choice" in result.err
 
 
-def test_stub_commands():
+def test_deploy_needs_a_deployment_block(example_project):
     result = run_cli("deploy")
+    assert result.code == 1
+    assert result.err_plain.strip() == "Error: Nothing to deploy: pkggen.yaml has no 'deployment' block"
+
+
+def test_deploy_options():
+    result = run_cli("deploy", "--help")
     assert result.code == 0
-    assert result.out.strip() == "This command is not currently implemented."
+    for option in ("--packages", "--distributions", "--targets", "--skip-tests", "--dry-run"):
+        assert option in result.out
 
 
 def test_expected_errors_are_one_line_without_traceback(tmp_path):

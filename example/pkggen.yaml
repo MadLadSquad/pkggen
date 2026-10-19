@@ -53,6 +53,20 @@ test:
   post-setup:
     - name: "show the release"
       run: "cat /etc/os-release"
+# `pkggen deploy` pushes what `pkggen test` built and checked (pkggen-build/test/<target>/)
+#deployment:
+#  arch:
+#    generator: "aur"             # every PKGBUILD folder to its own AUR repository
+#    username: "MadLadSquad"
+#    email: "contact@madladsquad.com"
+#  rpm-based:
+#    generator: "git"             # the compiled repositories, each target in its own folder
+#    url: "git@github.com:MadLadSquad/UntitledDesktopRPM.git"
+#    username: "MadLadSquad"
+#    email: "contact@madladsquad.com"
+#    targets: [ fedora-44, opensuse-tumbleweed ]
+#    prune: true                  # delete files the new repositories don't have...
+#    preserve: [ '^README\.md$' ] # ...except these
 pkggen:
   generator: "github"
   packages:

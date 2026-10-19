@@ -59,10 +59,18 @@ def isolated_env(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("APPDATA", str(config))
     monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(paths.GENERATORS))
     monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
+    # git (used by `pkggen deploy`) ignores the user's and the system's configuration
+    git_config = config / "gitconfig"
+    git_config.write_text("[init]\n\tdefaultBranch = main\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(git_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     for var in ("PKGGEN_RUN_PATH", "PKGGEN_FORCE", "PKGGEN_DEBUG", "PKGGEN_TEST_HTTP",
                 "PKGGEN_TEST_HTTP_LOG", "SOURCE_DATE_EPOCH", "PKGGEN_TEST_ENGINE", "PKGGEN_FAKE_ENGINE",
-                "CONTAINER_HOST", "DOCKER_HOST"):
+                "CONTAINER_HOST", "DOCKER_HOST", "PKGGEN_TEST_NOW", "PKGGEN_TEST_AUR_URL",
+                "GIT_SSH_COMMAND", "GIT_CONFIG_COUNT", "GIT_DIR", "GIT_WORK_TREE"):
         monkeypatch.delenv(var, raising=False)
+    for var in [v for v in os.environ if v.startswith(("PKGGEN_PASSWORD_", "PKGGEN_SSH_KEY_"))]:
+        monkeypatch.delenv(var)
     return config
 
 

@@ -16,6 +16,7 @@ import version  # noqa: E402
 import generate  # noqa: E402
 import gen_repo  # noqa: E402
 import testing  # noqa: E402
+import deploy  # noqa: E402
 from datetime import datetime  # noqa: E402
 
 from utilities.repology import query_repology  # noqa: E402
@@ -61,8 +62,14 @@ def run():
     test_parser.add_argument("--engine", help="The container engine to use", choices=["podman", "docker"])
     test_parser.add_argument("--keep", help="Don't remove the containers afterwards, for debugging", action="store_true")
 
-    deploy_parser = subparsers.add_parser("deploy", help="Deploy the generated packages")
-    deploy_parser.add_argument("-i", "--input", help="Set the input directory")
+    deploy_parser = subparsers.add_parser("deploy", help="Push the tested packages to their production repositories")
+    deploy_parser.add_argument("-p", "--packages", help="Only deploy these packages (AUR)", nargs='+')
+    deploy_parser.add_argument("-d", "--distributions", help="Only deploy these distributions", nargs='+')
+    deploy_parser.add_argument("-t", "--targets", help="Only deploy these test targets (e.g. fedora-44)", nargs='+')
+    deploy_parser.add_argument("--skip-tests", help="Also deploy targets and packages whose last test failed",
+                               action="store_true")
+    deploy_parser.add_argument("--dry-run", help="Commit the changes locally, but don't push them",
+                               action="store_true")
 
     repology_parser = subparsers.add_parser("repology", help="Query for dependencies using the repology database")
     repology_parser.add_argument("package")
@@ -79,7 +86,7 @@ def run():
     elif args.command == "test":
         sys.exit(testing.test(args.packages, args.distributions, args.targets, args.jobs, args.engine, args.keep))
     elif args.command == "deploy":
-        print("This command is not currently implemented.")
+        sys.exit(deploy.deploy(args.packages, args.distributions, args.targets, args.skip_tests, args.dry_run))
     elif args.command == "repology":
         query_repology(args.package, args.json, args.include_outdated)
     elif args.command == "version":

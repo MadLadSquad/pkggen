@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 import containers
 import generate
@@ -27,6 +28,8 @@ STEP_KEYS = {"name", "run", "user", "workdir"}
 ENGINES = ("podman", "docker")
 PULL_POLICIES = ("always", "missing", "never", "newer")
 TEST_DIR = "test"
+# The outcome of every target's last run, read by `pkggen deploy`
+RESULTS_FILE = "results.json"
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
@@ -277,6 +280,7 @@ class TargetResult:
         self.packages = 0
         self.skipped = None      # reason, when the target never ran
         self.output = None
+        self.package_status = {}  # package name -> True once it's built and installed
 
     @property
     def ok(self):
@@ -385,6 +389,7 @@ class Runner:
         result.packages = len(full.get("packages") or [])
         for package in full.get("packages") or []:
             pname = package["name"]
+            result.package_status[pname] = False
             if not self.run_steps(container, package.get("build") or [], log, result, pname, "build"):
                 say(f"{RED}✗{RESET} [{name}] {pname} failed to build")
                 continue
@@ -392,6 +397,7 @@ class Runner:
                 say(f"{RED}✗{RESET} [{name}] {pname} failed to install")
                 continue
             result.built += 1
+            result.package_status[pname] = True
             say(f"{GREEN}✓{RESET} [{name}] {pname} built and installed")
 
         if not self.run_steps(container, full.get("finalize") or [], log, result, "*", "finalize"):
@@ -443,6 +449,68 @@ def print_summary(results, pipeline_failures):
             say(f"      log: {utils.display_path(r.log_path)}")
 
 
+# --- Results file --------------------------------------------------------------------
+
+def test_output_dir():
+    return os.path.join(utils.get_run_path(), utils.DEFAULT_BUILD_DIR, TEST_DIR)
+
+
+def results_path():
+    return os.path.join(test_output_dir(), RESULTS_FILE)
+
+
+def load_results():
+    """The results file as {"targets": {name: entry}}, or None when there is none yet."""
+    path = results_path()
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as e:
+        raise utils.GenericError(f"Couldn't read {utils.display_path(path)}: {e}. Run `pkggen test` again")
+    if not isinstance(data, dict) or not isinstance(data.get("targets"), dict):
+        raise utils.GenericError(f"{utils.display_path(path)} isn't a pkggen test results file. Run `pkggen test` again")
+    return data
+
+
+def write_results(results, host_skipped, contexts, host_arch):
+    """Record every target of this run in the results file, keeping the other targets' entries.
+
+    host_skipped are the releases with no image for this host's architecture:
+    they're recorded as not passed, so an older result can't be deployed.
+    """
+    try:
+        data = load_results() or {"targets": {}}
+    except utils.GenericError:
+        data = {"targets": {}}
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for r in results:
+        entry = {
+            "distribution": r.distribution,
+            "ok": r.ok,
+            "finished": now,
+            "output": os.path.basename(r.output) if r.output else None,
+            "packages": {name: {"version": str((contexts.get(name) or {}).get("version", "")), "ok": ok}
+                         for name, ok in r.package_status.items()},
+        }
+        if r.skipped:
+            entry["skipped"] = r.skipped
+        elif r.failures:
+            entry["failed"] = [f.message.splitlines()[0] if f.message else "unknown error" for f in r.failures]
+        data["targets"][r.name] = entry
+    for t in host_skipped:
+        data["targets"][t["name"]] = {"distribution": t["distribution"], "ok": False, "finished": now,
+                                      "output": None, "packages": {},
+                                      "skipped": f"it has no {host_arch} container image"}
+    path = results_path()
+    temporary = path + ".tmp"
+    with open(temporary, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.replace(temporary, path)
+
+
 # --- Entry point -------------------------------------------------------------------
 
 def test(package_filter=None, distribution_filter=None, target_filter=None, jobs=None, engine_name=None, keep=False):
@@ -490,11 +558,15 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
         for dist in dists:
             settings["distributions"][dist]["versions"] = [t.get("rp_name") or t["name"] for t in chosen
                                                            if t["distribution"] == dist]
+        skipped = [t for t in skipped if t in chosen]
         matrix, _, found = describe_all(dists)
     warnings += found
     for warning in warnings:
         say(f"{YELLOW}Warning: {warning}{RESET}")
     if not matrix:
+        if skipped:  # so an older result for them can't be deployed
+            os.makedirs(test_output_dir(), exist_ok=True)
+            write_results([], skipped, {}, info["arch"])
         raise utils.GenericError("Nothing to test: no target can run on this machine")
 
     resources = containers.plan_resources(settings, len(matrix), info, whole_machine, jobs)
@@ -508,9 +580,9 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
     say(f"Testing {plural(len(matrix), 'target')} with {engine.kind}, {resources['jobs']} at a time"
         + (f" ({' and '.join(limits)} each)" if limits else "") + ": " + ", ".join(t["name"] for t in matrix))
 
-    test_dir = os.path.join(utils.get_run_path(), utils.DEFAULT_BUILD_DIR, TEST_DIR)
-    os.makedirs(test_dir, exist_ok=True)
-    runner = Runner(engine, secrets.token_hex(4), resources, settings, test_dir, keep)
+    output_dir = test_output_dir()
+    os.makedirs(output_dir, exist_ok=True)
+    runner = Runner(engine, secrets.token_hex(4), resources, settings, output_dir, keep)
     tested = sorted({t["distribution"] for t in matrix}, key=dists.index)
     for dist in tested:
         runner.ready[dist] = threading.Event()
@@ -552,6 +624,11 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
         pool.shutdown(wait=True, cancel_futures=True)
 
     print_summary(results, pipeline.failures)
+    try:
+        write_results(results, skipped, pipeline.contexts, info["arch"])
+    except OSError as e:
+        say(f"{YELLOW}Warning: couldn't write {utils.display_path(results_path())}: {e}. "
+            f"`pkggen deploy` needs it{RESET}")
     if keep:
         say(f"Containers were kept: remove them with `{engine.kind} rm -f -v $({engine.kind} ps -aq "
             f"--filter label={containers.SESSION_LABEL}={runner.session})`")

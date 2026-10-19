@@ -197,8 +197,13 @@ def test_success(generators, project, fake_engine, capsys):
     output = root / "pkggen-build" / "test"
     assert json.loads((output / "alpha-a1" / "one.json").read_text())["package"]["version"] == "1.0"
     assert sorted(p.name for p in output.iterdir()) == ["alpha-a1", "alpha-a1.log", "alpha-a2", "alpha-a2.log",
-                                                        "beta-b1", "beta-b1.log"]
-    log = (output / "alpha-a1.log").read_text()
+                                                        "beta-b1", "beta-b1.log", "results.json"]
+    results = json.loads((output / "results.json").read_text())["targets"]
+    assert sorted(results) == ["alpha-a1", "alpha-a2", "beta-b1"]
+    assert results["alpha-a1"]["ok"] is True and results["alpha-a1"]["distribution"] == "alpha"
+    assert results["alpha-a1"]["output"] == "alpha-a1"
+    assert results["alpha-a1"]["packages"] == {"one": {"version": "1.0", "ok": True}, "two": {"version": "1.0", "ok": True}}
+    log =(output / "alpha-a1.log").read_text()
     assert "==> setup: tools\n+ install tools on amd64" in log
     assert "==> build: build one\n+ build one from one.json" in log
 
@@ -228,6 +233,41 @@ def test_package_failure_doesnt_stop_the_others(generators, project, fake_engine
     assert "✗ [alpha-a2] one: build failed: 'build one' exited with code 1" in err
     assert "fake failure" in err
     assert f"log: {native('pkggen-build/test/alpha-a2.log')}" in err
+
+
+def read_results(root):
+    return json.loads((root / "pkggen-build" / "test" / "results.json").read_text())["targets"]
+
+
+def test_results_record_failed_packages_and_merge_runs(generators, project, fake_engine):
+    root = project(group=packages({"name": "one", "fail_build": "a2"}, {"name": "two"}))
+    assert testing.test() == 1
+    a2 = read_results(root)["alpha-a2"]
+    assert a2["ok"] is False and a2["output"] == "alpha-a2"
+    assert a2["packages"]["one"]["ok"] is False and a2["packages"]["two"]["ok"] is True
+    assert a2["failed"][0].startswith("build failed: 'build one' exited with code 1")
+
+    # A later run of one target only replaces that target's entry
+    (root / "pkggen.yaml").write_text((root / "pkggen.yaml").read_text().replace("fail_build: a2", "fail_build: none"))
+    assert testing.test(target_filter=["a2"]) == 0
+    results = read_results(root)
+    assert sorted(results) == ["alpha-a1", "alpha-a2", "beta-b1"]
+    assert results["alpha-a2"]["ok"] is True and results["alpha-a2"]["packages"]["one"]["ok"] is True
+
+
+def test_results_record_releases_this_host_cant_run(generators, project, fake_engine, capsys):
+    root = project()
+    assert testing.test() == 0
+    assert read_results(root)["alpha-a2"]["ok"] is True
+    fake_engine.configure(info={"host": {"arch": "arm64", "cpus": 8, "memTotal": 16 * 1024 ** 3,
+                                         "cgroupControllers": ["cpu", "memory"], "os": "linux"}})
+    # The older result for a2 must not stay deployable
+    with pytest.raises(utils.GenericError, match="no target can run on this machine"):
+        testing.test(target_filter=["a2"])
+    a2 = read_results(root)["alpha-a2"]
+    assert a2["ok"] is False and a2["skipped"] == "it has no arm64 container image" and a2["output"] is None
+    assert testing.test() == 0
+    assert read_results(root)["alpha-a1"]["ok"] is True
 
 
 def test_setup_failure(generators, project, fake_engine, capsys):
