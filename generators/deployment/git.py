@@ -5,7 +5,9 @@
 # The upstream is fetched into pkggen-build/deploy/<id>/, the new files are put
 # on top of it (overwriting changed files), and the result is committed and
 # pushed. Files that only exist upstream are kept unless `prune` is set;
-# `preserve` regexes exempt paths from pruning.
+# `preserve` regexes exempt paths from pruning. Executable bits come from the
+# test containers' list when there is one, so they survive file systems
+# without them (NTFS, where Git for Windows has core.filemode=false).
 #
 # The AUR generator imports this module, so everything here is reusable.
 import filecmp
@@ -204,7 +206,7 @@ def preserved(path, patterns):
 
 
 def sync(work, sources, prune=False, preserve=(), protected=()):
-    """Copy every file of the sources [(folder, destination)] into work, overwriting changed files.
+    """Copy every file of the sources [(folder, destination[, executables])] into work, overwriting changed files.
 
     With prune, files in work that no source has are deleted, except .git,
     paths matching a preserve regex and paths under a protected folder.
@@ -213,7 +215,7 @@ def sync(work, sources, prune=False, preserve=(), protected=()):
     patterns = [re.compile(p) for p in preserve]
     produced = set()
     written = []
-    for source, destination in sources:
+    for source, destination, *_ in sources:
         destination = normalise(destination)
         for root, dirs, files in os.walk(source):
             dirs[:] = sorted(d for d in dirs if d != ".git")
@@ -252,6 +254,27 @@ def sync(work, sources, prune=False, preserve=(), protected=()):
     return written, sorted(removed)
 
 
+def executable_modes(sources):
+    """{path in work: executable?} for the files of the sources that come with a set of executables.
+
+    A source's executables are the paths (relative to its folder) that were
+    executable in the test container; sources without that set (None) are left
+    to the file system.
+    """
+    modes = {}
+    for source, destination, *rest in sources:
+        executables = rest[0] if rest else None
+        if executables is None:
+            continue
+        destination = normalise(destination)
+        for root, dirs, files in os.walk(source):
+            dirs[:] = [d for d in dirs if d != ".git"]
+            for name in files:
+                inner = normalise(os.path.relpath(os.path.join(root, name), source))
+                modes[normalise(f"{destination}/{inner}")] = inner in executables
+    return modes
+
+
 def make_parents(work, relative):
     """Create the folders of relative inside work, replacing files that are in the way."""
     current = work
@@ -265,13 +288,35 @@ def make_parents(work, relative):
 
 # --- Committing and pushing ---------------------------------------------------------
 
-def commit(work, username, email, message, sign=False):
-    """Commit everything in work. Returns False when nothing changed.
+def set_modes(work, modes):
+    """Make the staged files' executable bits match modes {path: executable?}.
+
+    git add takes them from the file system, which on Windows (core.filemode=false)
+    has none: new files would be 100644 and existing ones keep their old mode.
+    """
+    if not modes:
+        return
+    changes = {"+x": [], "-x": []}
+    for entry in git(["ls-files", "--stage", "-z"], cwd=work).split("\0"):
+        info, _, path = entry.partition("\t")
+        mode = info.split(" ")[0]
+        if modes.get(path) is True and mode == "100644":
+            changes["+x"].append(path)
+        elif modes.get(path) is False and mode == "100755":
+            changes["-x"].append(path)
+    for flag, paths in changes.items():
+        for i in range(0, len(paths), 100):  # keep the command line short (Windows)
+            git(["update-index", f"--chmod={flag}", "--", *paths[i:i + 100]], cwd=work)
+
+
+def commit(work, username, email, message, sign=False, modes=None):
+    """Commit everything in work, with the executable bits of modes. Returns False when nothing changed.
 
     Commits aren't signed unless sign is set: signing keys that ask for a
     passphrase or a touch can't do it from here.
     """
     git(["add", "-A"], cwd=work)
+    set_modes(work, modes)
     if not git(["status", "--porcelain"], cwd=work).strip():
         return False
     options = ["-c", f"user.name={username}", "-c", f"user.email={email}"]
@@ -298,7 +343,8 @@ def deploy_tree(job, name, work, fetch_url, push_url, branch, sources, message, 
     for attempt in (1, 2):
         branch, base = prepare(work, fetch_url, push_url, branch, env)
         _, removed = sync(work, sources, bool(config.get("prune")), config.get("preserve") or (), protected)
-        if not commit(work, config["username"], config["email"], message, bool(config.get("sign"))):
+        if not commit(work, config["username"], config["email"], message, bool(config.get("sign")),
+                      executable_modes(sources)):
             job.say(f"{name}: already up to date")
             return "unchanged"
         summary = change_summary(work)
@@ -414,7 +460,7 @@ def main(job):
         return  # every target failed its tests: they're reported as skipped
     paths = target_paths(job, [t.name for t in targets] + job.skipped_targets + [s["name"] for s in job.skipped])
     url = config["url"]
-    sources = [(t.path, paths[t.name]) for t in targets]
+    sources = [(t.path, paths[t.name], t.executables) for t in targets]
     # Targets that aren't deployed this time keep what's upstream, even with prune
     protected = [paths[name] for name in job.skipped_targets + [s["name"] for s in job.skipped]]
     env = auth_env(job, url)

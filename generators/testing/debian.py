@@ -120,6 +120,10 @@ def main(job):
 
         prepare = [lib.step("write conf/distributions",
                             lib.heredoc(f"{lib.REPO}/conf/distributions", distributions_stanza(job, spec, suite)))]
+        if job.packages:
+            # The repository loses the bit on its way in from a host without one (Windows)
+            rules = " ".join(lib.shquote(f"{lib.REPO}/packages/{p.name}/debian/rules") for p in job.packages)
+            prepare.append(lib.step("make debian/rules executable", f"chmod +x {rules}\n"))
         finalize = [
             lib.step("add the packages to the repository", f"""\
 set -- {DEBS}/*/*.deb

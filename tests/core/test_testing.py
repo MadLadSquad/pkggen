@@ -38,11 +38,12 @@ STUB_TESTING = textwrap.dedent("""\
             built.append({"name": c["name"],
                           "build": [step("build " + c["name"], fail + "build " + c["name"] + " from " + entry["output"])],
                           "install": [step("install " + c["name"], "install " + c["name"])]})
+        prepare = "".join("\\nchmod +x /pkggen/repo/" + e["output"] for e in job["packages"] if e["context"].get("chmod"))
         targets.append({
             "name": job["distribution"] + "-" + rp, "rp_name": rp, "image": "example.org/" + rp + ":1",
             "env": {"TARGET": rp, "MAKEFLAGS": "-j99"}, "repo": "/pkggen/repo",
             "setup": [step("tools", "install tools on " + job["host_arch"])] + job["test"]["setup"],
-            "prepare": [step("prepare", "prepare")], "packages": built,
+            "prepare": [step("prepare", "prepare" + prepare)], "packages": built,
             "finalize": [step("collect", "cp -rL /pkggen/repo /pkggen/out")],
             "post_setup": job["test"]["post-setup"], "collect": "/pkggen/out",
         })
@@ -253,6 +254,23 @@ def test_results_record_failed_packages_and_merge_runs(generators, project, fake
     results = read_results(root)
     assert sorted(results) == ["alpha-a1", "alpha-a2", "beta-b1"]
     assert results["alpha-a2"]["ok"] is True and results["alpha-a2"]["packages"]["one"]["ok"] is True
+
+
+def test_results_list_the_executable_files_of_the_output(generators, project, fake_engine):
+    root = project(group=packages({"name": "one", "chmod": True}, {"name": "two"}))
+    assert testing.test() == 0
+    # Listed in the container: the copy on the host may have lost the bit (NTFS)
+    finds = [c for c in fake_engine.calls("exec") if "find" in c]
+    assert len(finds) == 3 and finds[0][-7:] == ["find", "/pkggen/out", "-type", "f", "-perm", "-u+x", "-print0"]
+    results = read_results(root)
+    assert {name: entry["executables"] for name, entry in results.items()} == {
+        "alpha-a1": ["one.json"], "alpha-a2": ["one.json"], "beta-b1": ["one.json"]}
+
+    # When they can't be listed, the entry says nothing, and deployments leave the bits alone
+    fake_engine.configure(fail_find=True)
+    assert testing.test(target_filter=["a1"]) == 0
+    assert "executables" not in read_results(root)["alpha-a1"]
+    assert "couldn't list the executable files" in (root / "pkggen-build" / "test" / "alpha-a1.log").read_text()
 
 
 def test_results_record_releases_this_host_cant_run(generators, project, fake_engine, capsys):

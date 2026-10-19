@@ -13,7 +13,8 @@
 #     "run_path": "/abs/dir/of/pkggen.yaml",
 #     "work_path": "/abs/pkggen-build/deploy/rpm-based-git",  // the generator's own scratch space
 #     "targets": [ { "name": "fedora-44", "path": "/abs/pkggen-build/test/fedora-44", "ok": true,
-#                    "reason": null, "packages": { "foo": { "version": "1.2", "ok": true } } } ],
+#                    "reason": null, "packages": { "foo": { "version": "1.2", "ok": true } },
+#                    "executables": [ "SOURCES/run.sh" ] } ],  // executable in the container (null: unknown)
 #     "skipped_targets": [ "fedora-43" ],  // selected, but with no test output to deploy
 #     "packages": null,                // or the names given with -p
 #     "skip_tests": false,             // --skip-tests: deploy targets and packages that failed their tests
@@ -59,6 +60,17 @@ class Target:
         self.ok = bool(data.get("ok"))
         self.reason = data.get("reason")
         self.packages = data.get("packages") or {}
+        # Files of path (POSIX, relative to it) that are executable in the test container: the
+        # file system may not have kept the bit (NTFS). None when the test run didn't list them.
+        executables = data.get("executables")
+        self.executables = None if executables is None else set(executables)
+
+    def executables_in(self, folder):
+        """The executables below folder of the output, relative to it (None when unknown)."""
+        if self.executables is None:
+            return None
+        prefix = folder.strip("/") + "/" if folder.strip("/") else ""
+        return {p[len(prefix):] for p in self.executables if p.startswith(prefix)}
 
 
 class Job:

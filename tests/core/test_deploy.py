@@ -5,7 +5,7 @@ import yaml
 
 import deploy
 import utils
-from tests.deployment.conftest import upstream, write_tree  # noqa: F401
+from tests.deployment.conftest import git, upstream, write_tree  # noqa: F401
 from tests.support.helpers import run_cli, strip_ansi
 
 IDENTITY = {"username": "Packager", "email": "packager@example.org"}
@@ -179,6 +179,17 @@ def test_filters(project, upstream, capsys):
     assert mirror.files() == {"RPMS/fedora-44.rpm": "fedora-44"}
     err = strip_ansi(capsys.readouterr().err)
     assert "Deploying rpm-based-git (fedora-44)" in err and "Deploying rpm-based-git-2 (fedora-44)" in err
+
+
+def test_executables_from_the_results_reach_the_upstream(project, upstream, monkeypatch):
+    # Git for Windows can't see executable bits; the list pkggen test recorded can
+    for key, value in {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.filemode", "GIT_CONFIG_VALUE_0": "false"}.items():
+        monkeypatch.setenv(key, value)
+    up = upstream()
+    project({"rpm-based": {"generator": "git", "url": up.url, **IDENTITY}},
+            results={"fedora-44": result("rpm-based", executables=["RPMS/fedora-44.rpm"])})
+    assert deploy.deploy() == 0
+    assert git("--git-dir", up.url, "ls-tree", "main", "fedora-44/RPMS/fedora-44.rpm").split()[0] == "100755"
 
 
 def test_dry_run(project, upstream, capsys):

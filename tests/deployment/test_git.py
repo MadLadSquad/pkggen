@@ -325,6 +325,43 @@ def test_the_work_clone_is_reset_between_runs(git_generator, make_job, upstream,
     assert up.files() == {"t1/a": "1"}
 
 
+def no_filemode(monkeypatch):
+    """Make git ignore the file system's executable bits, like Git for Windows does."""
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.filemode")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "false")
+
+
+def modes(up, folder="t1"):
+    lines = git("--git-dir", up.url, "ls-tree", "-r", "main", folder).splitlines()
+    return {line.split("\t")[1]: line.split()[0] for line in lines}
+
+
+def test_executable_bits_come_from_the_test_containers(git_generator, make_job, upstream, tmp_path, monkeypatch):
+    no_filemode(monkeypatch)
+    up = upstream()
+    # Copied out onto a file system without executable bits: only the list says which ones are
+    out = built(tmp_path, "t1", {"debian/rules": "#!/usr/bin/make -f\n", "run.sh": "#!/bin/sh\n", "README": "r"})
+    deploy(git_generator, make_job, config(up.url), [target(out, executables=["debian/rules", "run.sh"])])
+    assert modes(up) == {"t1/README": "100644", "t1/debian/rules": "100755", "t1/run.sh": "100755"}
+
+    # A file that isn't executable in the container anymore loses the bit upstream too, like on Linux
+    job = deploy(git_generator, make_job, config(up.url), [target(out, executables=["debian/rules"])])
+    assert job.pushed == ["dist-gen"]
+    assert modes(up) == {"t1/README": "100644", "t1/debian/rules": "100755", "t1/run.sh": "100644"}
+
+    # Without a list (results of an older pkggen), the upstream modes stay
+    job = deploy(git_generator, make_job, config(up.url), [target(out)])
+    assert job.unchanged == ["dist-gen"]
+
+
+def test_executables_are_relative_to_each_targets_output(deploy_lib):
+    t = deploy_lib.Target({"name": "arch", "path": "/x", "executables": ["foo/a", "foo/b/c", "foobar/d", "e"]})
+    assert t.executables_in("foo") == {"a", "b/c"}
+    assert t.executables_in("") == {"foo/a", "foo/b/c", "foobar/d", "e"}
+    assert deploy_lib.Target({"name": "arch", "path": "/x"}).executables_in("foo") is None
+
+
 @pytest.mark.skipif(os.name == "nt", reason="no executable bit on Windows")
 def test_executable_bits_are_kept(git_generator, make_job, upstream, tmp_path):
     up = upstream()

@@ -66,6 +66,8 @@ def test_build_and_install_steps(describe):
     ]:
         assert fragment in build
     assert scripts(package["install"]) == "apt-get install -y /pkggen/state/debs/foo/*.deb\n"
+    # debian/rules may come in without its executable bit (from Windows)
+    assert targets[0]["prepare"][-1]["run"] == "chmod +x '/pkggen/repo/packages/foo/debian/rules'\n"
     finalize = targets[0]["finalize"]
     assert "reprepro -b /pkggen/repo includedeb 'trixie' \"$@\"" in finalize[0]["run"]
     assert finalize[-1]["run"] == "rm -rf /pkggen/out\ncp -rL /pkggen/repo /pkggen/out\n"

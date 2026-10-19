@@ -237,6 +237,19 @@ class Engine:
         os.makedirs(parent, exist_ok=True)
         self.run("cp", f"{name}:{path.rstrip('/')}/.", f"./{base}", cwd=parent)
 
+    def list_executables(self, name, path):
+        """The files below path in the container with the owner's executable bit, as sorted POSIX paths
+        relative to it, or None when they can't be listed.
+
+        copy_out can't keep that bit on file systems without one (NTFS), so the
+        deployment puts it back from this list.
+        """
+        result = self.run("exec", name, "find", path, "-type", "f", "-perm", "-u+x", "-print0", check=False)
+        if result.returncode != 0:
+            return None
+        prefix = path.rstrip("/") + "/"
+        return sorted(p[len(prefix):] for p in result.stdout.split("\0") if p.startswith(prefix))
+
     def remove(self, *names):
         if names:
             self.run("rm", "-f", "-v", *names, check=False)

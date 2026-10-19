@@ -280,6 +280,7 @@ class TargetResult:
         self.packages = 0
         self.skipped = None      # reason, when the target never ran
         self.output = None
+        self.executables = None   # files of the output that are executable in the container, relative to it
         self.package_status = {}  # package name -> True once it's built and installed
 
     @property
@@ -409,6 +410,10 @@ class Runner:
             output = os.path.join(self.test_dir, NAME_RE.sub("-", name))
             self.engine.copy_out(container, full["collect"], output)
             result.output = output
+            result.executables = self.engine.list_executables(container, full["collect"])
+            if result.executables is None:
+                log.write(b"pkggen: couldn't list the executable files of the output (find failed), so the "
+                          b"deployment can't restore their executable bits where the file system has none\n")
 
     def report(self, result):
         log = utils.display_path(result.log_path)
@@ -494,6 +499,8 @@ def write_results(results, host_skipped, contexts, host_arch):
             "packages": {name: {"version": str((contexts.get(name) or {}).get("version", "")), "ok": ok}
                          for name, ok in r.package_status.items()},
         }
+        if r.output and r.executables is not None:
+            entry["executables"] = r.executables
         if r.skipped:
             entry["skipped"] = r.skipped
         elif r.failures:

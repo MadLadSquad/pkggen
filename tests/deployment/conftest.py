@@ -95,5 +95,6 @@ def make_job(tmp_path):
     return make
 
 
-def target(path, name="t1", ok=True, packages=None, reason=None):
-    return {"name": name, "path": str(path), "ok": ok, "reason": reason, "packages": packages or {}}
+def target(path, name="t1", ok=True, packages=None, reason=None, executables=None):
+    return {"name": name, "path": str(path), "ok": ok, "reason": reason, "packages": packages or {},
+            "executables": executables}

@@ -3,15 +3,19 @@
 It keeps its state in the folder named by PKGGEN_FAKE_ENGINE:
   calls.jsonl         every command line (without the program), one JSON list per line
   calls.lock          locked while a line is appended to calls.jsonl
-  config.json         optional: {"info": {...}, "fail_images": [...], "machines": [...], "vm_type": "wsl"}
+  config.json         optional: {"info": {...}, "fail_images": [...], "machines": [...], "fail_find": true, "vm_type": "wsl"}
   containers/<name>/  each container: meta.json and fs/, its file system
 
 Steps (`exec ... sh -exc <script>`) aren't really run. A script that contains
 FAKE_FAIL fails, and `cp -rL <src> <dst>` lines are copied inside fs/, so the
-collected output looks like the real thing.
+collected output looks like the real thing. `chmod +x <paths>` lines are
+recorded in executables.json (the host may have no executable bit), and
+`exec <name> find <path> -type f -perm -u+x -print0` lists those files plus
+the ones that are executable on the host.
 """
 import json
 import os
+import shlex
 import shutil
 import sys
 import time
@@ -61,6 +65,35 @@ def inside(name, path):
     return os.path.join(fs(name), path.lstrip("/"))
 
 
+def container_path(path):
+    return "/" + "/".join(p for p in path.replace("\\", "/").split("/") if p)
+
+
+def load_executables(name):
+    path = os.path.join(CONTAINERS, name, "executables.json")
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            return set(json.load(f))
+    return set()
+
+
+def save_executables(name, paths):
+    with open(os.path.join(CONTAINERS, name, "executables.json"), "w", encoding="utf-8") as f:
+        json.dump(sorted(paths), f)
+
+
+def find_executables(name, path):
+    root = inside(name, path)
+    marked = load_executables(name)
+    for folder, dirs, files in os.walk(root):
+        dirs.sort()
+        for file in sorted(files):
+            full = os.path.join(folder, file)
+            in_container = container_path(path + "/" + os.path.relpath(full, root))
+            if in_container in marked or os.stat(full).st_mode & 0o100:
+                sys.stdout.write(in_container + "\0")
+
+
 def create(args, start):
     options, positional = split(args)
     name, image = options["--name"][0], positional[0]
@@ -95,15 +128,26 @@ def exec_(args):
     if command[:2] == ["mkdir", "-p"]:
         os.makedirs(inside(name, command[2]), exist_ok=True)
         return 0
+    if command[:1] == ["find"]:
+        if config().get("fail_find"):
+            print("find: not found", file=sys.stderr)
+            return 127
+        find_executables(name, command[1])
+        return 0
     script = command[-1]
     print(f"+ {script.strip().splitlines()[0] if script.strip() else ''}")
     if "FAKE_FAIL" in script:
         print("fake failure")
         return 1
     for line in script.splitlines():
-        parts = line.split()
+        parts = shlex.split(line)
         if parts[:2] == ["cp", "-rL"] and len(parts) == 4 and os.path.isdir(inside(name, parts[2])):
             shutil.copytree(inside(name, parts[2]), inside(name, parts[3]), dirs_exist_ok=True)
+            src, dst = container_path(parts[2]), container_path(parts[3])
+            marked = load_executables(name)
+            save_executables(name, marked | {dst + p[len(src):] for p in marked if p.startswith(src + "/")})
+        elif parts[:2] == ["chmod", "+x"]:
+            save_executables(name, load_executables(name) | {container_path(p) for p in parts[2:]})
     return 0
 
 

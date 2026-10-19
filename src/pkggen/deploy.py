@@ -161,6 +161,7 @@ def select_targets(deployments, results, target_filter, skip_tests):
                 "name": name, "path": path, "ok": bool(entry.get("ok")),
                 "reason": None if entry.get("ok") else not_passed_reason(entry),
                 "packages": entry.get("packages") or {},
+                "executables": entry.get("executables"),
             })
         if not dep.targets and not names:
             dep.skipped.append(("*", f"{dep.distribution} has no tested target: run `pkggen test -d {dep.distribution}`"))
