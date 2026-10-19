@@ -15,7 +15,9 @@
 {% endif %}
 	</maintainer>
 {% endfor %}
-{% if author is defined or github is defined %}
+{# Gentoo's "gitlab" remote-id only covers gitlab.com #}
+{% set on_gitlab_com = gitlab is defined and (gitlab.domain | default("gitlab.com")) == "gitlab.com" %}
+{% if author is defined or github is defined or on_gitlab_com %}
 	<upstream>
 {% if author is defined %}
 		<maintainer>
@@ -27,6 +29,9 @@
 {% endif %}
 {% if github is defined %}
 		<remote-id type="github">{{ github.user | e }}/{{ github.repo | e }}</remote-id>
+{% endif %}
+{% if on_gitlab_com %}
+		<remote-id type="gitlab">{{ gitlab.user | e }}/{{ gitlab.repo | e }}</remote-id>
 {% endif %}
 	</upstream>
 {% endif %}

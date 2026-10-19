@@ -102,22 +102,29 @@ def apply_transforms(transforms, value):
     return value
 
 
-def http_error(response, what):
-    """Build a descriptive TinyError for a failed HTTP response."""
+def http_error(response, what, secret_hint="a 'github_key'"):
+    """Build a descriptive TinyError for a failed HTTP response.
+
+    secret_hint names the secret that would help, e.g. "a 'gitlab_key'".
+    """
     message = f"couldn't {what}: HTTP {response.status_code} {response.reason} ({response.url})"
     try:
-        api_message = response.json().get("message")
+        body = response.json()
+        api_message = body.get("message") or body.get("error")
         if api_message:
             message += f": {api_message}"
     except (ValueError, AttributeError):
         pass
 
-    if response.status_code in (403, 429) and response.headers.get("X-RateLimit-Remaining") == "0":
-        reset = response.headers.get("X-RateLimit-Reset")
+    # GitHub sends X-RateLimit-*, GitLab sends RateLimit-*
+    headers = response.headers
+    remaining = headers.get("X-RateLimit-Remaining") or headers.get("RateLimit-Remaining")
+    if response.status_code == 429 or (response.status_code == 403 and remaining == "0"):
+        reset = headers.get("X-RateLimit-Reset") or headers.get("RateLimit-Reset")
         when = datetime.fromtimestamp(int(reset)).strftime("%H:%M:%S") if reset and reset.isdigit() else "later"
-        message += f". API rate limit exceeded, it resets at {when}. Add a 'github_key' to {secrets_path()} to raise the limit"
+        message += f". API rate limit exceeded, it resets at {when}. Add {secret_hint} to {secrets_path()} to raise the limit"
     elif response.status_code == 404:
-        message += ". Check that it exists. Private repositories also need a 'github_key' in secrets.yaml"
+        message += f". Check that it exists. Private repositories also need {secret_hint} in secrets.yaml"
     return TinyError(message)
 
 
@@ -153,7 +160,7 @@ def short_name(name, width=30):
     return name if len(name) <= width else name[:width - 3] + "..."
 
 
-def download_and_hash(session, url, headers=None, position=0, label=None):
+def download_and_hash(session, url, headers=None, position=0, label=None, secret_hint="a 'github_key'"):
     """Stream url, hashing it on the fly.
 
     Returns {"size", "checksums"} plus "last_modified" (ISO 8601) when the
@@ -170,7 +177,7 @@ def download_and_hash(session, url, headers=None, position=0, label=None):
 
     with response:
         if response.status_code != 200:
-            raise http_error(response, f"download {url}")
+            raise http_error(response, f"download {url}", secret_hint)
 
         expected = int(response.headers.get("content-length") or 0)
         last_modified = iso_date(response.headers.get("last-modified"))

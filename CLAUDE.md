@@ -61,7 +61,7 @@ pkggen takes inspiration from funtoo-metatools but extends the idea to the entir
 6. **Deployment generators** — `pkggen deploy`. They use the `deployment` key in `pkggen.yaml`. A per-repository, per-distribution-type deployment generator updates the upstream repository with the new packages. Many distributions may not need this step. Deployment usually needs secrets, read from environment variables or the standard secrets file (see below).
 
 ### Secrets
-Secrets are stored in `$XDG_CONFIG_HOME/pkggen/secrets.yaml` (defaults to `~/.config/pkggen/secrets.yaml`), or `%APPDATA%\pkggen\secrets.yaml` on Windows. Loaded by `load_secrets()` in `generators/generation/lib.py`. Today only `github_key` is used. Deployment generators should also accept secrets from environment variables.
+Secrets are stored in `$XDG_CONFIG_HOME/pkggen/secrets.yaml` (defaults to `~/.config/pkggen/secrets.yaml`), or `%APPDATA%\pkggen\secrets.yaml` on Windows. Loaded by `load_secrets()` in `generators/generation/lib.py`. Today `github_key` (GitHub), `gitlab_key` (gitlab.com) and `gitlab_keys` (a `{<domain>: <token>}` map for self-hosted GitLab instances) are used. Deployment generators should also accept secrets from environment variables.
 
 ### Current state vs. intended design
 - `pkggen test` and `pkggen deploy` are stubs; `generators/testing/` and `generators/deployment/` only hold a `.gitkeep`.
@@ -84,7 +84,7 @@ File contents style: when a file's content is fixed (optionally with f-string va
 `gen_repo.py` discovers available distributions by cross-referencing `utils.load_distributions()` with the presence of a matching `.py` file in `repositories/`.
 
 ### 2. Fetch generators (`generators/generation/`)
-`github.py` and `url.py` read one package (JSON) from stdin and print one JSON result on stdout:
+`github.py`, `gitlab.py` and `url.py` read one package (JSON) from stdin and print one JSON result on stdout:
 ```json
 { "version": "1.2.0", "date": "<ISO 8601 UTC, optional>", "tag": "<releases/tags>", "commit": "<commits>",
   "artifacts": [ { "url": "...", "alias": "pkg-1.2.0.tar.gz", "type": "source|asset",
@@ -96,6 +96,8 @@ File contents style: when a file's content is fixed (optionally with f-string va
 `lib.py`: `run(generate)` (reads stdin, prints the JSON result, turns `TinyError`/network errors into one `Error [pkg]: ...` line on stderr and exit code 1), `download_and_hash()` (streams a URL and hashes it in one pass, without decompressing), `http_error()` (messages with URL, status and rate-limit hints), `apply_transforms()`, `to_bool()`, `load_secrets()`, `archive_stem()`.
 
 GitHub release queries with `artifacts` download only the listed assets (a missing one is an error); `include-source: true` also adds GitHub's auto-generated tarball. Auto-generated tarballs use `https://<domain>/<user>/<repo>/archive/<ref>.tar.gz`.
+
+`gitlab.py` mirrors `github.py` (same keys and queries, a `gitlab:` block, placeholders `{gitlab_user}`/`{gitlab_repo}`). Differences: `user` may contain subgroups; `domain` (default `gitlab.com`, may include a path prefix) replaces `domain`/`api-domain`; GitLab has no drafts or pre-releases, so `include-upcoming` (releases dated in the future) replaces `include-drafts`/`include-pre-releases`; release `artifacts` are matched against release asset links and use their `direct_asset_url`; auto-generated tarballs use `https://<domain>/<user>/<repo>/-/archive/<ref>/<repo>-<ref>.tar.gz` and extract to `<repo>-<ref>` (leading `v` kept, `/` → `-`); Licensee license keys are mapped to the SPDX ids GitHub reports. The token is only sent to the instance's own host.
 
 ### 3. Packaging generators (`generators/packaging/`)
 `arch.py`, `debian.py`, `gentoo.py`, `rpm-based.py`. Each reads a job from stdin: `{distribution, package (template context), repository (repositories.<dist>), repository_path, templates_path, default_templates_path, run_path}`, and prints `{output, files_written, files_unchanged, warnings}` on stdout.
@@ -119,7 +121,7 @@ Template folders live next to `pkggen.yaml` in `packages/<dist>/<package>/`. If 
   - `maintainer`: string, `"Name <email>"`. The packager: Debian `Maintainer:` and changelog trailer, PKGBUILD `# Maintainer:` header, RPM `%changelog`, Gentoo `metadata.xml` `<maintainer>` (needs the email, else the overlay `owners` are used).
   - `author`: string, `"Name <email>"` or just a name. Upstream author: Debian `copyright` `Copyright:` field, Gentoo `metadata.xml` `<upstream><maintainer>`.
   - `architectures`: `"any"` (builds on every architecture) or a list of names, default `[amd64, arm64]`. Each packaging generator translates it with `lib.architectures(job, names, any_value, other=None)` into the template variable `arches`: arch → `x86_64`/`aarch64`, `any` → `['any']`; debian → `amd64`/`arm64`, `any` → `any`; rpm-based → `ExclusiveArch: x86_64 aarch64`, `any` → no `ExclusiveArch`; gentoo → `~<arch>` keywords, other names passed through, `any` → every main Gentoo arch. Names a generator doesn't know are dropped; if none is left it fails. Packages without compiled code override it per distribution (`debian: { architecture: all }`, `arch: { arch: [any] }`, `BuildArch: noarch` in the spec).
-- **`$XDG_CONFIG_HOME/pkggen/secrets.yaml`** (default `~/.config/pkggen/secrets.yaml`; `%APPDATA%\pkggen\secrets.yaml` on Windows) — API keys. Currently used key: `github_key` for authenticated GitHub API requests.
+- **`$XDG_CONFIG_HOME/pkggen/secrets.yaml`** (default `~/.config/pkggen/secrets.yaml`; `%APPDATA%\pkggen\secrets.yaml` on Windows) — API keys. Currently used keys: `github_key` for authenticated GitHub API requests, `gitlab_key` for gitlab.com and `gitlab_keys: { <domain>: <token> }` for other GitLab instances.
 
 ### Template context
 Templates see the package's own `pkggen.yaml` keys at the top level (`name`, `github.user`, `maintainer`, …), plus:

@@ -57,7 +57,7 @@ packages:
         transforms: [ [ "^v", "" ] ]
 ```
 When declaring a package, you specify a fetch generator, which is the script that will fetch the sources for it. Each generator has its own additional configuration that is parsed in its own code.
-We include pre-installed generators for integrating with popular platforms like GitHub, however if a generator does not exist for your use case, you can write one in python.
+We include pre-installed generators for integrating with popular platforms like GitHub and GitLab, however if a generator does not exist for your use case, you can write one in python.
 
 Next, create the repository skeleton for every distribution you target with `pkggen gen-repo <distribution>`. Repositories are created in the `pkggen-build` directory
 next to your `pkggen.yaml`. Each distribution has its own repository generator, which allows you to easily introduce support for platforms we may not currently support.
