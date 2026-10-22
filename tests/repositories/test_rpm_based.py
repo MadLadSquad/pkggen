@@ -11,10 +11,11 @@ def test_rpm_skeleton(gen_repo, example_config):
     assert (gen_repo.out / "untitled-desktop-rpm.repo").read_bytes() == (
         b"[untitled-desktop-rpm]\n"
         b"name=RPM packages for the UntitledDesktop project\n"
-        b"baseurl=https://rpms.madladsquad.com/\n"
+        b"baseurl=https://rpms.madladsquad.com/fedora-$releasever/RPMS/\n"
         b"type=rpm-md\n"
         b"enabled=1\n"
-        b"gpgcheck=1\n"
+        b"gpgcheck=0\n"
+        b"repo_gpgcheck=1\n"
         b"gpgkey=https://rpms.madladsquad.com/rpmkey.pub\n"
     )
     assert (gen_repo.out / ".gitignore").read_text() == "*.tar.*\nBUILD/*/\nBUILDROOT/\n"

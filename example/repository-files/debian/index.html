@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="The official Debian/Ubuntu repository for the UntitledDesktopEnvironment and related projects.">
+		<meta name="author" content="MadLadSquad">
+		<link rel="icon" type="image/png" href="./favicon.png">
+		<title>UntitledDesktop Debian/Ubuntu Repository</title>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet" type="text/css">
+
+		<style>
+			body {
+				background-color: #E8EEF2;
+				color: #37293A;
+				max-width: 1360px;
+			}
+			h1, h2, h3, h4, h5, h6, p, a, li {
+				font-family: Ubuntu, sans-serif;
+			}
+
+			a {
+				text-decoration: none;
+				color: #1d84b5;
+			}
+
+			.inline-code {
+				display: inline;
+				border: 1px solid #37293A;
+				border-radius: 0.25rem;
+				background-color: #37293A;
+				color: #e8eef2;
+				padding-left: 0.25rem;
+				padding-right: 0.25rem;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Welcome to the UntitledDesktopEnvironment Debian/Ubuntu repository</h1>
+		<p>This repository is used for hosting all UntitledDesktopEnvironment packages, as well as all <a href="https://madladsquad.com">MadLadSquad</a> applications.</p>
+		
+		<p>Packages are built for Debian 13 (<code class="inline-code">trixie</code>), Debian unstable (<code class="inline-code">sid</code>), Ubuntu 24.04 (<code class="inline-code">noble</code>) and Ubuntu 26.04 (<code class="inline-code">resolute</code>). First, install our PGP key:</p>
+		<pre class="sourceCode language-plaintext"><code class="sourceCode language-plaintext">root # wget -qO- "https://debs.madladsquad.com/keys/public.asc" | gpg --dearmor -o /usr/share/keyrings/untitled-desktop.gpg</code></pre>
+
+		<p>Then add the repository to <code class="inline-code">/etc/apt/sources.list.d/untitled-desktop-deb.sources</code>, with your release's codename in <code class="inline-code">Suites</code>:</p>
+		<pre class="sourceCode language-plaintext"><code class="sourceCode language-plaintext">Types: deb
+URIs: https://debs.madladsquad.com/
+Suites: trixie
+Components: main
+Signed-By: /usr/share/keyrings/untitled-desktop.gpg</code></pre>
+
+		<p>After adding the repository make sure to run <code class="inline-code">apt update</code>!</p>
+
+		<h2>Available packages:</h2>
+		<ul>
+			<li>untitled-game-system-manager - Provides <a href="https://github.com/MadLadSquad/UntitledGameSystemManager">UntitledGameSystemManager</a>, a manager for containerised Linux game systems</li>
+			<li>untitled-ibus-handwriting - Provides <a href="https://github.com/MadLadSquad/UntitledIBusHandwriting">UntitledIBusHandwriting</a>, an IBus handwriting input method for IBus</li>
+			<li>ude-session-logout - Provides <a href="https://github.com/MadLadSquad/UntitledDESessionLogout">UntitledDESessionLogout</a>, a session logout utility for the UntitledDesktopEnvironment</li>
+			<li>untitled-imgui-framework - Provides <a href="https://github.com/MadLadSquad/UntitledImGuiFramework">UntitledImGuiFramework</a>, an independent cross-platform desktop application development toolkit</li>
+			<li>untitled-dbus-utils - Provides <a href="https://github.com/MadLadSquad/UntitledDBusUtils">UntitledDBusUtils</a>, a C++ wrapper on top of the low level D-Bus C API</li>
+			<li>untitled-exec - Provides <a href="https://github.com/MadLadSquad/UntitledExec">UntitledExec</a>, a cross-platform fork and exec/CreateProcess wrapper library</li>
+			<li>untitled-cli-parser - Provides <a href="https://github.com/MadLadSquad/UntitledCLIParser">UntitledCLIParser</a>, a parser for CLI arguments</li>
+			<li>untitled-i18n - Provides <a href="https://github.com/MadLadSquad/UntitledI18N">UntitledI18N</a>, a i18n library</li>
+			<li>untitled-open - Provides <a href="https://github.com/MadLadSquad/UntitledOpen">UntitledOpen</a>, a file dialog, URL and file opener library</li>
+			<li>untitled-xdg-basedir - Provides <a href="https://github.com/MadLadSquad/UntitledXDGBasedir">UntitledXDGBasedir</a>, a better implementation of the XDG base directory specification</li>
+		</ul>
+		<footer>
+			<p>A <a href="https://madladsquad.com">MadLadSquad</a> / <a href="https://heapforge.com">Heapforge</a> project. Copyright &#169; <a href="https://heapforge.com">Heapforge Ltd.</a> 2025 - 2026 &bull; <a href="https://madladsquad.com/privacy-policy">Privacy Policy</a>.</p>
+		</footer>
+	</body>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark-reasonable.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+	<script>hljs.highlightAll();</script>
+</html>
+

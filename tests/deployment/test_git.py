@@ -1,9 +1,11 @@
 import os
+import shutil
 import subprocess
 
 import pytest
 
 from tests.deployment.conftest import git, target, write_tree
+from tests.deployment.test_s3 import gpg_key  # noqa: F401 (fixture)
 
 IDENTITY = {"username": "Packager", "email": "packager@example.org"}
 
@@ -104,8 +106,9 @@ def test_check_errors(git_generator, make_job, secrets, tmp_path, isolated_env):
         "prune": "yes", "preserve": ["(unclosed"], "typo": 1, "path": "../out",
     })
     assert errors == [
-        "'deployment.dist' has unknown keys: typo (allowed: branch, email, generator, managed-key, message, "
-        "password, path, preserve, prune, sign, ssh-key, targets, url, username)",
+        "'deployment.dist' has unknown keys: typo (allowed: branch, email, exclude, generator, gpg-key, "
+        "gpg-passphrase, managed-key, message, password, path, preserve, prune, public-key, sign, ssh-key, targets, "
+        "url, username)",
         "'deployment.dist.username' is required",
         "'deployment.dist.email' must be a non-empty string",
         "set either 'deployment.dist.ssh-key' or 'deployment.dist.password', not both",
@@ -122,7 +125,8 @@ def test_check_errors(git_generator, make_job, secrets, tmp_path, isolated_env):
 
 
 @pytest.mark.parametrize("path, targets, message", [
-    ("", ("a", "b"), "puts several targets (a, b) in the same folder"),
+    # Targets can share a folder: their files are merged
+    ("", ("a", "b"), None),
     ("repo", ("a",), None),
     ("", ("a",), None),
     ("{target}", ("a", "a/b"), "puts one target's folder (a/b) inside another one's (a)"),
@@ -370,3 +374,60 @@ def test_executable_bits_are_kept(git_generator, make_job, upstream, tmp_path):
     deploy(git_generator, make_job, config(up.url), [target(out)])
     mode = git("--git-dir", up.url, "ls-tree", "main", "t1/run.sh").split()[0]
     assert mode == "100755"
+
+
+# --- Shared folders, exclude and signing ---------------------------------------------------
+
+
+def test_targets_can_share_a_folder(git_generator, make_job, upstream, tmp_path):
+    up = upstream()
+    a = built(tmp_path, "debian-13", {"pool/a_1~deb13.deb": "a", "dists/trixie/Release": "t", "index.html": "same"})
+    b = built(tmp_path, "ubuntu-24.04", {"pool/a_1~ubuntu24.04.deb": "b", "dists/noble/Release": "n",
+                                         "index.html": "same"})
+    deploy(git_generator, make_job, config(up.url, path=""), [target(a, "debian-13"), target(b, "ubuntu-24.04")])
+    assert up.files() == {"pool/a_1~deb13.deb": "a", "pool/a_1~ubuntu24.04.deb": "b", "dists/trixie/Release": "t",
+                          "dists/noble/Release": "n", "index.html": "same"}
+
+
+def test_shared_folder_conflicts(git_generator, make_job, upstream, tmp_path):
+    up = upstream()
+    a = built(tmp_path, "a", {"index.html": "one"})
+    b = built(tmp_path, "b", {"index.html": "two"})
+    job = make_job(git_generator, config(up.url, path=""), targets=[target(a, "a"), target(b, "b")])
+    with pytest.raises(git_generator.lib.DeployError, match="a and b both have index.html, with different content"):
+        git_generator.main(job)
+    assert up.files() is None
+
+
+def test_exclude(git_generator, make_job, upstream, tmp_path):
+    up = upstream()
+    up.commit(tmp_path, {"binpkgs/old.gpkg.tar": "kept: excluded files aren't pruned", "stale.ebuild": "x"})
+    out = built(tmp_path, "gentoo", {"app/foo/foo-1.ebuild": "e", "binpkgs/app/foo-1.gpkg.tar": "binary"})
+    deploy(git_generator, make_job, config(up.url, path="", exclude=["^binpkgs/"], prune=True),
+           [target(out, "gentoo")])
+    assert up.files() == {"app/foo/foo-1.ebuild": "e", "binpkgs/old.gpkg.tar": "kept: excluded files aren't pruned"}
+
+
+def test_a_skipped_target_holds_back_pruning_in_a_shared_folder(git_generator, make_job, upstream, tmp_path, capfd):
+    up = upstream()
+    up.commit(tmp_path, {"dists/noble/Release": "the last noble release"})
+    a = built(tmp_path, "debian-13", {"dists/trixie/Release": "t"})
+    deploy(git_generator, make_job, config(up.url, path="", prune=True), [target(a, "debian-13")],
+           skipped_targets=["ubuntu-24.04"])
+    assert up.files() == {"dists/noble/Release": "the last noble release", "dists/trixie/Release": "t"}
+    assert "nothing is pruned in the root this time" in capfd.readouterr().err
+
+
+@pytest.mark.skipif(shutil.which("gpg") is None, reason="needs GnuPG")
+def test_signed_repository_in_git(git_generator, make_job, upstream, tmp_path, gpg_key):
+    up = upstream()
+    out = built(tmp_path, "debian-13", {"dists/trixie/Release": "Codename: trixie\n"})
+    deployment = config(up.url, path="", **{"gpg-key": "test", "public-key": "keys/public.asc"})
+    deploy(git_generator, make_job, deployment, [target(out, "debian-13")])
+    files = up.files()
+    assert set(files) == {"dists/trixie/Release", "dists/trixie/InRelease", "dists/trixie/Release.gpg",
+                          "keys/public.asc"}
+    assert files["dists/trixie/InRelease"].startswith("-----BEGIN PGP SIGNED MESSAGE-----")
+    # The signatures of an unchanged Release are kept: nothing to commit
+    job = deploy(git_generator, make_job, deployment, [target(out, "debian-13")])
+    assert job.unchanged == ["dist-gen"] and len(up.log()) == 1

@@ -1,0 +1,13 @@
+{#- An UntitledImGuiFramework application with a Rust handwriting recognition
+    library, whose crates are vendored in the release tarball. -#}
+{% extends "uimgui-app/ebuild.tmpl" %}
+{% set extra_inherit = ["rust"] %}
+{% block functions %}
+
+src_compile() {
+	pushd hanzi_lookup >/dev/null || die
+	cargo build --release --offline --locked || die
+	popd >/dev/null || die
+	uimgui_src_compile
+}
+{% endblock %}

@@ -1,0 +1,30 @@
+{#- The UntitledDesktop libraries: CMake projects that install with -DUIMGUI_INSTALL=ON.
+    Extra CMake options: the package's `gentoo.cmake-args`, else its `cmake.args`. -#}
+{% extends "_base/ebuild.tmpl" %}
+{% set inherit = ["cmake"] %}
+{% block functions %}
+
+src_prepare() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	if ! grep -q 'include(GNUInstallDirs)' CMakeLists.txt; then
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt || die
+	fi
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt || die
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in || die
+	cmake_src_prepare
+}
+
+src_configure() {
+	local mycmakeargs=(
+		-DUIMGUI_INSTALL=ON
+{% for arg in dist["cmake-args"] | default((cmake | default({})).args | default([])) %}
+		"{{ arg }}"
+{% endfor %}
+	)
+	cmake_src_configure
+}
+{% endblock %}

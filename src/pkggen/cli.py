@@ -71,8 +71,9 @@ def run():
     deploy_parser.add_argument("--dry-run", help="Commit the changes locally, but don't push them",
                                action="store_true")
 
-    repology_parser = subparsers.add_parser("repology", help="Query for dependencies using the repology database")
-    repology_parser.add_argument("package")
+    repology_parser = subparsers.add_parser("repology", help="Show what a dependency (a repology project) is called "
+                                                             "in every release, as `dependencies` in pkggen.yaml uses it")
+    repology_parser.add_argument("package", help="The repology project name, e.g. glfw")
     repology_parser.add_argument("-j", "--json", help="Print the result of the query as a JSON object", action="store_true")
     repology_parser.add_argument("-i", "--include-outdated", help="Include versions in outdated distribution releases", action="store_true")
 
@@ -88,7 +89,7 @@ def run():
     elif args.command == "deploy":
         sys.exit(deploy.deploy(args.packages, args.distributions, args.targets, args.skip_tests, args.dry_run))
     elif args.command == "repology":
-        query_repology(args.package, args.json, args.include_outdated)
+        sys.exit(query_repology(args.package, args.json, args.include_outdated))
     elif args.command == "version":
         print(f"pkggen version {version.PKGGEN_VERSION}")
 

@@ -1,0 +1,82 @@
+{#- The framework and its build tool, UVKBuildTool. Upstream has no plain
+    install step for the framework: it's installed by building an empty
+    project with install-framework: true, whose own files are then removed. -#}
+{% extends "_base/ebuild.tmpl" %}
+{% set inherit = ["multilib", "multiprocessing"] %}
+{% block functions %}
+
+# Configures a UVKBuildTool project for a system-wide build, with every
+# library in $(get_libdir) (upstream defaults to lib64/). The same function as
+# uimgui_configure_project in eclass/uimgui.eclass, which can't be inherited
+# here: it depends on this package.
+_configure_project() {
+	local file=${1} framework=${2:-false} libdir
+	libdir=$(get_libdir)
+	sed -i \
+		-e "s|lib64/|${libdir}/|g" \
+		-e "/^build-mode-vendor:/d" \
+		-e "/^system-wide:/d" \
+		-e "/^install-framework:/d" \
+		"${file}" || die
+	cat >> "${file}" <<-EOF || die
+	install-override:
+	  unix:
+	    framework-library-dir: "${libdir}/"
+	    framework-application-library-dir: "${libdir}/"
+	build-mode-vendor: false
+	system-wide: true
+	install-framework: ${framework}
+	EOF
+}
+
+src_prepare() {
+	default
+	# The framework's pkg-config file, in the system's library directory
+	sed -i "s|^libdir=.*|libdir=\"\${prefix}/$(get_libdir)\"|" Framework/cmake/UntitledImGuiFramework.pc.in || die
+	sed -i "s|DESTINATION lib/pkgconfig/|DESTINATION $(get_libdir)/pkgconfig/|" \
+		UVKBuildTool/Templates/UntitledImGuiFramework/BuildFiles/CMakeInstall.tmpl || die
+	# The build scripts run make with one job per CPU, which can run out of
+	# memory: let UIMGUI_JOBS set the count (the installed export.sh too, which
+	# builds the applications)
+	sed -i 's/^\([[:space:]]*\)\(cpus\|jobs\)=\$(grep -c processor .*$/&\n\1[ -z "${UIMGUI_JOBS}" ] || \2="${UIMGUI_JOBS}"/' \
+		install.sh export.sh create-project.sh UVKBuildTool/ci.sh || die
+	grep -q UIMGUI_JOBS export.sh || die "the build scripts' job count wasn't patched"
+}
+
+src_configure() {
+	:
+}
+
+src_compile() {
+	export UIMGUI_JOBS=$(makeopts_jobs)
+	# Builds UVKBuildTool in UVKBuildTool/build
+	./install.sh ci || die
+	# The empty project that installs the framework
+	./create-project.sh pkg --skip-compilation || die
+	_configure_project Projects/pkg/uvproj.yaml true
+
+	# UVKBuildTool itself, built again for its system-wide location
+	cmake -B "${WORKDIR}/uvkbuildtool" -S UVKBuildTool \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="${EPREFIX}/usr" \
+		-DUBT_INSTALL=ON \
+		-DUBT_FRAMEWORK_DIR="${EPREFIX}/usr/include/UntitledImGuiFramework/" \
+		-DUBT_DATA_INSTALL_PREFIX="${EPREFIX}/usr/share/" || die
+	emake -C "${WORKDIR}/uvkbuildtool"
+}
+
+src_install() {
+	export UIMGUI_JOBS=$(makeopts_jobs)
+	pushd UVKBuildTool/build >/dev/null || die
+	./UVKBuildTool --build "${ED}/usr" "${EPREFIX}/usr" ../../Projects/pkg || die
+	popd >/dev/null || die
+	# UVKBuildTool exits with 0 even when the build fails
+	[[ -e ${ED}/usr/$(get_libdir)/libUntitledImGuiFramework.so ]] || die "UVKBuildTool didn't install the framework"
+	# Only keep the framework, not the project that installed it
+	rm -rf "${ED}/usr/$(get_libdir)/libpkgLib.so" "${ED}/usr/bin/pkg" "${ED}/usr/share/config/pkg" \
+		"${ED}/usr/include/pkg" "${ED}"/usr/{include,share}/utf8cpp || die
+
+	DESTDIR="${D}" cmake --install "${WORKDIR}/uvkbuildtool" || die
+	einstalldocs
+}
+{% endblock %}

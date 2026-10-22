@@ -90,3 +90,9 @@ Thumbs.db
 graphify-out/
 .claude/
 .agents/
+
+reference/
+docs/
+
+# pkggen output (e.g. of runs in example/)
+pkggen-build/

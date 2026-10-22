@@ -3,17 +3,92 @@
 #   spec.tmpl        -> SPECS/<name>.spec
 #   everything else  -> SOURCES/ (patches, desktop files, ...)
 import os
+from collections import Counter
+
 import lib
 
 REQUIRED = ["spec.tmpl"]
 # OpenMandriva builds x86_64 packages as znver1, which its %{x86_64} macro includes.
 # openSUSE Leap doesn't define the macro, so fall back to plain x86_64 there
 ARCHITECTURES = {"amd64": "%{?x86_64}%{!?x86_64:x86_64}", "arm64": "aarch64"}
+# Libraries need their -devel package to build; the runtime library is found
+# by rpmbuild's automatic dependencies
+DEPENDENCY_FIELDS = {
+    "build": [("build_requires", "main")],
+    "libraries": [("build_requires", "dev")],
+    "runtime": [("requires", "main")],
+    "development": [("build_requires", "dev"), ("requires", "dev")],
+}
+# The families share one spec: a dependency they name differently is written in
+# an %if block per family. rp-name prefix -> (family, the spec condition)
+FAMILIES = {
+    "fedora": "0%{?fedora}",
+    "opensuse": "0%{?suse_version}",
+    "openmandriva": "0%{?mdvver}",
+}
+
+
+def family(rp_name):
+    return rp_name.split("_", 1)[0]
+
+
+def pick(job, dep, package, kind):
+    if kind != "dev":
+        return lib.main_package(package, dep["name"])
+    if lib.lists_binaries(package):
+        return lib.dev_package(package, dep["name"], "-devel")
+    # openSUSE Leap: repology only knows the binary package's own name, so go by the convention
+    guess = f"{lib.basename(package.get('srcname'))}-devel"
+    job.warn(f"repology doesn't list the packages of {dep['name']} in {package.get('repo')}: guessed {guess}")
+    return guess
+
+
+def render(job, dep, names):
+    """glfw-devel >= 3.4, or {"families": {family: name}} when the families name it differently."""
+    suffix = f" {dep['op']} {dep['version']}" if dep.get("op") else ""
+    by_family = {}
+    for rp in job.releases or list(names):
+        if rp in names:
+            by_family.setdefault(family(rp), []).append(names[rp])
+    if not by_family:  # a local package: the same name everywhere
+        return f"{next(iter(names.values()))}{suffix}"
+    chosen = {}
+    for name, found in by_family.items():
+        counts = Counter(found)
+        chosen[name] = max(found, key=lambda n: counts[n])  # the most common, the first release's on a tie
+        if len(counts) > 1:
+            job.warn(f"the {name} releases call {dep['name']} {', '.join(counts)}: using {chosen[name]} for all of them")
+    families = {family(rp) for rp in job.releases} or set(chosen)
+    if set(chosen) == families and len(set(chosen.values())) == 1:
+        return f"{next(iter(chosen.values()))}{suffix}"
+    return {"families": {name: f"{value}{suffix}" for name, value in chosen.items()}}
+
+
+def split_families(job, deps):
+    """Move the per-family dependencies to deps["by_family"]: [{family, condition, build_requires, requires}]."""
+    blocks = {}
+    for field in ("build_requires", "requires"):
+        common = []
+        for value in deps[field]:
+            if isinstance(value, dict):
+                for name, rendered in value["families"].items():
+                    if name not in FAMILIES:
+                        job.warn(f"pkggen can't tell {name} releases apart in a spec, so {rendered} is left out")
+                        continue
+                    block = blocks.setdefault(name, {"family": name, "condition": FAMILIES[name],
+                                                     "build_requires": [], "requires": []})
+                    if rendered not in block[field]:
+                        block[field].append(rendered)
+            else:
+                common.append(value)
+        deps[field] = common
+    deps["by_family"] = [blocks[name] for name in FAMILIES if name in blocks]
 
 
 def main(job):
     # "any" means no ExclusiveArch line
     job.context["arches"] = lib.architectures(job, ARCHITECTURES, [])
+    split_families(job, lib.dependencies(job, DEPENDENCY_FIELDS, pick, render))
     lib.ensure_templates(job, REQUIRED)
 
     def place(rel):

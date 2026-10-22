@@ -19,7 +19,8 @@ def test_category_comes_from_the_packaging_output(describe):
     assert "[$repo]\nlocation = /pkggen/repo\nauto-sync = no\n" in prepare
     assert 'echo "*/*::$repo ~amd64" > /etc/portage/package.accept_keywords/pkggen' in prepare
     # Categories that profiles/categories doesn't list are added in the container's copy
-    assert "grep -qx 'dev-libs' /pkggen/repo/profiles/categories || echo 'dev-libs' >>" in prepare
+    assert ("grep -qx 'dev-libs' /var/db/repos/gentoo/profiles/categories /pkggen/repo/profiles/categories || "
+            "echo 'dev-libs' >>") in prepare
     assert "grep -qx 'ude-base'" in prepare
 
     foo = target["packages"][0]

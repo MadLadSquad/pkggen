@@ -26,7 +26,7 @@ def test_build_runs_makepkg_as_the_build_user(describe):
 
 
 def test_repository_name(describe):
-    finalize = scripts(describe("arch")[0][0]["finalize"])
+    finalize = scripts(describe("arch", repository={})[0][0]["finalize"])
     assert "repo-add 'pkggen.db.tar.zst' ./*.pkg.tar.*" in finalize
     finalize = scripts(describe("arch", repository={"name": "mine"})[0][0]["finalize"])
     assert "repo-add 'mine.db.tar.zst'" in finalize

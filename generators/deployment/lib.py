@@ -21,16 +21,21 @@
 #     "interactive": true,             // a person is at the terminal, so prompts can wait for them
 #     "dry_run": false                 // --dry-run: commit locally, don't push
 #   }
+# Generators that publish whole repositories stage them first (stage_targets():
+# several targets may share a folder, `exclude` leaves files out), then sign
+# their metadata with GPG when `gpg-key` is set (sign_repository()).
 # Progress, prompts and errors go to stderr. It prints on stdout:
 #   check mode: { "errors": [...], "warnings": [...] }
 #   otherwise:  { "pushed": [names], "unchanged": [names], "failed": [{name, message}],
 #                 "skipped": [{name, reason}], "warnings": [...] }
+import filecmp
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import traceback
 from datetime import datetime, timedelta, timezone
 
@@ -165,6 +170,9 @@ SECRET_KINDS = {
     # kind: (secrets.yaml key, environment variable prefix, what it is)
     "password": ("git_passwords", "PKGGEN_PASSWORD_", "password"),
     "ssh-key": ("ssh_keys", "PKGGEN_SSH_KEY_", "SSH key"),
+    # A key fingerprint (in the user's keyring), an armored private key's path, or the armored key itself
+    "gpg-key": ("gpg_keys", "PKGGEN_GPG_KEY_", "GPG key"),
+    "gpg-passphrase": ("gpg_passphrases", "PKGGEN_GPG_PASSPHRASE_", "GPG key passphrase"),
 }
 
 
@@ -197,6 +205,10 @@ def secret_problem(kind, nickname):
         path = os.path.expanduser(value)
         if not os.path.isfile(path):
             return f"the SSH key '{nickname}' is {path}, which doesn't exist"
+    if kind == "gpg-key" and not (FINGERPRINT_RE.match(value.strip()) or ARMORED_KEY in value
+                                  or os.path.isfile(os.path.expanduser(value))):
+        return (f"the GPG key '{nickname}' must be a key fingerprint, the path of an armored private key "
+                f"(gpg --armor --export-secret-keys), or the armored key itself")
     return None
 
 
@@ -357,6 +369,284 @@ def wait_for_user(prompt):
     if not line:  # end of input, e.g. Ctrl-D
         raise DeployError("stopped. Run `pkggen deploy` again once the key is added")
     return line
+
+
+# --- Staging: the files a deployment publishes -------------------------------------
+
+def normalise(path):
+    """A relative POSIX path without ./ and trailing slashes: '' is the repository root."""
+    parts = [p for p in str(path).replace("\\", "/").split("/") if p not in ("", ".")]
+    return "/".join(parts)
+
+
+def under(path, folder):
+    return folder == "" or path == folder or path.startswith(folder + "/")
+
+
+def preserved(path, patterns):
+    """Whether path, or a folder it's in, matches one of the regexes."""
+    parts = path.split("/")
+    candidates = ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
+    return any(p.search(c) for p in patterns for c in candidates)
+
+
+def same_file(a, b):
+    return filecmp.cmp(a, b, shallow=False) and (os.stat(a).st_mode & 0o111) == (os.stat(b).st_mode & 0o111)
+
+
+class Staged:
+    """The files to publish: {relative path: source file}, and where they came from."""
+
+    def __init__(self, folders, exclude):
+        self.files = {}
+        self.owners = {}
+        self.folders = folders    # the folder of every deployed target
+        self.exclude = exclude    # compiled `exclude` regexes
+        self.hold = []            # folders shared with a target that isn't deployed: nothing is pruned there
+
+    def excluded(self, path):
+        """Whether a path of the published repository is left out by `exclude` (matched inside its target's folder)."""
+        for folder in self.folders:
+            if under(path, folder):
+                inner = path[len(folder) + 1:] if folder else path
+                if any(p.search(inner) for p in self.exclude):
+                    return True
+        return False
+
+    def prunable(self, path, preserve=(), protected=()):
+        """Whether a published file that no target has any more can be deleted."""
+        return not (path in self.files or preserved(path, preserve) or self.excluded(path)
+                    or any(under(path, normalise(folder)) for folder in list(protected) + self.hold))
+
+
+def stage_targets(sources, exclude=(), skipped_folders=()):
+    """Collect what a deployment publishes. sources: [(target name, output folder, destination folder)].
+
+    `exclude` regexes are matched against paths inside each target's output.
+    Targets may share a destination: their identical files merge, and a file
+    they have with different content is an error.
+    """
+    patterns = [re.compile(p) for p in exclude or ()]
+    folders = sorted({normalise(destination) for _, _, destination in sources})
+    staged = Staged(folders, patterns)
+    for name, source, destination in sources:
+        destination = normalise(destination)
+        for root, dirs, files in os.walk(source):
+            dirs[:] = sorted(d for d in dirs if d != ".git")
+            for file in sorted(files):
+                path = os.path.join(root, file)
+                inner = normalise(os.path.relpath(path, source))
+                if any(p.search(inner) for p in patterns):
+                    continue
+                relative = f"{destination}/{inner}" if destination else inner
+                if relative in staged.files:
+                    if same_file(staged.files[relative], path):
+                        continue
+                    raise DeployError(f"{staged.owners[relative]} and {name} both have {relative}, with different "
+                                      "content: give every target its own folder ({target} in 'path'), or leave "
+                                      "the file out with 'exclude'")
+                staged.files[relative] = path
+                staged.owners[relative] = name
+    staged.hold = sorted({normalise(f) for f in skipped_folders} & set(folders))
+    return staged
+
+
+def write_staged(staged, folder):
+    """Copy the staged files into an empty folder (for signing), returning it."""
+    if os.path.exists(folder):
+        shutil.rmtree(folder)
+    os.makedirs(folder)
+    for relative, source in staged.files.items():
+        target = os.path.join(folder, *relative.split("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(source, target)
+        shutil.copymode(source, target)
+    return folder
+
+
+def check_patterns(job, key, errors):
+    """A list of regexes, like `preserve` and `exclude`."""
+    value = job.config.get(key)
+    if value is None:
+        return
+    if not isinstance(value, list) or not all(isinstance(p, str) and p for p in value):
+        errors.append(f"{job.key(key)} must be a list of regular expressions")
+        return
+    for pattern in value:
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            errors.append(f"{job.key(key)} has an invalid regular expression {pattern!r}: {e}")
+
+
+# --- Signing repository metadata with GPG -----------------------------------------
+#
+# apt checks dists/<suite>/InRelease (or Release + Release.gpg), dnf and zypper
+# repodata/repomd.xml.asc. They're made on the host with the gpg command, so the
+# key never enters the test containers. A signature is only made again when
+# the file it signs changed, so unchanged repositories stay unchanged.
+
+FINGERPRINT_RE = re.compile(r"^(0x)?([0-9A-Fa-f]{16}|[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$")
+ARMORED_KEY = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+
+
+def gpg_binary():
+    path = shutil.which("gpg") or shutil.which("gpg2")
+    if not path:
+        raise DeployError("signing repositories needs GnuPG (the gpg command). Install it, or remove 'gpg-key'")
+    return path
+
+
+def signed_files(folder):
+    """[(metadata file, [(signature file, kind)])] of the repositories in folder, as relative POSIX paths."""
+    result = []
+    for root, dirs, files in os.walk(folder):
+        dirs[:] = sorted(d for d in dirs if d != ".git")
+        relative_root = normalise(os.path.relpath(root, folder))
+        parts = relative_root.split("/") if relative_root else []
+        # dists/<suite>/Release, not the per-component Release files further down
+        if "Release" in files and len(parts) >= 2 and parts[-2] == "dists":
+            base = f"{relative_root}/Release"
+            result.append((base, [(f"{relative_root}/InRelease", "clearsign"), (f"{base}.gpg", "detach")]))
+        if "repomd.xml" in files and parts and parts[-1] == "repodata":
+            base = f"{relative_root}/repomd.xml"
+            result.append((base, [(f"{base}.asc", "detach"), (f"{base}.key", "public-key")]))
+    return sorted(result)
+
+
+class Signer:
+    """Signs with the deployment's `gpg-key`, in a GnuPG home pkggen owns unless it's a fingerprint."""
+
+    def __init__(self, job, nickname):
+        self.job = job
+        self.gpg = gpg_binary()
+        value = lookup_secret("gpg-key", nickname)
+        problem = secret_problem("gpg-key", nickname)
+        if problem:
+            raise DeployError(f"{job.key('gpg-key')}: {problem}")
+        passphrase_nick = job.config.get("gpg-passphrase") or nickname
+        self.passphrase = lookup_secret("gpg-passphrase", passphrase_nick)
+        self.home = None
+        value = value.strip()
+        if FINGERPRINT_RE.match(value):
+            self.key = value[2:] if value.lower().startswith("0x") else value
+        else:
+            armored = value if ARMORED_KEY in value else open(os.path.expanduser(value), encoding="utf-8").read()
+            os.makedirs(job.work_path, exist_ok=True)
+            self.home = tempfile.mkdtemp(prefix="gnupg-", dir=job.work_path)
+            os.chmod(self.home, 0o700)
+            self.run(["--import"], data=armored, passphrase=False)
+            self.key = self.fingerprint()
+
+    def env(self):
+        env = dict(os.environ)
+        if self.home:
+            env["GNUPGHOME"] = self.home
+        return env
+
+    def run(self, args, data=None, passphrase=True):
+        options = ["--batch", "--yes", "--no-tty"]
+        if passphrase and self.passphrase is not None:
+            # The passphrase comes first on stdin, the data (if any) is in files
+            options += ["--pinentry-mode", "loopback", "--passphrase-fd", "0"]
+            data = self.passphrase + "\n" + (data or "")
+        process = subprocess.run([self.gpg, *options, *args], input=data, capture_output=True, text=True,
+                                 env=self.env())
+        if process.returncode != 0:
+            lines = [line for line in process.stderr.strip().splitlines() if line.strip()]
+            raise DeployError(f"gpg {' '.join(args[:2])} failed: {lines[-1] if lines else process.returncode}")
+        return process.stdout
+
+    def fingerprint(self):
+        output = self.run(["--with-colons", "--list-secret-keys"], passphrase=False)
+        for line in output.splitlines():
+            fields = line.split(":")
+            if fields[0] == "fpr" and len(fields) > 9:
+                return fields[9]
+        raise DeployError(f"{self.job.key('gpg-key')} has no private key")
+
+    def public_key(self):
+        return self.run(["--armor", "--export", self.key], passphrase=False)
+
+    def sign(self, path, output, kind):
+        if kind == "public-key":
+            with open(output, "w", encoding="utf-8", newline="\n") as f:
+                f.write(self.public_key())
+            return
+        # Armored, like reprepro's Release.gpg: text files are easier to keep in git
+        mode = {"clearsign": ["--clearsign"], "detach": ["--detach-sign", "--armor"]}[kind]
+        self.run(["--local-user", self.key, "--digest-algo", "SHA512", *mode, "--output", output, path])
+
+    def close(self):
+        if self.home:
+            # Stop the gpg-agent that gpg started for this home before deleting it
+            if shutil.which("gpgconf"):
+                subprocess.run(["gpgconf", "--kill", "gpg-agent"], env=self.env(), capture_output=True,
+                               stdin=subprocess.DEVNULL)
+            shutil.rmtree(self.home, ignore_errors=True)
+
+
+def sign_repository(job, folder, published):
+    """Sign the repository metadata in folder, and write the public key to `public-key`.
+
+    published(path) returns the bytes now published at a relative path, or
+    None: a file that didn't change keeps its published signatures, so
+    re-deploying an unchanged repository changes nothing. Returns the
+    relative paths of the files it added.
+    """
+    nickname = job.config.get("gpg-key")
+    if not nickname:
+        return []
+    added = []
+    signer = None
+    try:
+        for base, signatures in signed_files(folder):
+            with open(os.path.join(folder, *base.split("/")), "rb") as f:
+                content = f.read()
+            previous = [published(signature) for signature, _ in signatures]
+            if published(base) == content and all(p is not None for p in previous):
+                for (signature, _), data in zip(signatures, previous):
+                    with open(os.path.join(folder, *signature.split("/")), "wb") as f:
+                        f.write(data)
+            else:
+                signer = signer or Signer(job, nickname)
+                for signature, kind in signatures:
+                    signer.sign(os.path.join(folder, *base.split("/")), os.path.join(folder, *signature.split("/")),
+                                kind)
+            added += [signature for signature, _ in signatures]
+        public = job.config.get("public-key")
+        if public:
+            public = normalise(public)
+            target = os.path.join(folder, *public.split("/"))
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            signer = signer or Signer(job, nickname)
+            with open(target, "w", encoding="utf-8", newline="\n") as f:
+                f.write(signer.public_key())
+            added.append(public)
+    finally:
+        if signer:
+            signer.close()
+    if not added:
+        job.warn(f"{job.key('gpg-key')} is set, but there's no repository metadata to sign "
+                 "(dists/<suite>/Release or repodata/repomd.xml)")
+    return added
+
+
+def check_signing(job, errors):
+    """The checks of `gpg-key`, `gpg-passphrase` and `public-key`."""
+    nickname = check_string(job, "gpg-key", errors)
+    check_string(job, "gpg-passphrase", errors)
+    public = check_string(job, "public-key", errors)
+    if public and (".." in normalise(public).split("/") or os.path.isabs(public)):
+        errors.append(f"{job.key('public-key')} must be a path inside the repository, got {public!r}")
+    if public and not job.config.get("gpg-key"):
+        errors.append(f"{job.key('public-key')} needs {job.key('gpg-key')}: it's the public half of that key")
+    if nickname:
+        problem = secret_problem("gpg-key", nickname)
+        if problem:
+            errors.append(f"{job.key('gpg-key')}: {problem}")
+        if not (shutil.which("gpg") or shutil.which("gpg2")):
+            errors.append(f"{job.key('gpg-key')} needs GnuPG (the gpg command), which isn't installed")
 
 
 # --- Configuration checks ----------------------------------------------------------

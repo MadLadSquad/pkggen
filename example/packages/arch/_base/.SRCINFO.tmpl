@@ -1,0 +1,28 @@
+{#- Mirrors _base/PKGBUILD.tmpl, so the repository can be pushed to the AUR as is.
+    The folders extend it with the same base_depends and base_makedepends. -#}
+{% set depends = base_depends | default([]) + deps.depends + dist.depends | default([]) %}
+{% set makedepends = base_makedepends | default([]) + deps.makedepends + dist.makedepends | default([]) %}
+pkgbase = {{ name }}
+	pkgdesc = {{ description }}
+	pkgver = {{ version | pkgver }}
+	pkgrel = {{ dist.pkgrel | default(1) }}
+	url = {{ homepage }}
+{% for a in dist.arch | default(arches) %}
+	arch = {{ a }}
+{% endfor %}
+	license = {{ license | spdx }}
+{% block fields %}{% endblock %}
+{% for d in makedepends %}
+	makedepends = {{ d }}
+{% endfor %}
+{% for d in depends %}
+	depends = {{ d }}
+{% endfor %}
+{% for a in artifacts %}
+	source = {{ a.alias }}::{{ a.url }}
+{% endfor %}
+{% for a in artifacts %}
+	sha256sums = {{ a.checksums.sha2_256 }}
+{% endfor %}
+
+pkgname = {{ name }}

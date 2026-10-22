@@ -1,0 +1,5 @@
+{#- Applications compile against the framework, so it depends on the development
+    files it uses. -#}
+{% extends "_base/debian/control.tmpl" %}
+{% set base_section = "libdevel" %}
+{% set base_depends = ["cmake", "pkgconf"] %}

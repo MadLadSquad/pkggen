@@ -49,7 +49,8 @@ def get_category(job):
                                      "Set 'category' for the package in pkggen.yaml")
         category = categories[0]
         job.warn(f"{job.name} has no 'category', so it went into '{category}'. Set 'category' in pkggen.yaml to choose one")
-    elif categories and category not in categories:
+    elif categories and category not in categories and not as_list(job.repository.get("masters")):
+        # With masters (e.g. gentoo), the overlay also has the master repositories' categories
         job.warn(f"category '{category}' isn't listed in 'repositories.gentoo.categories', "
                  "so Portage won't see it until it's added to profiles/categories")
 
@@ -96,6 +97,43 @@ def write_manifest(job, out):
         lib.write_output(job, path, "\n".join(entries[name] for name in sorted(entries)) + "\n")
 
 
+# Gentoo has no separate development packages
+DEPENDENCY_FIELDS = {
+    "build": [("bdepend", "main")],
+    "libraries": [("depend", "main")],
+    "runtime": [("rdepend", "main")],
+    "development": [("depend", "main")],
+}
+# "=" means any revision of the version
+OPERATORS = {">=": ">=", "<=": "<=", "=": "~", ">": ">", "<": "<"}
+
+
+def pick(job, dep, package, kind):
+    srcname = package.get("srcname") or ""
+    return srcname if "/" in srcname else None
+
+
+def render(job, dep, names):
+    """>=media-libs/glfw-3.4"""
+    atom = lib.releases_in_order(job, names)[0]
+    if not dep.get("op"):
+        return atom
+    version = str(dep["version"])
+    if not VERSION_RE.match(version):
+        raise lib.PackagingError(f"the version of the dependency '{lib.describe(dep)}' isn't a Gentoo version. "
+                                 f"Give it its Gentoo atom in pkggen.yaml: {{ name: {dep['name']}, gentoo: \"...\" }}")
+    return f"{OPERATORS[dep['op']]}{atom}-{version}"
+
+
+def local_atom(job, local):
+    """category/name of one of pkggen.yaml's own packages."""
+    category = local.get("category") or next(iter(as_list(job.repository.get("categories"))), None)
+    if not category:
+        raise lib.PackagingError(f"the dependency '{local['name']}' has no 'category' and "
+                                 "'repositories.gentoo.categories' is empty. Set 'category' for it in pkggen.yaml")
+    return f"{category}/{local['name']}"
+
+
 def main(job):
     if not VERSION_RE.match(job.version):
         raise lib.PackagingError(f"version '{job.version}' of {job.name} isn't a valid Gentoo version. "
@@ -103,6 +141,7 @@ def main(job):
 
     job.context["arches"] = lib.architectures(job, ARCHITECTURES, ALL_ARCHITECTURES,
                                               other=lambda arch: keyword(job, arch))
+    lib.dependencies(job, DEPENDENCY_FIELDS, pick, render, local=local_atom)
     lib.ensure_templates(job, REQUIRED)
     out = os.path.join(job.repository_path, get_category(job), job.name)
 

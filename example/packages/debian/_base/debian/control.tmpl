@@ -1,0 +1,23 @@
+{#- Base of every UntitledDesktop debian/control. The folders the packages use
+    extend it and set base_build_depends and base_depends; the package's
+    `dependencies` in pkggen.yaml (`deps`) add to them, and its own `debian:`
+    block adds `build-depends`, `depends` and `section`.
+    One binary package per source: the libraries ship their headers too. -#}
+{% set build_depends = ["debhelper-compat (= 13)"] + base_build_depends | default([]) + deps.build_depends
+                      + dist["build-depends"] | default([]) %}
+{% set depends = ["${shlibs:Depends}", "${misc:Depends}"] + base_depends | default([]) + deps.depends
+                 + dist.depends | default([]) %}
+Source: {{ name }}
+Section: {{ dist.section | default(base_section | default("misc")) }}
+Priority: optional
+Maintainer: {{ maintainer }}
+Build-Depends: {{ build_depends | join(",\n ") }}
+Standards-Version: 4.7.2
+Homepage: {{ homepage }}
+Rules-Requires-Root: no
+
+Package: {{ name }}
+Architecture: {{ dist.architecture | default(arches | join(" ")) }}
+Depends: {{ depends | join(",\n ") }}
+Description: {{ description }}
+ {{ dist["long-description"] | default(description ~ ".") }}

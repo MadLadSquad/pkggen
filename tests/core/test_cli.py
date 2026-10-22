@@ -40,6 +40,7 @@ def test_gen_repo_rejects_unknown_distribution():
 
 
 def test_deploy_needs_a_deployment_block(example_project):
+    (example_project / "pkggen.yaml").write_text("repositories:\n  arch: {}\n")
     result = run_cli("deploy")
     assert result.code == 1
     assert result.err_plain.strip() == "Error: Nothing to deploy: pkggen.yaml has no 'deployment' block"

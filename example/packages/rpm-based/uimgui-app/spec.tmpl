@@ -1,0 +1,28 @@
+{#- UntitledImGuiFramework applications, built and installed by UVKBuildTool.
+    The files come from the package's `rpm-based: { files: [...] }` in pkggen.yaml.
+    Applications with extra parts extend this file and fill `build_parts`. -#}
+{% extends "_base/spec.tmpl" %}
+{% set base_build_requires = ["gcc-c++", "make"] %}
+{% block globals %}
+# UVKBuildTool builds with its own flags, so there's no debug information to package
+%global debug_package %{nil}
+{% endblock %}
+{% block build %}
+{% include "_base/configure-project.sh" %}
+
+{% block build_parts %}
+{% endblock %}
+UVKBuildTool --generate "$PWD"
+configure_project uvproj.yaml
+{% endblock %}
+{% block install %}
+{% include "_base/check-installed.sh" %}
+
+# UVKBuildTool compiles and installs in one step, with the framework's
+# build script, which uses UIMGUI_JOBS jobs
+export UIMGUI_JOBS=%{_smp_build_ncpus}
+UVKBuildTool --build %{buildroot}%{_prefix} %{_prefix} "$PWD"
+check_installed uvproj.yaml %{buildroot}%{_libdir}
+# The framework's copy of utfcpp comes from the system
+rm -rf %{buildroot}%{_includedir}/utf8cpp %{buildroot}%{_datadir}/utf8cpp
+{% endblock %}

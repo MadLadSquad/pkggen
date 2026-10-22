@@ -67,9 +67,11 @@ def isolated_env(tmp_path_factory, monkeypatch):
     for var in ("PKGGEN_RUN_PATH", "PKGGEN_FORCE", "PKGGEN_DEBUG", "PKGGEN_TEST_HTTP",
                 "PKGGEN_TEST_HTTP_LOG", "SOURCE_DATE_EPOCH", "PKGGEN_TEST_ENGINE", "PKGGEN_FAKE_ENGINE",
                 "CONTAINER_HOST", "DOCKER_HOST", "PKGGEN_TEST_NOW", "PKGGEN_TEST_AUR_URL",
-                "GIT_SSH_COMMAND", "GIT_CONFIG_COUNT", "GIT_DIR", "GIT_WORK_TREE"):
+                "GIT_SSH_COMMAND", "GIT_CONFIG_COUNT", "GIT_DIR", "GIT_WORK_TREE", "PKGGEN_CACHE_DIR",
+                "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "GNUPGHOME"):
         monkeypatch.delenv(var, raising=False)
-    for var in [v for v in os.environ if v.startswith(("PKGGEN_PASSWORD_", "PKGGEN_SSH_KEY_"))]:
+    for var in [v for v in os.environ if v.startswith(("PKGGEN_PASSWORD_", "PKGGEN_SSH_KEY_", "PKGGEN_GPG_",
+                                                         "PKGGEN_S3_"))]:
         monkeypatch.delenv(var)
     return config
 
@@ -118,6 +120,9 @@ def http_subprocess(tmp_path_factory, monkeypatch):
         log_dir.mkdir(exist_ok=True)
         monkeypatch.setenv("PKGGEN_TEST_HTTP", str(routes.write(directory / "routes.json")))
         monkeypatch.setenv("PKGGEN_TEST_HTTP_LOG", str(log_dir))
+        # Also for subprocesses the code under test starts itself (not through tests.support.helpers)
+        monkeypatch.setenv("PYTHONPATH", os.pathsep.join(filter(None, [str(paths.HTTP_SHIM),
+                                                                         os.environ.get("PYTHONPATH")])))
 
         def calls():
             import json
@@ -206,7 +211,8 @@ def real_engine(isolated_env, monkeypatch):
 def example_project(tmp_path, monkeypatch):
     """A copy of example/ to run pkggen in. The real example/ is never written to."""
     project = tmp_path / "example"
-    shutil.copytree(paths.EXAMPLE, project)
+    # Without the output of runs in the real example/
+    shutil.copytree(paths.EXAMPLE, project, ignore=shutil.ignore_patterns("pkggen-build"))
     monkeypatch.setenv("PKGGEN_RUN_PATH", str(project))
     return project
 

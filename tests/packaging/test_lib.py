@@ -17,7 +17,7 @@ def test_job_defaults(plib, make_job, monkeypatch):
     job = plib.Job(data)
     assert (job.name, job.version) == ("p", "1.5")
     assert job.context["distribution"] == "arch"
-    assert job.context["repository"] == {}
+    assert job.context["repository"] == data["repository"]
     assert job.context["architectures"] == ["amd64", "arm64"]
     assert job.context["dist"] == {"depends": ["x"]}
     now = datetime(2026, 10, 19, 12, 0, tzinfo=timezone.utc)
@@ -293,6 +293,73 @@ def test_executable_bits(plib, make_job, tmp_path):
     assert os.access(tmp_path / "out" / "script", os.X_OK)
     assert os.access(tmp_path / "out" / "named", os.X_OK)
     assert not os.access(tmp_path / "out" / "plain", os.X_OK)
+
+
+# --- Shared template folders -------------------------------------------------------------------
+
+def test_templates_extend_and_include_other_folders(plib, make_job, tmp_path):
+    root = tmp_path / "packages" / "arch"
+    make_tree(root, {
+        "base/PKGBUILD.tmpl": "name={{ name }}\n{% block build %}default build\n{% endblock %}end\n",
+        "base/.SRCINFO.tmpl": "pkgbase = {{ name }}\n",
+        "_snippets/libdir.j2": "libdir=lib\n",
+        "p/PKGBUILD.tmpl": '{% extends "base/PKGBUILD.tmpl" %}{% block build %}{% include "_snippets/libdir.j2" %}\n'
+                           "{% endblock %}",
+    })
+    job = plib.Job(make_job("arch", package={"name": "p", "version": "1"}))
+    assert job.templates_root == str(root)
+    assert job.context["template_dir"] == "packages/arch/p"
+    out = tmp_path / "out"
+    plib.render_tree(job, lambda rel: str(out / rel))
+    assert (out / "PKGBUILD").read_text() == "name=p\nlibdir=lib\nend\n"
+    # Only the package's own folder is rendered
+    assert sorted(os.listdir(out)) == ["PKGBUILD"]
+
+
+def test_errors_in_an_extended_template_point_at_it(plib, make_job, tmp_path):
+    make_tree(tmp_path / "packages" / "arch", {
+        "base/t.tmpl": "line1\n{{ nope }}\n",
+        "p/t.tmpl": '{% extends "base/t.tmpl" %}',
+    })
+    job = plib.Job(make_job("arch", package={"name": "p", "version": "1"}))
+    with pytest.raises(plib.PackagingError) as info:
+        plib.render_tree(job, lambda rel: str(tmp_path / "out" / rel))
+    assert str(info.value).replace(os.sep, "/").startswith("packages/arch/base/t.tmpl:2: 'nope' is undefined")
+
+
+def test_missing_extended_template(plib, make_job, tmp_path):
+    make_tree(tmp_path / "packages" / "arch", {"p/t.tmpl": '{% extends "base/missing.tmpl" %}'})
+    job = plib.Job(make_job("arch", package={"name": "p", "version": "1"}))
+    with pytest.raises(plib.PackagingError, match="template 'base/missing.tmpl' not found in"):
+        plib.render_tree(job, lambda rel: str(tmp_path / "out" / rel))
+
+
+def test_shared_folder_gets_defaults_once(plib, make_job, tmp_path):
+    """Two packages of one shared folder: the second one finds the full set the first one created."""
+    first = defaults_job(plib, make_job, tmp_path)
+    second = defaults_job(plib, make_job, tmp_path)
+    for job in (first, second):
+        job.templates_path = str(tmp_path / "packages" / "arch" / "shared")
+    plib.ensure_templates(first, ["main.tmpl"])
+    plib.ensure_templates(second, ["main.tmpl"])
+    assert sorted(plib.iter_files(first.templates_path)) == ["data/file", "extra.tmpl", "main.tmpl"]
+    assert len(first.warnings) == 1 and second.warnings == []
+    # No temporary folders are left behind
+    assert os.listdir(tmp_path / "packages" / "arch") == ["shared"]
+
+
+def test_create_default_folder_loses_the_race_quietly(plib, make_job, tmp_path, monkeypatch):
+    job = defaults_job(plib, make_job, tmp_path)
+    real_rename = os.rename
+
+    def racing_rename(src, dst):
+        make_tree(tmp_path / "packages" / "arch" / "p", {"main.tmpl": "from the other generator"})
+        return real_rename(src, dst)
+
+    monkeypatch.setattr(plib.os, "rename", racing_rename)
+    assert plib.create_default_folder(job) is False
+    assert (tmp_path / "packages" / "arch" / "p" / "main.tmpl").read_text() == "from the other generator"
+    assert os.listdir(tmp_path / "packages" / "arch") == ["p"]
 
 
 # --- run() --------------------------------------------------------------------------------------

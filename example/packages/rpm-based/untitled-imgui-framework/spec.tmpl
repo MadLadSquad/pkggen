@@ -1,0 +1,64 @@
+{#- The framework and its build tool, UVKBuildTool. Upstream has no plain
+    install step for the framework: it's installed by building an empty
+    project with install-framework: true, whose own files are then removed.
+    Applications compile against it, so it requires the development files it uses. -#}
+{% extends "_base/spec.tmpl" %}
+{% set base_build_requires = ["gcc-c++", "make"] %}
+{% block globals %}
+# UVKBuildTool builds with its own flags, so there's no debug information to package
+%global debug_package %{nil}
+{% endblock %}
+{% block prep %}
+# The framework's pkg-config file, in the system's library directory
+sed -i 's|^libdir=.*|libdir="${prefix}/%{_lib}"|' Framework/cmake/UntitledImGuiFramework.pc.in
+sed -i 's|DESTINATION lib/pkgconfig/|DESTINATION %{_lib}/pkgconfig/|' \
+	UVKBuildTool/Templates/UntitledImGuiFramework/BuildFiles/CMakeInstall.tmpl
+# The build scripts run make with one job per CPU, which can run out of
+# memory: let UIMGUI_JOBS set the count (the installed export.sh too, which
+# builds the applications)
+sed -i 's/^\([[:space:]]*\)\(cpus\|jobs\)=\$(grep -c processor .*$/&\n\1[ -z "${UIMGUI_JOBS}" ] || \2="${UIMGUI_JOBS}"/' \
+	install.sh export.sh create-project.sh UVKBuildTool/ci.sh
+grep -q UIMGUI_JOBS export.sh
+{% endblock %}
+{% block build %}
+{% include "_base/configure-project.sh" %}
+
+export UIMGUI_JOBS=%{_smp_build_ncpus}
+# Builds UVKBuildTool in UVKBuildTool/build
+./install.sh ci
+# The empty project that installs the framework
+./create-project.sh pkg --skip-compilation
+configure_project Projects/pkg/uvproj.yaml true
+
+# UVKBuildTool itself, built again for its system-wide location
+cmake -B uvkbuildtool -S UVKBuildTool \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
+	-DUBT_INSTALL=ON \
+	-DUBT_FRAMEWORK_DIR=%{_includedir}/UntitledImGuiFramework/ \
+	-DUBT_DATA_INSTALL_PREFIX=%{_datadir}/
+cmake --build uvkbuildtool %{?_smp_mflags}
+{% endblock %}
+{% block install %}
+{% include "_base/check-installed.sh" %}
+
+export UIMGUI_JOBS=%{_smp_build_ncpus}
+# The framework looks for <wayland-client.h> without pkg-config's flags, and
+# openSUSE keeps it in %%{_includedir}/wayland
+export CPATH="$(pkg-config --variable=includedir wayland-client)${CPATH:+:$CPATH}"
+(cd UVKBuildTool/build && ./UVKBuildTool --build %{buildroot}%{_prefix} %{_prefix} ../../Projects/pkg)
+check_installed Projects/pkg/uvproj.yaml %{buildroot}%{_libdir}
+test -e %{buildroot}%{_libdir}/libUntitledImGuiFramework.so
+# Only keep the framework, not the project that installed it
+rm -rf %{buildroot}%{_libdir}/libpkgLib.so %{buildroot}%{_bindir}/pkg %{buildroot}%{_datadir}/config/pkg \
+	%{buildroot}%{_includedir}/pkg %{buildroot}%{_includedir}/utf8cpp %{buildroot}%{_datadir}/utf8cpp
+
+DESTDIR=%{buildroot} cmake --install uvkbuildtool
+{% endblock %}
+{% block files %}
+%{_libdir}/libUntitledImGuiFramework.so
+%{_libdir}/pkgconfig/UntitledImGuiFramework.pc
+%{_includedir}/UntitledImGuiFramework/
+%{_bindir}/UVKBuildTool
+%{_datadir}/UVKBuildTool/
+{% endblock %}

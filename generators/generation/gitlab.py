@@ -168,7 +168,7 @@ class GitLab:
             self.secret_hint = f"a 'gitlab_keys' entry for {self.domain}"
         # Sent to this instance only: requests drops it on redirects to other hosts
         self.auth = {"Authorization": f"Bearer {key}"} if key else {}
-        self.session = requests.Session()
+        self.session = lib.session()
 
     def api(self, path, what, **params):
         url = f"{self.api_base}{path}"

@@ -36,3 +36,11 @@ def test_target_names_are_unique_and_images_fully_qualified():
 
 def test_pclinuxos_is_not_supported():
     assert "pclinuxos" not in (paths.GENERATORS / "distributions" / "distributions.yaml").read_text()
+
+
+def test_target_names_match_their_rp_names():
+    """A package's `distributions.<dist>.versions` can use either name: pkggen compares them normalised."""
+    import generate
+    for dist in TESTING:
+        for rp, spec in load_generator("testing", dist).TARGETS.items():
+            assert generate.release_key(spec["name"]) == generate.release_key(rp), (dist, rp, spec["name"])

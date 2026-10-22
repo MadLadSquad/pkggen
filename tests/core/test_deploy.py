@@ -65,7 +65,7 @@ def test_config_errors_are_listed_together(project):
     errors = errors_of(info)
     assert errors[0].startswith("'deployment.slackware' isn't a distribution pkggen knows")
     assert errors[1].startswith("'deployment.rpm-based[0].generator' must name a deployment generator in ")
-    assert errors[1].endswith("(available: aur, git)")
+    assert errors[1].endswith("(available: aur, git, s3)")
     assert errors[2] == "'deployment.rpm-based[1]' must be a mapping with a 'generator' key"
     assert errors[3] == "'deployment.arch.targets' must be a list of test target names like fedora-44"
     assert len(errors) == 4

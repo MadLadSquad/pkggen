@@ -249,6 +249,21 @@ def payload(dist, config, settings, rp_names, host_arch, packages=()):
     }
 
 
+def limit_packages(target, contexts):
+    """Drop the packages whose `distributions` don't include this release. Returns their names."""
+    kept, dropped = [], []
+    for package in target.get("packages") or []:
+        # A malformed entry is kept, so the worker reports it for this target only
+        context = contexts.get(package.get("name")) if isinstance(package, dict) else None
+        if context is None or generate.tested_on(context, target["distribution"], target["name"], target.get("rp_name") or ""):
+            kept.append(package)
+        else:
+            dropped.append(package["name"])
+    target["packages"] = kept
+    target["excluded"] = dropped
+    return dropped
+
+
 def package_entries(dist, pipeline):
     """The packages that were fetched and packaged for dist, in pkggen.yaml order."""
     target = next((t for t in pipeline.targets if t.name == dist), None)
@@ -282,6 +297,7 @@ class TargetResult:
         self.output = None
         self.executables = None   # files of the output that are executable in the container, relative to it
         self.package_status = {}  # package name -> True once it's built and installed
+        self.excluded = []        # packages whose `distributions` leave out this release
 
     @property
     def ok(self):
@@ -387,6 +403,9 @@ class Runner:
         if not self.run_steps(container, full.get("prepare") or [], log, result, "*", "prepare"):
             return
 
+        for pname in full.get("excluded") or []:
+            result.excluded.append(pname)
+            say(f"{YELLOW}-{RESET} [{name}] {pname} isn't built on {name} (see its 'distributions')")
         result.packages = len(full.get("packages") or [])
         for package in full.get("packages") or []:
             pname = package["name"]
@@ -501,6 +520,10 @@ def write_results(results, host_skipped, contexts, host_arch):
         }
         if r.output and r.executables is not None:
             entry["executables"] = r.executables
+        # Not built here on purpose: not a failure, but nothing to deploy from this target either
+        for name in r.excluded:
+            entry["packages"][name] = {"version": str((contexts.get(name) or {}).get("version", "")), "ok": False,
+                                       "skipped": f"its 'distributions' leave out {r.name}"}
         if r.skipped:
             entry["skipped"] = r.skipped
         elif r.failures:
@@ -614,6 +637,8 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
                     for warning in described.get("warnings") or []:
                         if f"{dist}: {warning}" not in warnings:
                             say(f"{YELLOW}Warning: {dist}: {warning}{RESET}")
+                    for t in described["targets"]:
+                        limit_packages(t, pipeline.contexts)
                     runner.plans[dist] = {t["name"]: t for t in described["targets"]}
                 except RuntimeError as e:
                     runner.plans[dist] = f"the testing generator failed: {e}"

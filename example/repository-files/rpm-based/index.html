@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="The official RPM repository for the UntitledDesktopEnvironment and related projects.">
+		<meta name="author" content="MadLadSquad">
+		<link rel="icon" type="image/png" href="./favicon.png">
+		<title>UntitledDesktop RPM Repository</title>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet" type="text/css">
+
+		<style>
+			body {
+				background-color: #E8EEF2;
+				color: #37293A;
+				max-width: 1360px;
+			}
+			h1, h2, h3, h4, h5, h6, p, a, li {
+				font-family: Ubuntu, sans-serif;
+			}
+
+			a {
+				text-decoration: none;
+				color: #1d84b5;
+			}
+
+			.inline-code {
+				display: inline;
+				border: 1px solid #37293A;
+				border-radius: 0.25rem;
+				background-color: #37293A;
+				color: #e8eef2;
+				padding-left: 0.25rem;
+				padding-right: 0.25rem;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Welcome to the UntitledDesktopEnvironment RPM repository</h1>
+		<p>This repository is used for hosting all UntitledDesktopEnvironment packages, as well as all <a href="https://madladsquad.com">MadLadSquad</a> applications, for RPM-based distributions.</p>
+
+		<p>Packages are built for Fedora 43 and Fedora 44. To use this repository add the following configuration to <code class="inline-code">/etc/yum.repos.d/untitled-desktop.repo</code>:</p>
+		<pre class="sourceCode language-plaintext"><code class="sourceCode language-plaintext">[untitled-desktop]
+name=RPM packages for the UntitledDesktop project
+baseurl=https://rpms.madladsquad.com/fedora-$releasever/RPMS/
+type=rpm-md
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://rpms.madladsquad.com/rpmkey.pub</code></pre>
+
+		<p><code class="inline-code">$releasever</code> is filled in by dnf, so the same file works on every supported Fedora release. The repository metadata is signed with our PGP key, which dnf asks you to import the first time it uses the repository.</p>
+
+		<h2>Available packages:</h2>
+		<ul>
+			<li>untitled-game-system-manager - Provides <a href="https://github.com/MadLadSquad/UntitledGameSystemManager">UntitledGameSystemManager</a>, a manager for containerised Linux game systems</li>
+			<li>untitled-ibus-handwriting - Provides <a href="https://github.com/MadLadSquad/UntitledIBusHandwriting">UntitledIBusHandwriting</a>, an IBus handwriting input method for IBus</li>
+			<li>ude-session-logout - Provides <a href="https://github.com/MadLadSquad/UntitledDESessionLogout">UntitledDESessionLogout</a>, a session logout utility for the UntitledDesktopEnvironment</li>
+			<li>untitled-imgui-framework - Provides <a href="https://github.com/MadLadSquad/UntitledImGuiFramework">UntitledImGuiFramework</a>, an independent cross-platform desktop application development toolkit</li>
+			<li>untitled-dbus-utils - Provides <a href="https://github.com/MadLadSquad/UntitledDBusUtils">UntitledDBusUtils</a>, a C++ wrapper on top of the low level D-Bus C API</li>
+			<li>untitled-exec - Provides <a href="https://github.com/MadLadSquad/UntitledExec">UntitledExec</a>, a cross-platform fork and exec/CreateProcess wrapper library</li>
+			<li>untitled-cli-parser - Provides <a href="https://github.com/MadLadSquad/UntitledCLIParser">UntitledCLIParser</a>, a parser for CLI arguments</li>
+			<li>untitled-i18n - Provides <a href="https://github.com/MadLadSquad/UntitledI18N">UntitledI18N</a>, a i18n library</li>
+			<li>untitled-open - Provides <a href="https://github.com/MadLadSquad/UntitledOpen">UntitledOpen</a>, a file dialog, URL and file opener library</li>
+			<li>untitled-xdg-basedir - Provides <a href="https://github.com/MadLadSquad/UntitledXDGBasedir">UntitledXDGBasedir</a>, a better implementation of the XDG base directory specification</li>
+		</ul>
+		<footer>
+			<p>A <a href="https://madladsquad.com">MadLadSquad</a> / <a href="https://heapforge.com">Heapforge</a> project. Copyright &#169; <a href="https://heapforge.com">Heapforge Ltd.</a> 2025 - 2026 &bull; <a href="https://madladsquad.com/privacy-policy">Privacy Policy</a>.</p>
+		</footer>
+	</body>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark-reasonable.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+	<script>hljs.highlightAll();</script>
+</html>
+

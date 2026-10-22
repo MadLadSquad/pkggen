@@ -8,29 +8,43 @@ def test_debian_skeleton(gen_repo, example_config):
     assert result.code == 0, result.err
     assert files(gen_repo.out) == [".gitignore", "conf/distributions", "conf/options", "packages/.gitkeep",
                                    "untitled-desktop-deb.sources"]
+    # Unsigned: pkggen signs the repository when it deploys it
     assert (gen_repo.out / "conf" / "distributions").read_bytes() == (
         b"Origin: MadLadSquad\n"
         b"Label: UntitledDesktopDEB\n"
         b"Suite: stable\n"
         b"Codename: trixie\n"
-        b"Architectures: amd64 arm64 source\n"
+        b"Architectures: amd64 arm64\n"
         b"Components: main\n"
         b"Description: Debian packages for the UntitledDesktop project\n"
-        b"SignWith: default\n"
+        b"\n"
+        b"Origin: MadLadSquad\n"
+        b"Label: UntitledDesktopDEB\n"
+        b"Suite: unstable\n"
+        b"Codename: sid\n"
+        b"Architectures: amd64 arm64\n"
+        b"Components: main\n"
+        b"Description: Debian packages for the UntitledDesktop project\n"
         b"\n"
         b"Origin: MadLadSquad\n"
         b"Label: UntitledDesktopDEB\n"
         b"Codename: noble\n"
-        b"Architectures: amd64 arm64 source\n"
+        b"Architectures: amd64 arm64\n"
         b"Components: main\n"
         b"Description: Debian packages for the UntitledDesktop project\n"
-        b"SignWith: default\n"
+        b"\n"
+        b"Origin: MadLadSquad\n"
+        b"Label: UntitledDesktopDEB\n"
+        b"Codename: resolute\n"
+        b"Architectures: amd64 arm64\n"
+        b"Components: main\n"
+        b"Description: Debian packages for the UntitledDesktop project\n"
     )
     assert (gen_repo.out / "conf" / "options").read_bytes() == b"verbose\nbasedir .\n"
     assert (gen_repo.out / "untitled-desktop-deb.sources").read_bytes() == (
         b"Types: deb\n"
         b"URIs: https://debs.madladsquad.com/\n"
-        b"Suites: trixie noble\n"
+        b"Suites: trixie sid noble resolute\n"
         b"Components: main\n"
         b"Signed-By: /usr/share/keyrings/untitled-desktop.gpg\n"
     )

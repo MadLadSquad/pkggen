@@ -7,9 +7,17 @@
 #     "package": { ...template context... },
 #     "repository": { ...repositories.<dist> from pkggen.yaml... },
 #     "repository_path": "/abs/path/pkggen-build/arch",
-#     "templates_path": "/abs/path/packages/arch/<name>",
+#     "templates_path": "/abs/path/packages/arch/<folder>",   // the package's `templates`, else its name
+#     "templates_root": "/abs/path/packages/arch",            // also searched by {% extends %}/{% include %}
 #     "default_templates_path": "/abs/path/generators/templates/arch",
-#     "run_path": "/abs/path"            // the pkggen.yaml directory, for messages
+#     "run_path": "/abs/path",           // the pkggen.yaml directory, for messages
+#     "releases": ["debian_13", ...],    // the rp-names the package is built for
+#     "dependencies": {                  // the package's `dependencies`, see dependencies() below
+#       "build" | "libraries" | "runtime" | "development": [
+#         { "name": "glfw", "op": ">=", "version": "3.4",
+#           "override": "<literal>" | false,          // only when pkggen.yaml sets one for this distribution
+#           "local": { "name", "category", "packaged" } | null,   // one of pkggen.yaml's own packages
+#           "releases": { "<rp-name>": [ <repology package> ] } } ] }
 #   }
 # It renders the templates into the repository and prints
 #   { "output": "...", "files_written": [...], "files_unchanged": [...], "warnings": [...] }
@@ -43,11 +51,15 @@ class Job:
         self.repository = data.get("repository") or {}
         self.repository_path = data["repository_path"]
         self.templates_path = data["templates_path"]
+        # Templates can extend or include templates of other folders through this root
+        self.templates_root = data.get("templates_root") or os.path.dirname(self.templates_path)
         self.defaults_path = data["default_templates_path"]
         self.run_path = data.get("run_path") or os.getcwd()
 
         self.name = self.context["name"]
         self.version = str(self.context["version"])
+        self.releases = list(data.get("releases") or [])
+        self.dependencies = data.get("dependencies") or {}
 
         self.output = None  # set by the generator: where the package files went
         self.written = []
@@ -57,6 +69,8 @@ class Job:
         self.context.setdefault("distribution", self.distribution)
         self.context.setdefault("repository", self.repository)
         self.context.setdefault("architectures", list(DEFAULT_ARCHITECTURES))
+        # Where the templates live, for "edit ... instead" comments in the output
+        self.context["template_dir"] = self.display(self.templates_path).replace(os.sep, "/")
         # The package's own `<distribution>:` block, e.g. `arch: { depends: [...] }`
         dist = self.context.get(self.distribution)
         self.context["dist"] = dist if isinstance(dist, dict) else {}
@@ -65,7 +79,8 @@ class Job:
         self.context["date"] = parse_date(self.context.get("date")) or now
 
     def warn(self, message):
-        self.warnings.append(message)
+        if message not in self.warnings:
+            self.warnings.append(message)
 
     def display(self, path):
         """Path relative to the pkggen.yaml directory, for messages."""
@@ -173,6 +188,178 @@ def architectures(job, names, any_value, other=None):
     return result
 
 
+# --- Dependencies ----------------------------------------------------------
+#
+# pkggen.yaml lists a package's dependencies once, by repology project name,
+# in four roles (ROLES). pkggen looks them up on repology and passes every
+# targeted release's packages of each project in the job. A generator calls
+# dependencies(job, fields, pick, render), which:
+#   - maps each role to the template fields it fills and the kind of package
+#     it needs there: "main" (the program or library) or "dev" (its
+#     development files), e.g. Debian's {"libraries": [("build_depends", "dev")]}
+#   - picks one repology package per release (choose_package()), and the name
+#     to use from it with pick(job, dep, package, kind) -> name or None
+#   - renders the names of every release with render(job, dep, names) ->
+#     a value (or a list of them) for the field, e.g. "libglfw3-dev (>= 3.4)"
+# and sets job.context["deps"] = {field: [values]}. Overrides are used as they
+# are, `false` drops the dependency, local packages use local_name(job, local).
+
+ROLES = ("build", "libraries", "runtime", "development")
+# Repology statuses of a release's current package (not an old branch, a live ebuild, ...)
+CURRENT_STATUSES = {"newest", "devel", "unique", "outdated"}
+# Packages for other targets: cross compilers, 32-bit multilib
+OTHER_TARGET_RE = re.compile(r"^(mingw(32|64)?-|ucrt64-|lib32-|cross-)|-cross-")
+# Binary packages that are never what a dependency means
+NOISE_RE = re.compile(r"-(doc|docs|dbg|dbgsym|debuginfo|debugsource|static|tests?|src|devel-static|devel-doc)$")
+DEV_SUFFIXES = ("-dev", "-devel")
+VERSION_PREFIX_RE = re.compile(r"\d+(\.\d+)*")
+
+
+def version_key(version):
+    """A distribution version as a comparable tuple: the epoch is dropped, then the leading numbers count."""
+    text = re.sub(r"^\d+:", "", str(version or ""))
+    match = VERSION_PREFIX_RE.match(text)
+    return tuple(int(part) for part in match.group(0).split(".")) if match else ()
+
+
+def satisfies(version, op, wanted):
+    """Whether `version` meets "<op> <wanted>" (by version_key; unknown versions do)."""
+    have, want = version_key(version), version_key(wanted)
+    if not have or not want:
+        return True
+    width = max(len(have), len(want))
+    have, want = have + (0,) * (width - len(have)), want + (0,) * (width - len(want))
+    return {">=": have >= want, "<=": have <= want, "=": have == want, ">": have > want, "<": have < want}[op]
+
+
+def basename(srcname):
+    """Gentoo's srcname is category/name."""
+    return str(srcname or "").rsplit("/", 1)[-1]
+
+
+def choose_package(project, packages):
+    """The package a release means by a project: its own name, current, newest; None for none."""
+    candidates = [p for p in packages
+                  if not OTHER_TARGET_RE.search(basename(p.get("srcname")))
+                  and not OTHER_TARGET_RE.search(p.get("binname") or "")
+                  and not NOISE_RE.search(p.get("binname") or "")]
+    if not candidates:
+        return None
+
+    def rank(p):
+        source = basename(p.get("srcname")).lower()
+        binary = (p.get("binname") or "").lower()
+        return (source == project.lower(),
+                not binary or binary == source,           # Arch lists each split package
+                p.get("status") in CURRENT_STATUSES,
+                version_key(p.get("version")),
+                -len(source))                             # glfw rather than glfw-wayland
+    return max(candidates, key=rank)
+
+
+def binary_names(package):
+    names = package.get("binnames") or ([package["binname"]] if package.get("binname") else [])
+    return [n for n in names if not NOISE_RE.search(n) and not OTHER_TARGET_RE.search(n)]
+
+
+def lists_binaries(package):
+    """Whether repology knows the binary packages (openSUSE Leap lists each one as its own srcname)."""
+    return bool(package.get("binnames") or package.get("binname"))
+
+
+def main_package(package, project):
+    """The program or library itself among a source package's binary packages."""
+    source = basename(package.get("srcname"))
+    if not lists_binaries(package):
+        return source or None
+    names = [n for n in binary_names(package) if not n.endswith(DEV_SUFFIXES)]
+    if not names:
+        return None
+    for wanted in (source, project, f"lib{source}", f"lib{project}"):
+        if wanted in names:
+            return wanted
+    return min(names, key=lambda n: (len(n), n))
+
+
+def dev_package(package, project, suffix):
+    """The development files' package (…-dev, …-devel, lib64…-devel), else the main package.
+
+    None when repology doesn't list the binary packages (see guess_dev_package()).
+    """
+    if not lists_binaries(package):
+        return None
+    names = [n for n in binary_names(package) if n.endswith(suffix)]
+    source = basename(package.get("srcname"))
+    for stem in (source, project):
+        for wanted in (f"{stem}{suffix}", f"lib{stem}{suffix}", f"lib64{stem}{suffix}"):
+            if wanted in names:
+                return wanted
+    if names:
+        return min(names, key=lambda n: (not n.startswith("lib"), len(n), n))
+    return main_package(package, project)
+
+
+def describe(dep):
+    return dep["name"] + (f" {dep['op']} {dep['version']}" if dep.get("op") else "")
+
+
+def local_name(job, local):
+    """The name of one of pkggen.yaml's own packages here (Gentoo overrides it with the category)."""
+    return local["name"]
+
+
+def dependencies(job, fields, pick, render, local=local_name):
+    """Fill job.context["deps"]: {field: [rendered dependencies]} (see the comment above)."""
+    deps = {field: [] for kinds in fields.values() for field, _ in kinds}
+    missing = []
+    for role in ROLES:
+        for dep in job.dependencies.get(role) or []:
+            for field, kind in fields.get(role, ()):
+                if "override" in dep:
+                    values = [dep["override"]] if dep["override"] is not False else []
+                elif dep.get("local"):
+                    if not dep["local"].get("packaged"):
+                        job.warn(f"the dependency '{dep['name']}' is one of pkggen.yaml's packages, but it "
+                                 f"isn't packaged for {job.distribution}")
+                    name = local(job, dep["local"])
+                    values = render(job, dep, {rp: name for rp in job.releases} or {job.distribution: name})
+                else:
+                    names = {}
+                    for rp in job.releases:
+                        package = choose_package(dep["name"], (dep.get("releases") or {}).get(rp) or [])
+                        name = pick(job, dep, package, kind) if package else None
+                        if name:
+                            names[rp] = name
+                            if dep.get("op") and package.get("status") != "rolling" \
+                                    and not satisfies(package.get("version"), dep["op"], dep["version"]):
+                                job.warn(f"{rp} has {dep['name']} {package.get('version')}, but {job.name} "
+                                         f"needs {describe(dep)}")
+                    if not names:
+                        missing.append(dep["name"])
+                        continue
+                    absent = [rp for rp in job.releases if rp not in names]
+                    if absent:
+                        job.warn(f"{dep['name']} isn't packaged in {', '.join(absent)} (repology)")
+                    values = render(job, dep, names)
+                for value in values if isinstance(values, list) else [values]:
+                    if value not in deps[field]:
+                        deps[field].append(value)
+    if missing:
+        names = ", ".join(dict.fromkeys(missing))
+        raise PackagingError(
+            f"repology has no package for {names} in {', '.join(job.releases) or job.distribution}. Check the "
+            f"repology project name with `pkggen repology <name>`, or give the dependency its "
+            f"{job.distribution} name in pkggen.yaml: {{ name: <project>, {job.distribution}: \"<name>\" }} "
+            f"(or false to leave it out there)")
+    job.context["deps"] = deps
+    return deps
+
+
+def releases_in_order(job, names):
+    """The distinct names, in the order of the releases."""
+    return list(dict.fromkeys(names[rp] for rp in job.releases if rp in names)) or list(dict.fromkeys(names.values()))
+
+
 # --- Licenses and versions -------------------------------------------------
 
 # SPDX id (including the deprecated ids GitHub still returns) -> Debian DEP-5 short name
@@ -180,6 +367,7 @@ DEBIAN_LICENSES = {
     "MIT": "Expat",
     "GPL-2.0": "GPL-2", "GPL-2.0-only": "GPL-2", "GPL-2.0-or-later": "GPL-2+",
     "GPL-3.0": "GPL-3", "GPL-3.0-only": "GPL-3", "GPL-3.0-or-later": "GPL-3+",
+    "LGPL-2.0": "LGPL-2", "LGPL-2.0-only": "LGPL-2", "LGPL-2.0-or-later": "LGPL-2+",
     "LGPL-2.1": "LGPL-2.1", "LGPL-2.1-only": "LGPL-2.1", "LGPL-2.1-or-later": "LGPL-2.1+",
     "LGPL-3.0": "LGPL-3", "LGPL-3.0-only": "LGPL-3", "LGPL-3.0-or-later": "LGPL-3+",
     "AGPL-3.0": "AGPL-3", "AGPL-3.0-only": "AGPL-3", "AGPL-3.0-or-later": "AGPL-3+",
@@ -190,6 +378,7 @@ DEBIAN_LICENSES = {
 GENTOO_LICENSES = {
     "GPL-2.0": "GPL-2", "GPL-2.0-only": "GPL-2", "GPL-2.0-or-later": "GPL-2+",
     "GPL-3.0": "GPL-3", "GPL-3.0-only": "GPL-3", "GPL-3.0-or-later": "GPL-3+",
+    "LGPL-2.0": "LGPL-2", "LGPL-2.0-only": "LGPL-2", "LGPL-2.0-or-later": "LGPL-2+",
     "LGPL-2.1": "LGPL-2.1", "LGPL-2.1-only": "LGPL-2.1", "LGPL-2.1-or-later": "LGPL-2.1+",
     "LGPL-3.0": "LGPL-3", "LGPL-3.0-only": "LGPL-3", "LGPL-3.0-or-later": "LGPL-3+",
     "AGPL-3.0": "AGPL-3", "AGPL-3.0-only": "AGPL-3", "AGPL-3.0-or-later": "AGPL-3+",
@@ -257,11 +446,42 @@ def iter_files(root):
             yield os.path.relpath(os.path.join(directory, name), root).replace(os.sep, "/")
 
 
-def copy_default(job, rel):
-    src = os.path.join(job.defaults_path, rel)
-    dst = os.path.join(job.templates_path, rel)
+def copy_atomic(src, dst):
+    """Copy src to dst through a temporary file, so a reader never sees half a file.
+
+    Several packages can share a template folder, and their packaging
+    generators run at the same time.
+    """
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copy2(src, dst)
+    tmp = f"{dst}.pkggen-{os.getpid()}.tmp"
+    shutil.copy2(src, tmp)
+    os.replace(tmp, dst)
+
+
+def copy_default(job, rel):
+    copy_atomic(os.path.join(job.defaults_path, rel), os.path.join(job.templates_path, rel))
+
+
+def create_default_folder(job):
+    """Create the missing template folder with every default template in one step.
+
+    The defaults are copied into a temporary sibling folder that's renamed into
+    place, so a generator running at the same time for another package of a
+    shared folder either sees no folder or the full set. Returns False when
+    another generator created the folder first.
+    """
+    tmp = f"{job.templates_path}.pkggen-{os.getpid()}.tmp"
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(job.defaults_path, tmp)
+    os.makedirs(os.path.dirname(job.templates_path), exist_ok=True)
+    try:
+        os.rename(tmp, job.templates_path)
+        return True
+    except OSError:
+        shutil.rmtree(tmp, ignore_errors=True)
+        if os.path.isdir(job.templates_path):
+            return False
+        raise
 
 
 def ensure_templates(job, required):
@@ -275,6 +495,11 @@ def ensure_templates(job, required):
         raise PackagingError(f"default templates for {job.distribution} not found at {job.defaults_path}")
 
     shown = job.display(job.templates_path)
+    if not os.path.exists(job.templates_path) and create_default_folder(job):
+        job.warn(f"no template data found for {job.name}, so default templates were created in {shown}. "
+                 "Edit them to customise the package")
+        return
+
     has_templates = os.path.isdir(job.templates_path) and any(
         rel.endswith(TEMPLATE_SUFFIX) for rel in iter_files(job.templates_path))
 
@@ -298,7 +523,8 @@ def ensure_templates(job, required):
 
 def make_environment(job):
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(job.templates_path),
+        # The package's folder first, then the root, so `{% extends "shared/PKGBUILD.tmpl" %}` works
+        loader=jinja2.FileSystemLoader([job.templates_path, job.templates_root]),
         undefined=jinja2.StrictUndefined,
         keep_trailing_newline=True,
         trim_blocks=True,
@@ -309,13 +535,21 @@ def make_environment(job):
     return env
 
 
-def template_line(error, filename):
-    """Find the template line an exception was raised from, using Jinja's rewritten traceback."""
-    line = None
+def template_location(job, error, path):
+    """'<template>:<line>' of the innermost template frame an exception was raised from.
+
+    Uses Jinja's rewritten traceback, so it also finds lines in templates
+    that `path` extends or includes. Falls back to path itself.
+    """
+    roots = [os.path.abspath(job.templates_path), os.path.abspath(job.templates_root)]
+    found = None
     for frame in traceback.extract_tb(error.__traceback__):
-        if frame.filename == filename:
-            line = frame.lineno
-    return line
+        filename = os.path.abspath(frame.filename)
+        if any(filename.startswith(root + os.sep) for root in roots):
+            found = (filename, frame.lineno)
+    if not found:
+        return job.display(path)
+    return f"{job.display(found[0])}:{found[1]}"
 
 
 def render(job, env, rel):
@@ -324,15 +558,17 @@ def render(job, env, rel):
     try:
         return env.get_template(rel).render(job.context)
     except jinja2.TemplateSyntaxError as e:
-        raise PackagingError(f"{shown}:{e.lineno}: syntax error: {e.message}")
+        where = job.display(e.filename) if e.filename else shown
+        raise PackagingError(f"{where}:{e.lineno}: syntax error: {e.message}")
+    except jinja2.TemplateNotFound as e:
+        raise PackagingError(f"{shown}: template {e.name!r} not found in {job.display(job.templates_path)} "
+                             f"or {job.display(job.templates_root)}")
     except jinja2.UndefinedError as e:
-        line = template_line(e, path)
-        where = f"{shown}:{line}" if line else shown
+        where = template_location(job, e, path)
         raise PackagingError(f"{where}: {e.message}. Define it for {job.name} in pkggen.yaml, "
                              "or guard it with '| default(...)' in the template")
     except Exception as e:
-        line = template_line(e, path)
-        where = f"{shown}:{line}" if line else shown
+        where = template_location(job, e, path)
         message = e.message if isinstance(e, jinja2.TemplateError) and e.message else str(e)
         raise PackagingError(f"{where}: {type(e).__name__}: {message}")
 

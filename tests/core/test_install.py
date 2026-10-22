@@ -73,10 +73,12 @@ def check_commands(pkggen, project):
     version = open(paths.SRC / "version.py", encoding="utf-8").read().split('"')[1]
     assert sh(pkggen, "version", cwd=project, env=environment()).strip() == f"pkggen version {version}"
     shutil.copy(paths.EXAMPLE / "pkggen.yaml", project / "pkggen.yaml")
+    shutil.copytree(paths.EXAMPLE / "repository-files", project / "repository-files")
     for dist in DISTRIBUTIONS:
         sh(pkggen, "gen-repo", dist, cwd=project, env=environment())
     assert (project / "pkggen-build" / "gentoo" / "profiles" / "repo_name").is_file()
     assert (project / "pkggen-build" / "debian" / "conf" / "distributions").is_file()
+    assert (project / "pkggen-build" / "gentoo" / "eclass" / "uimgui.eclass").is_file()
 
 
 def test_install(checkout, install, tmp_path):

@@ -1,3 +1,5 @@
+import os
+import re
 import shutil
 
 import pytest
@@ -72,3 +74,50 @@ def test_failing_generator(example_project, capfd):
     err = capfd.readouterr().err
     assert "'repositories.debian' is missing: origin" in err
     assert "Exit code: 1" in err
+
+
+# --- seed-files ----------------------------------------------------------------------
+
+
+def seed_project(example_project, value="seeds/arch"):
+    (example_project / "pkggen.yaml").write_text(f"repositories:\n  arch:\n    seed-files: {value}\n")
+    seeds = example_project / "seeds" / "arch"
+    (seeds / "eclass").mkdir(parents=True)
+    (seeds / "eclass" / "x.eclass").write_bytes(b"# eclass\r\n")
+    (seeds / "README.md").write_text("seed readme\n")
+    return example_project / "pkggen-build" / "arch"
+
+
+def test_seed_files_are_copied(example_project, capfd):
+    repo = seed_project(example_project)
+    gen_repo.gen_repo("arch")
+    assert (repo / "eclass" / "x.eclass").read_bytes() == b"# eclass\r\n"  # byte for byte
+    assert (repo / "README.md").read_text() == "seed readme\n"
+    assert (repo / ".gitignore").is_file()
+    assert "Copied 2 seed files from " + os.path.join("seeds", "arch") in capfd.readouterr().err
+
+
+def test_seed_files_keep_existing_files_unless_forced(example_project, capfd):
+    repo = seed_project(example_project)
+    gen_repo.gen_repo("arch")
+    (repo / "README.md").write_text("mine\n")
+    capfd.readouterr()
+
+    gen_repo.gen_repo("arch")
+    assert (repo / "README.md").read_text() == "mine\n"
+    assert "Copied 0 seed files" in (err := capfd.readouterr().err) and "2 already there, kept" in err
+
+    gen_repo.gen_repo("arch", force=True)
+    assert (repo / "README.md").read_text() == "seed readme\n"
+
+
+@pytest.mark.parametrize("value, message", [
+    ("missing", "'repositories.arch.seed-files' is missing, but missing isn't a folder"),
+    ("''", "'repositories.arch.seed-files' must be the path of a folder"),
+])
+def test_seed_files_errors(example_project, value, message):
+    seed_project(example_project, value)
+    with pytest.raises(utils.GenericError, match=re.escape(message)):
+        gen_repo.gen_repo("arch")
+    # Nothing is generated when the seed folder is wrong
+    assert not (example_project / "pkggen-build" / "arch").exists()

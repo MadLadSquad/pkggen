@@ -9,12 +9,15 @@ import json
 import os
 import re
 import sys
+import time
 import traceback
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 import requests
 import yaml
+from requests.adapters import HTTPAdapter
+from requests.structures import CaseInsensitiveDict
 from tqdm import tqdm
 
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
@@ -40,6 +43,154 @@ HASHES = (
 
 class TinyError(Exception):
     """An expected error. Reported as a single line, without a traceback."""
+
+
+# --- HTTP cache --------------------------------------------------------------
+#
+# `pkggen generate` sets PKGGEN_CACHE_DIR (pkggen-build/cache by default). API
+# answers and artifact checksums are kept there with their ETag/Last-Modified,
+# and requested again conditionally: an unchanged answer is a 304, which
+# GitHub doesn't count against the rate limit, and an unchanged artifact isn't
+# downloaded again. Answers with `Cache-Control: max-age` (repology's) are
+# also kept, and reused without asking until they're that old; when the
+# network fails, an expired one is used with a warning. Without the variable
+# nothing is cached.
+
+CACHE_ENV = "PKGGEN_CACHE_DIR"
+# Request headers that change the answer, so they're part of the cache key
+CACHE_KEY_HEADERS = ("Accept", "Authorization", "PRIVATE-TOKEN")
+
+
+def cache_dir():
+    return os.getenv(CACHE_ENV) or None
+
+
+def cache_path(kind, key):
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return os.path.join(cache_dir(), kind, digest[:2], f"{digest}.json")
+
+
+def read_cache(kind, key):
+    try:
+        with open(cache_path(kind, key), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def write_cache(kind, key, entry):
+    path = cache_path(kind, key)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(entry, f)
+        os.replace(tmp, path)
+    except OSError as e:
+        warn(f"couldn't write the HTTP cache ({e}), continuing without it")
+
+
+def validators(headers):
+    """The ETag/Last-Modified of a response, which a later request can be made conditional on."""
+    return {key: headers[name] for key, name in (("etag", "ETag"), ("last_modified", "Last-Modified"))
+            if headers.get(name)}
+
+
+def max_age(headers):
+    """How many seconds an answer may be reused without asking again (Cache-Control: max-age), or None."""
+    directives = [d.strip().lower() for d in (headers.get("Cache-Control") or "").split(",")]
+    if "no-store" in directives or "no-cache" in directives:
+        return None
+    for directive in directives:
+        name, _, value = directive.partition("=")
+        if name.strip() == "max-age" and value.strip().strip('"').isdigit():
+            return int(value.strip().strip('"')) or None
+    return None
+
+
+def now():
+    return time.time()
+
+
+def cached_response(entry, request, reason):
+    response = requests.Response()
+    response.status_code = 200
+    response.reason = reason
+    response._content = entry["body"].encode("utf-8")
+    response.encoding = "utf-8"
+    response.headers = CaseInsensitiveDict(entry["headers"])
+    response.url = request.url
+    response.request = request
+    return response
+
+
+def conditional_headers(entry):
+    headers = {}
+    if entry.get("etag"):
+        headers["If-None-Match"] = entry["etag"]
+    if entry.get("last_modified"):
+        headers["If-Modified-Since"] = entry["last_modified"]
+    return headers
+
+
+class CachingAdapter(HTTPAdapter):
+    """Makes GET requests (not streamed downloads) conditional on the cached answer.
+
+    A 304 is turned back into the cached 200, with the fresh rate limit headers.
+    An answer with `Cache-Control: max-age` is returned from the cache, without
+    a request, until it expires; after that it's still used when the request
+    fails to connect.
+    """
+
+    def send(self, request, stream=False, **kwargs):
+        if request.method != "GET" or stream or not cache_dir():
+            return super().send(request, stream=stream, **kwargs)
+        key = "\n".join([request.url] + [f"{name}: {request.headers.get(name, '')}" for name in CACHE_KEY_HEADERS])
+        entry = read_cache("http", key)
+        if entry and entry.get("max_age") and 0 <= now() - entry.get("stored", 0) < entry["max_age"]:
+            return cached_response(entry, request, "OK (cached)")
+        if entry:
+            request.headers.update(conditional_headers(entry))
+        try:
+            response = super().send(request, stream=stream, **kwargs)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if not (entry and entry.get("max_age")):
+                raise
+            stored = datetime.fromtimestamp(entry.get("stored", 0), timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            warn(f"couldn't reach {request.url} ({type(e).__name__}), using its answer from {stored}")
+            return cached_response(entry, request, "OK (stale)")
+
+        if response.status_code == 304 and entry:
+            cached = cached_response(entry, request, "OK (cached)")
+            for name, value in response.headers.items():
+                if name.lower().startswith(("x-ratelimit", "ratelimit")):
+                    cached.headers[name] = value
+            cached.url = response.url
+            cached.connection = response.connection
+            if entry.get("max_age"):
+                write_cache("http", key, {**entry, "stored": now()})
+            return cached
+
+        lifetime = max_age(response.headers)
+        if response.status_code == 200 and (validators(response.headers) or lifetime):
+            try:
+                body = response.content.decode("utf-8")
+            except UnicodeDecodeError:
+                return response  # only text answers are cached
+            entry = {**validators(response.headers), "headers": dict(response.headers), "body": body}
+            if lifetime:
+                entry.update(max_age=lifetime, stored=now())
+            write_cache("http", key, entry)
+        return response
+
+
+def session():
+    """A requests session with the HTTP cache. Fetch generators use it for every request."""
+    result = requests.Session()
+    adapter = CachingAdapter()
+    result.mount("https://", adapter)
+    result.mount("http://", adapter)
+    return result
 
 
 def readinput():
@@ -171,12 +322,18 @@ def download_and_hash(session, url, headers=None, position=0, label=None, secret
     is what package managers see when they download the same URL.
     """
     request_headers = {"Accept-Encoding": "identity", **(headers or {})}
+    # The artifact's checksums from an earlier run, used again when the server says it hasn't changed
+    cached = read_cache("downloads", url) if cache_dir() else None
+    if cached:
+        request_headers.update(conditional_headers(cached))
     try:
         response = session.get(url, headers=request_headers, timeout=TIMEOUT, stream=True)
     except requests.RequestException as e:
         raise TinyError(f"couldn't download {url}: {e}")
 
     with response:
+        if response.status_code == 304 and cached:
+            return dict(cached["result"])
         if response.status_code != 200:
             raise http_error(response, f"download {url}", secret_hint)
 
@@ -203,6 +360,8 @@ def download_and_hash(session, url, headers=None, position=0, label=None, secret
     result = {"size": size, "checksums": {key: h.hexdigest() for key, h in hashers.items()}}
     if last_modified:
         result["last_modified"] = last_modified
+    if cache_dir() and validators(response.headers):
+        write_cache("downloads", url, {**validators(response.headers), "result": result})
     return result
 
 

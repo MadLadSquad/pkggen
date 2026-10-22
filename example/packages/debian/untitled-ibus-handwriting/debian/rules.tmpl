@@ -1,0 +1,16 @@
+{#- An UntitledImGuiFramework application with a Rust handwriting recognition
+    library, whose crates are vendored in the release tarball. -#}
+{% extends "uimgui-app/debian/rules.tmpl" %}
+{% block variables %}
+export CARGO_HOME = $(CURDIR)/debian/.cargo
+{% endblock %}
+{% block build_parts %}
+	cd hanzi_lookup && cargo build --release --offline --locked
+{% endblock %}
+{% block rules %}
+
+# dh_clean deletes *.orig files, which would break the checksums of the
+# vendored crates (vendor/*/Cargo.toml.orig)
+override_dh_clean:
+	dh_clean -XCargo.toml.orig
+{% endblock %}

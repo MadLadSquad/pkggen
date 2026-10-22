@@ -4,10 +4,15 @@ import os
 from tests.support import paths
 
 
-def snapshot(root):
-    """Every file under root, sorted, as '==> path (N bytes)' followed by its content."""
+def snapshot(root, exclude=()):
+    """Every file under root, sorted, as '==> path (N bytes)' followed by its content.
+
+    Folders named in `exclude` (directly under root) are left out.
+    """
     parts = []
     for directory, dirs, files in os.walk(root):
+        if directory == str(root):
+            dirs[:] = [d for d in dirs if d not in exclude]
         dirs.sort()
         for name in sorted(files):
             path = os.path.join(directory, name)

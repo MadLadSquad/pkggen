@@ -275,21 +275,23 @@ def test_config_errors(gh, pkg, message):
 # --- Subprocess contract -------------------------------------------------------------------------
 
 def test_example_package_offline(http_subprocess, example_config):
+    import generate
     calls = http_subprocess(example_routes())
-    pkg = example_config["pkggen"]["packages"][0]
+    # The first example package, with its group's defaults
+    pkg = generate.load_packages(example_config, ["untitled-cli-parser"])[0][0]
     result = run_generator("generation", "github", {**pkg, "position": 0})
     assert result.code == 0, result.err
-    data = archive_bytes("untitled-cli-parser-1.2.0.tar.xz")
+    data = archive_bytes("untitled-cli-parser-6.1.0.0.tar.xz")
     assert result.json == {
-        "version": "1.2.0",
-        "tag": "v1.2.0",
+        "version": "6.1.0.0",
+        "tag": "v6.1.0.0",
         "date": "2026-09-01T10:00:00+00:00",
         "artifacts": [{
-            "url": "https://github.com/MadLadSquad/UntitledCLIParser/releases/download/v1.2.0/"
-                   "untitled-cli-parser-1.2.0.tar.xz",
-            "alias": "untitled-cli-parser-1.2.0.tar.xz", "type": "asset", "directory": "untitled-cli-parser-1.2.0",
-            "size": len(data), "checksums": checksums(data)}],
-        "exports": {"description": "A command line argument parser", "license": "MIT",
-                    "homepage": "https://github.com/MadLadSquad/UntitledCLIParser"},
+            "url": "https://github.com/MadLadSquad/UntitledCLIParser/releases/download/v6.1.0.0/"
+                   "untitled-cli-parser-6.1.0.0.tar.xz",
+            "alias": "untitled-cli-parser-6.1.0.0.tar.xz", "type": "asset",
+            "directory": "untitled-cli-parser-6.1.0.0", "size": len(data), "checksums": checksums(data)}],
+        # The package sets its description, license and homepage, so the repository isn't asked
+        "exports": {},
     }
-    assert len(calls()) == 3
+    assert len(calls()) == 2

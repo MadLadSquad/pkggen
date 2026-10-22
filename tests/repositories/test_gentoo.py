@@ -28,14 +28,14 @@ def test_gentoo_skeleton(gen_repo, example_config):
 <repositories xmlns="" version="1.0">
   <repo priority="10" quality="experimental" status="unofficial">
     <name>untitled-desktop-overlay</name>
-    <description>An overlay containing Gentoo ebuilds and autogens for the applications and libraries part of the UntitledDesktop project</description>
-    <homepage>https://github.com/MadLadSquad/UntitledDesktopOverlay.git</homepage>
+    <description>An overlay containing Gentoo ebuilds for the applications and libraries part of the UntitledDesktop project</description>
+    <homepage>https://github.com/MadLadSquad/UntitledDesktopOverlay</homepage>
     <owner type="project">
       <email>contact@madladsquad.com</email>
       <name>MadLadSquad</name>
     </owner>
     <source type="git">https://github.com/MadLadSquad/UntitledDesktopOverlay.git</source>
-    <feed>https://github.com/MadLadSquad/UntitledDesktopOverlay.git</feed>
+    <feed>https://github.com/MadLadSquad/UntitledDesktopOverlay/commits/master.atom</feed>
   </repo>
 </repositories>
 """

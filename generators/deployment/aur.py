@@ -147,7 +147,7 @@ def main(job):
             if env is None:
                 env = git.auth_env(job, push_url, default_key="aur", hint=key_hint(job))
             message = (config.get("message") or DEFAULT_MESSAGE).replace("{version}", version).replace("{name}", pkgbase)
-            sources = [(path, "", target.executables_in(name))]
+            sources = [(name, path, "", target.executables_in(name))]
             outcome = git.deploy_tree(job, f"{pkgbase} {version}", os.path.join(job.work_path, pkgbase),
                                       fetch_url, push_url, BRANCH, sources, message, env)
         except lib.DeployError as e:

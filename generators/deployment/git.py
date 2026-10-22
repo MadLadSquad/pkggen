@@ -5,12 +5,14 @@
 # The upstream is fetched into pkggen-build/deploy/<id>/, the new files are put
 # on top of it (overwriting changed files), and the result is committed and
 # pushed. Files that only exist upstream are kept unless `prune` is set;
-# `preserve` regexes exempt paths from pruning. Executable bits come from the
-# test containers' list when there is one, so they survive file systems
-# without them (NTFS, where Git for Windows has core.filemode=false).
+# `preserve` regexes exempt paths from pruning. Targets may share a folder
+# (their files are merged), `exclude` leaves files of the test output out, and
+# `gpg-key` signs the repository metadata (apt's Release, dnf's repomd.xml).
+# Executable bits come from the test containers' list when there is one, so
+# they survive file systems without them (NTFS, where Git for Windows has
+# core.filemode=false).
 #
 # The AUR generator imports this module, so everything here is reusable.
-import filecmp
 import os
 import re
 import shutil
@@ -20,7 +22,7 @@ from urllib.parse import unquote, urlsplit
 import lib
 
 KEYS = {"generator", "url", "branch", "username", "email", "ssh-key", "password", "managed-key", "targets",
-        "path", "prune", "preserve", "message", "sign"}
+        "path", "prune", "preserve", "exclude", "message", "sign", "gpg-key", "gpg-passphrase", "public-key"}
 DEFAULT_BRANCH = "main"
 DEFAULT_PATH = "{target}"
 
@@ -188,64 +190,43 @@ def prepare(work, fetch_url, push_url, branch, env):
 
 # --- Putting the new files on top ---------------------------------------------------
 
-def normalise(path):
-    """A relative POSIX path without ./ and trailing slashes: '' is the repository root."""
-    parts = [p for p in str(path).replace("\\", "/").split("/") if p not in ("", ".")]
-    return "/".join(parts)
+# The path helpers live in lib, shared with the other generators
+normalise = lib.normalise
+under = lib.under
+preserved = lib.preserved
 
 
-def under(path, folder):
-    return folder == "" or path == folder or path.startswith(folder + "/")
+def sync(work, staged, prune=False, preserve=(), protected=()):
+    """Copy every staged file into work, overwriting changed files.
 
-
-def preserved(path, patterns):
-    """Whether path, or a folder it's in, matches one of the regexes."""
-    parts = path.split("/")
-    candidates = ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
-    return any(p.search(c) for p in patterns for c in candidates)
-
-
-def sync(work, sources, prune=False, preserve=(), protected=()):
-    """Copy every file of the sources [(folder, destination[, executables])] into work, overwriting changed files.
-
-    With prune, files in work that no source has are deleted, except .git,
-    paths matching a preserve regex and paths under a protected folder.
+    With prune, files in work that no target has are deleted, except .git,
+    paths matching a preserve regex, paths `exclude` leaves out and paths
+    under a protected folder (or one the staging holds back).
     Returns (written, removed), lists of relative paths.
     """
     patterns = [re.compile(p) for p in preserve]
-    produced = set()
     written = []
-    for source, destination, *_ in sources:
-        destination = normalise(destination)
-        for root, dirs, files in os.walk(source):
-            dirs[:] = sorted(d for d in dirs if d != ".git")
-            for name in sorted(files):
-                relative = normalise(os.path.join(destination, os.path.relpath(os.path.join(root, name), source)))
-                produced.add(relative)
-                target = os.path.join(work, *relative.split("/"))
-                if os.path.isfile(target) and filecmp.cmp(os.path.join(root, name), target, shallow=False) \
-                        and (os.stat(target).st_mode & 0o111) == (os.stat(os.path.join(root, name)).st_mode & 0o111):
-                    continue
-                make_parents(work, relative)
-                if os.path.isdir(target) and not os.path.islink(target):
-                    shutil.rmtree(target)
-                shutil.copyfile(os.path.join(root, name), target)
-                shutil.copymode(os.path.join(root, name), target)
-                written.append(relative)
+    for relative, source in sorted(staged.files.items()):
+        target = os.path.join(work, *relative.split("/"))
+        if os.path.isfile(target) and lib.same_file(source, target):
+            continue
+        make_parents(work, relative)
+        if os.path.isdir(target) and not os.path.islink(target):
+            shutil.rmtree(target)
+        shutil.copyfile(source, target)
+        shutil.copymode(source, target)
+        written.append(relative)
 
     removed = []
     if prune:
-        keep_folders = [normalise(p) for p in protected]
         for root, dirs, files in os.walk(work, topdown=True):
             if os.path.abspath(root) == os.path.abspath(work):
                 dirs[:] = [d for d in dirs if d != ".git"]
             for name in files:
                 relative = normalise(os.path.relpath(os.path.join(root, name), work))
-                if relative in produced or preserved(relative, patterns) \
-                        or any(under(relative, folder) for folder in keep_folders):
-                    continue
-                os.remove(os.path.join(root, name))
-                removed.append(relative)
+                if staged.prunable(relative, patterns, protected):
+                    os.remove(os.path.join(root, name))
+                    removed.append(relative)
         # Folders the deletions left empty
         for root, dirs, files in os.walk(work, topdown=False):
             relative = normalise(os.path.relpath(root, work))
@@ -254,16 +235,15 @@ def sync(work, sources, prune=False, preserve=(), protected=()):
     return written, sorted(removed)
 
 
-def executable_modes(sources):
-    """{path in work: executable?} for the files of the sources that come with a set of executables.
+def executable_modes(sources, staged):
+    """{path in work: executable?} for the staged files of the sources that come with a set of executables.
 
     A source's executables are the paths (relative to its folder) that were
     executable in the test container; sources without that set (None) are left
-    to the file system.
+    to the file system, and so are files the staging left out.
     """
     modes = {}
-    for source, destination, *rest in sources:
-        executables = rest[0] if rest else None
+    for _, source, destination, executables in sources:
         if executables is None:
             continue
         destination = normalise(destination)
@@ -271,8 +251,35 @@ def executable_modes(sources):
             dirs[:] = [d for d in dirs if d != ".git"]
             for name in files:
                 inner = normalise(os.path.relpath(os.path.join(root, name), source))
-                modes[normalise(f"{destination}/{inner}")] = inner in executables
+                relative = f"{destination}/{inner}" if destination else inner
+                if relative in staged.files:
+                    # Targets sharing a folder merge their files: executable if any of them says so
+                    modes[relative] = modes.get(relative, False) or inner in executables
     return modes
+
+
+def published_file(work, relative):
+    """The bytes of a file in the checkout of the upstream, or None."""
+    path = os.path.join(work, *relative.split("/"))
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def signed(job, work, staged):
+    """The staged files with the repository metadata signed, when `gpg-key` is set."""
+    if not job.config.get("gpg-key"):
+        return staged
+    folder = lib.write_staged(staged, work.rstrip("/\\") + ".signed")
+    lib.sign_repository(job, folder, lambda relative: published_file(work, relative))
+    result = lib.Staged(staged.folders, staged.exclude)
+    result.hold = staged.hold
+    for root, _, files in os.walk(folder):
+        for name in files:
+            path = os.path.join(root, name)
+            result.files[normalise(os.path.relpath(path, folder))] = path
+    return result
 
 
 def make_parents(work, relative):
@@ -336,15 +343,25 @@ def change_summary(work):
 def deploy_tree(job, name, work, fetch_url, push_url, branch, sources, message, env, protected=()):
     """Fetch the upstream, put sources on top, commit and push. Returns 'pushed' or 'unchanged'.
 
+    sources are [(target name, folder, destination[, executables])] (or
+    [(folder, destination)]); executables (paths relative to folder, or None
+    when unknown) set the committed executable bits.
     When the upstream moves while pushing, everything is done again once on
     top of the new upstream. Pushes are never forced.
     """
     config = job.config
+    sources = [(source[1] or source[0], *source, None) if len(source) == 2 else (*source, None)[:4]
+               for source in sources]
+    staged = lib.stage_targets([source[:3] for source in sources], config.get("exclude") or (), protected)
+    modes = executable_modes(sources, staged)
+    if staged.hold:
+        job.warn(f"nothing is pruned in {', '.join(f or 'the root' for f in staged.hold)} this time: a target "
+                 "that shares it isn't deployed")
     for attempt in (1, 2):
         branch, base = prepare(work, fetch_url, push_url, branch, env)
-        _, removed = sync(work, sources, bool(config.get("prune")), config.get("preserve") or (), protected)
-        if not commit(work, config["username"], config["email"], message, bool(config.get("sign")),
-                      executable_modes(sources)):
+        _, removed = sync(work, signed(job, work, staged), bool(config.get("prune")), config.get("preserve") or (),
+                          protected)
+        if not commit(work, config["username"], config["email"], message, bool(config.get("sign")), modes):
             job.say(f"{name}: already up to date")
             return "unchanged"
         summary = change_summary(work)
@@ -394,18 +411,13 @@ def check_common(job, allowed, errors, rejected=()):
     for key in ("prune", "sign"):
         if key in config and not isinstance(config[key], bool):
             errors.append(f"{job.key(key)} must be true or false")
-    preserve = config.get("preserve")
-    if preserve is not None:
-        if not isinstance(preserve, list) or not all(isinstance(p, str) and p for p in preserve):
-            errors.append(f"{job.key('preserve')} must be a list of regular expressions")
-        else:
-            for pattern in preserve:
-                try:
-                    re.compile(pattern)
-                except re.error as e:
-                    errors.append(f"{job.key('preserve')} has an invalid regular expression {pattern!r}: {e}")
-        if not config.get("prune"):
-            job.warn(f"{job.key('preserve')} only matters with 'prune: true': without it nothing is deleted")
+    lib.check_patterns(job, "preserve", errors)
+    if config.get("preserve") is not None and not config.get("prune"):
+        job.warn(f"{job.key('preserve')} only matters with 'prune: true': without it nothing is deleted")
+    if "exclude" in allowed:
+        lib.check_patterns(job, "exclude", errors)
+    if "gpg-key" in allowed:
+        lib.check_signing(job, errors)
     return ssh_key, password
 
 
@@ -436,16 +448,13 @@ def check(job):
         if ".." in normalise(path).split("/") or os.path.isabs(path) or re.match(r"^[A-Za-z]:", path):
             errors.append(f"{job.key('path')} must be a folder inside the repository, got {path!r}")
         names = [t.name for t in job.targets] + job.skipped_targets
-        paths = target_paths(job, names)
-        folders = sorted(set(paths.values()))
-        if len(paths) > 1 and len(folders) < len(paths):
-            errors.append(f"{job.key('path')} puts several targets ({', '.join(names)}) in the same folder: "
-                          "add {target} to it")
-        else:
-            nested = [(a, b) for a in folders for b in folders if a != b and under(b, a)]
-            if nested:
-                errors.append(f"{job.key('path')} puts one target's folder ({nested[0][1] or 'the root'}) inside "
-                              f"another one's ({nested[0][0] or 'the root'}): add {{target}} to it")
+        folders = sorted(set(target_paths(job, names).values()))
+        # Targets may share a folder (their files are merged), but one target's folder can't be inside another's
+        nested = [(a, b) for a in folders for b in folders if a != b and under(b, a)]
+        if nested:
+            errors.append(f"{job.key('path')} puts one target's folder ({nested[0][1] or 'the root'}) inside "
+                          f"another one's ({nested[0][0] or 'the root'}): add {{target}} to it, or use the same "
+                          "folder for all of them")
     return errors
 
 
@@ -460,7 +469,7 @@ def main(job):
         return  # every target failed its tests: they're reported as skipped
     paths = target_paths(job, [t.name for t in targets] + job.skipped_targets + [s["name"] for s in job.skipped])
     url = config["url"]
-    sources = [(t.path, paths[t.name], t.executables) for t in targets]
+    sources = [(t.name, t.path, paths[t.name], t.executables) for t in targets]
     # Targets that aren't deployed this time keep what's upstream, even with prune
     protected = [paths[name] for name in job.skipped_targets + [s["name"] for s in job.skipped]]
     env = auth_env(job, url)

@@ -21,6 +21,14 @@ TARGETS = {
 
 TOPDIR = f'--define "_topdir {lib.REPO}"'
 
+
+def zypper(args):
+    """A zypper command that also succeeds with exit code 106, which only means that
+    some repositories couldn't be refreshed (a mirror timing out): a package that
+    really is missing still fails the step, or rpmbuild after it."""
+    return f"zypper -n {args} || [ $? -eq 106 ]\n"
+
+
 # Per family: install command, set up the tools, install build dependencies, install local RPMs
 FAMILIES = {
     "fedora": {
@@ -36,10 +44,14 @@ FAMILIES = {
         "install": "dnf -y install {files}\n",
     },
     "opensuse": {
-        "upgrade": "zypper -n dup\n",
-        "setup": "zypper -n in rpm-build createrepo_c curl tar gzip xz bzip2\n",
-        "builddep": f"rpmspec {TOPDIR} -q --buildrequires {{spec}} | xargs -r -d '\\n' zypper -n in\n",
-        "install": "zypper -n --no-gpg-checks in --allow-unsigned-rpm {files}\n",
+        "upgrade": zypper("dup"),
+        "setup": zypper("in rpm-build createrepo_c curl tar gzip xz bzip2"),
+        # zypper has no builddep: install what rpmspec lists, one argument per line
+        "builddep": f"rpmspec {TOPDIR} -q --buildrequires {{spec}} > {lib.STATE}/buildrequires\n"
+                    "set --\n"
+                    f"while IFS= read -r dep; do set -- \"$@\" \"$dep\"; done < {lib.STATE}/buildrequires\n"
+                    "[ $# -eq 0 ] || " + zypper('in "$@"'),
+        "install": zypper("--no-gpg-checks in --allow-unsigned-rpm {files}"),
     },
 }
 

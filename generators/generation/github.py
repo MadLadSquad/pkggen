@@ -132,7 +132,7 @@ class GitHub:
         key = lib.load_secrets().get("github_key")
         # Sent to GitHub only: requests drops it on redirects to other hosts
         self.auth = {"Authorization": f"Bearer {key}"} if key else {}
-        self.session = requests.Session()
+        self.session = lib.session()
 
     def api(self, path, what, **params):
         url = f"https://{self.api_domain}/repos/{self.user}/{self.repo}{path}"

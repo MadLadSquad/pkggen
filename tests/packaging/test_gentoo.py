@@ -67,11 +67,19 @@ def test_category_from_package_and_gentoo_block(package_with, tmp_path):
     assert package_dir(tmp_path, "ude-misc").is_dir()
 
 
-def test_unlisted_category_warns(package_with, tmp_path):
-    result = package_with("gentoo", category="dev-libs")
+def test_unlisted_category_warns_without_masters(package_with, make_job, example_config, tmp_path):
+    repository = {k: v for k, v in example_config["repositories"]["gentoo"].items() if k != "masters"}
+    result = package_with("gentoo", make_job("gentoo", repository=repository, category="dev-libs"))
     assert result.code == 0
     assert "category 'dev-libs' isn't listed in 'repositories.gentoo.categories'" in result.json["warnings"][-1]
     assert package_dir(tmp_path, "dev-libs").is_dir()
+
+
+def test_categories_of_the_masters_dont_warn(package_with, tmp_path):
+    # The example overlay builds on ::gentoo, which has dev-libs
+    result = package_with("gentoo", category="dev-libs")
+    assert result.code == 0
+    assert not any("isn't listed" in w for w in result.json["warnings"])
 
 
 @pytest.mark.parametrize("overrides, repository, message", [

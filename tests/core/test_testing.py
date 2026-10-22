@@ -461,3 +461,21 @@ def test_malformed_target_only_fails_itself(generators, project, fake_engine, ca
     assert "[beta-b1]: unexpected KeyError: 'name'" in err
     assert "2/3 targets passed" in err
     assert fake_engine.containers() == []
+
+
+def test_package_distributions_limit_the_releases_it_is_tested_on(generators, project, fake_engine, capsys):
+    project(group=packages({"name": "one"}, {"name": "two", "distributions": {"alpha": {"versions": ["a2"]},
+                                                                              "beta": {}}}))
+    assert testing.test() == 0
+    a1 = "\n".join(container_scripts(fake_engine, "alpha-a1"))
+    a2 = "\n".join(container_scripts(fake_engine, "alpha-a2"))
+    assert "build one" in a1 and "build two" not in a1
+    assert "build two" in a2 and "build two" in "\n".join(container_scripts(fake_engine, "beta-b1"))
+    err = strip_ansi(capsys.readouterr().err)
+    assert "[alpha-a1] two isn't built on alpha-a1 (see its 'distributions')" in err
+    targets = testing.load_results()["targets"]
+    assert targets["alpha-a1"]["ok"] is True
+    assert targets["alpha-a1"]["packages"]["one"] == {"version": "1.0", "ok": True}
+    assert targets["alpha-a1"]["packages"]["two"] == {"version": "1.0", "ok": False,
+                                                      "skipped": "its 'distributions' leave out alpha-a1"}
+    assert targets["alpha-a2"]["packages"]["two"] == {"version": "1.0", "ok": True}

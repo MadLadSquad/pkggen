@@ -1,0 +1,4 @@
+{#- UntitledImGuiFramework applications: the uimgui eclass (eclass/uimgui.eclass in
+    the overlay, a seed file) builds and installs them with UVKBuildTool. -#}
+{% extends "_base/ebuild.tmpl" %}
+{% set inherit = (extra_inherit | default([])) + ["uimgui"] %}

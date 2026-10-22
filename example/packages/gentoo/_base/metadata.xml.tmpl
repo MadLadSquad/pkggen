@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+{# The overlay's owners maintain every package #}
+{% for owner in repository.owners %}
+	<maintainer type="{{ owner.type | default("person") }}">
+		<email>{{ owner.email | e }}</email>
+		<name>{{ owner.name | e }}</name>
+	</maintainer>
+{% endfor %}
+{% if dist["use-flags"] is defined %}
+	<use>
+{% for flag, text in dist["use-flags"].items() %}
+		<flag name="{{ flag | e }}">{{ text | e }}</flag>
+{% endfor %}
+	</use>
+{% endif %}
+{% if github is defined %}
+	<upstream>
+		<remote-id type="github">{{ github.user | e }}/{{ github.repo | e }}</remote-id>
+	</upstream>
+{% endif %}
+</pkgmetadata>

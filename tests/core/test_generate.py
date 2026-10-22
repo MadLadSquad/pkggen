@@ -167,8 +167,22 @@ def test_load_packages_applies_group_defaults():
 
 
 def test_load_packages_example(example_config):
+    from tests.support.example import PACKAGES
     result = generate.load_packages(example_config, None)
-    assert [p["name"] for p, _ in result] == ["untitled-cli-parser", "untitled-imgui-framework"]
+    # In pkggen.yaml order: the libraries, the framework, the applications, then the overlay's own packages
+    assert [p["name"] for p, _ in result] == list(PACKAGES) + ["btrustbiss"]
+    packages = {p["name"]: p for p, _ in result}
+    assert packages["untitled-cli-parser"]["templates"] == "cmake-library"
+    assert packages["untitled-game-system-manager"]["templates"] == "untitled-game-system-manager"
+    assert packages["abcccid"]["distributions"] == ["gentoo"]
+    assert packages["untitled-open"]["gentoo"] == {"category": "ude-base", "bdepend": ["dev-util/wayland-scanner"]}
+    # The group's dependencies with the package's own
+    pkgconf = {"name": "pkgconf", "gentoo": "virtual/pkgconfig", "rpm-based": "pkgconfig"}
+    assert packages["untitled-open"]["dependencies"] == {
+        "build": ["cmake", pkgconf], "libraries": ["dbus", "wayland"], "runtime": ["xdg-desktop-portal"]}
+    assert packages["untitled-game-system-manager"]["dependencies"]["build"] == [
+        {"name": "cmake", "gentoo": False}, {**pkgconf, "gentoo": False},
+        {"name": "go", "version": ">= 1.25", "debian": "golang-go (>= 2:1.25~)", "rpm-based": "go >= 1.25"}]
 
 
 def test_load_packages_filter(example_config):
@@ -345,8 +359,11 @@ def test_run_packaging(stub_generators, project):
         "repository": {"key": "value"},
         "repository_path": str(root / "pkggen-build" / "alpha"),
         "templates_path": str(root / "packages" / "alpha" / "p"),
+        "templates_root": str(root / "packages" / "alpha"),
         "default_templates_path": str(stub_generators / "templates" / "alpha"),
         "run_path": str(root),
+        "releases": [],
+        "dependencies": {"build": [], "libraries": [], "runtime": [], "development": []},
     }
 
 
@@ -438,3 +455,247 @@ def test_generate_rejects_configs(stub_generators, tmp_path, monkeypatch, conten
     with pytest.raises(utils.GenericError) as info:
         generate.generate()
     assert info.value.args[0] == message
+
+
+# --- templates / distributions ----------------------------------------------------
+
+KNOWN = {"alpha": ["a", "alpha_2"], "beta": ["b"]}
+
+
+@pytest.mark.parametrize("package", [
+    {"name": "p", "templates": "cmake-library"},
+    {"name": "p", "distributions": ["alpha"]},
+    {"name": "p", "distributions": {"alpha": {}, "beta": None}},
+    {"name": "p", "distributions": {"alpha": {"versions": ["a", "alpha-2"]}}},
+])
+def test_check_package_accepts_templates_and_distributions(package):
+    assert generate.check_package(package, KNOWN) == []
+
+
+@pytest.mark.parametrize("package, fragment", [
+    ({"name": "p", "templates": "a/b"}, "'templates' of package 'p'"),
+    ({"name": "p", "templates": ".."}, "'templates' of package 'p'"),
+    ({"name": "p", "templates": ""}, "'templates' of package 'p'"),
+    ({"name": "p", "distributions": []}, "must be a list of distributions"),
+    ({"name": "p", "distributions": "alpha"}, "must be a list of distributions"),
+    ({"name": "p", "distributions": {}}, "must be a list of distributions"),
+    ({"name": "p", "distributions": ["alpha", "gamma"]}, "unknown distribution(s): gamma"),
+    ({"name": "p", "distributions": {"gamma": {}}}, "unknown distribution(s): gamma"),
+    ({"name": "p", "distributions": {"alpha": {"other": 1}}}, "'alpha' must be {} or { versions: [...] }"),
+    ({"name": "p", "distributions": {"alpha": {"versions": []}}}, "'alpha.versions' must be a non-empty list"),
+    ({"name": "p", "distributions": {"alpha": {"versions": ["z"]}}}, "unknown release(s): z (known: a, alpha_2)"),
+])
+def test_check_package_rejects_templates_and_distributions(package, fragment):
+    errors = generate.check_package(package, KNOWN)
+    assert len(errors) == 1 and fragment in errors[0], errors
+
+
+def test_package_distributions_and_tested_on():
+    assert generate.package_distributions({"name": "p"}) is None
+    assert generate.package_distributions({"distributions": ["alpha"]}) == {"alpha": None}
+    limited = {"distributions": {"alpha": {"versions": ["alpha-2"]}, "beta": {}}}
+    assert generate.package_distributions(limited) == {"alpha": ["alpha-2"], "beta": None}
+    assert generate.builds_for(limited, "beta") and not generate.builds_for(limited, "gamma")
+    # Target names and rp-names match each other
+    assert generate.tested_on(limited, "alpha", "alpha-2", "alpha_2")
+    assert generate.tested_on(limited, "alpha", "whatever", "alpha_2")
+    assert not generate.tested_on(limited, "alpha", "alpha-1", "a")
+    assert generate.tested_on(limited, "beta", "b", "b")
+    assert not generate.tested_on(limited, "gamma", "g", "g")
+    assert generate.tested_on({"name": "p"}, "alpha", "x", "y")
+
+
+def test_load_packages_checks_distributions_against_the_list(stub_generators):
+    config = {"g": packages({"name": "p", "distributions": ["gamma"]}, {"name": "q"}, distributions=["alpha"])}
+    with pytest.raises(utils.GenericError, match="unknown distribution\\(s\\): gamma"):
+        generate.load_packages(config, None)
+    # Group defaults apply, and the package's own value replaces the list
+    config = {"g": packages({"name": "p", "distributions": ["beta"]}, {"name": "q"}, distributions=["alpha"])}
+    loaded = {p["name"]: p["distributions"] for p, _ in generate.load_packages(config, None)}
+    assert loaded == {"p": ["beta"], "q": ["alpha"]}
+
+
+def test_generate_respects_distributions(stub_generators, project, capsys):
+    root = project({"repositories": REPOSITORIES,
+                    "group": packages({"name": "everywhere"}, {"name": "only-beta", "distributions": ["beta"]},
+                                      {"name": "only-nopackaging", "distributions": ["nopackaging"]})})
+    assert generate.generate() == 0
+    built = sorted(str(p.relative_to(root / "pkggen-build")) for p in (root / "pkggen-build").rglob("*.json"))
+    assert built == ["alpha/everywhere.json", "beta/everywhere.json", "beta/only-beta.json"]
+    err = strip_ansi(capsys.readouterr().err)
+    assert "only-nopackaging is only packaged for nopackaging (see its 'distributions')" in err
+    assert "3/3 distribution packages generated" in err
+
+
+def test_generate_shared_templates_folder(stub_generators, project):
+    root = project({"repositories": REPOSITORIES,
+                    "group": packages({"name": "one"}, {"name": "two", "templates": "own"}, templates="shared")})
+    assert generate.generate(None, ["alpha"]) == 0
+    jobs = {name: json.loads((root / "pkggen-build" / "alpha" / f"{name}.json").read_text())
+            for name in ("one", "two")}
+    assert jobs["one"]["templates_path"] == str(root / "packages" / "alpha" / "shared")
+    assert jobs["two"]["templates_path"] == str(root / "packages" / "alpha" / "own")
+    assert jobs["two"]["templates_root"] == str(root / "packages" / "alpha")
+
+
+# --- dependencies ----------------------------------------------------------------
+
+STUB_DEPENDENCIES = textwrap.dedent("""\
+    import json, os, sys
+    job = json.loads(sys.stdin.read())
+    with open(os.environ["STUB_DEPENDENCY_LOG"], "a") as f:
+        f.write(json.dumps(job) + "\\n")
+    if "fail-lookup" in job["projects"]:
+        print("\\x1b[31mError [dependencies]: repology is down\\x1b[0m", file=sys.stderr)
+        sys.exit(1)
+    print("\\x1b[33mWarning: an old answer\\x1b[0m", file=sys.stderr)
+    print(json.dumps({"projects": {name: {rp: [{"srcname": name, "version": "1"}] for rp in job["repositories"]}
+                                   for name in job["projects"]}, "missing": [], "warnings": []}))
+""")
+
+
+@pytest.fixture
+def stub_dependencies(stub_generators, tmp_path, monkeypatch):
+    (stub_generators / "dependencies").mkdir()
+    (stub_generators / "dependencies" / "repology.py").write_text(STUB_DEPENDENCIES)
+    log = tmp_path / "dependency-jobs.jsonl"
+    monkeypatch.setenv("STUB_DEPENDENCY_LOG", str(log))
+    return lambda: [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+
+@pytest.mark.parametrize("value", [
+    {"build": ["cmake"], "libraries": ["glfw >= 3.4", "python:requests"], "runtime": None, "development": []},
+    {"libraries": [{"name": "glfw", "version": ">= 3.4", "alpha": "glfw3-dev", "beta": False}]},
+    {"runtime": [{"name": "go", "version": "= 1.25.1"}, "xhost<2"]},
+])
+def test_check_package_accepts_dependencies(value):
+    assert generate.check_package({"name": "p", "dependencies": value}, {"alpha": [], "beta": []}) == []
+
+
+@pytest.mark.parametrize("value, fragment", [
+    (["cmake"], "'dependencies' of package 'p' must be a mapping with the lists build, libraries"),
+    ({"tools": ["cmake"]}, "has an unknown list 'tools'"),
+    ({"build": "cmake"}, "'dependencies.build' of package 'p' must be a list"),
+    ({"build": ["cmake >="]}, "'cmake >=' isn't \"<project>\" or \"<project> <op> <version>\""),
+    ({"build": ["glfw ~> 3"]}, "isn't \"<project>\""),
+    ({"build": [3]}, "must be a string like \"glfw >= 3.4\" or a mapping"),
+    ({"build": [{"version": ">= 1"}]}, "needs a 'name'"),
+    ({"build": [{"name": "glfw", "version": "3.4"}]}, "the 'version' of 'glfw' must be \"<op> <version>\""),
+    ({"build": [{"name": "glfw", "alpha": True}]}, "'glfw.alpha' must be the dependency's name there"),
+    ({"build": [{"name": "glfw", "alpha": ""}]}, "'glfw.alpha' must be the dependency's name there"),
+    ({"build": [{"name": "glfw", "gamma": "x"}]}, "'glfw' has unknown key(s) gamma"),
+])
+def test_check_package_rejects_dependencies(value, fragment):
+    errors = generate.check_package({"name": "p", "dependencies": value}, {"alpha": [], "beta": []})
+    assert any(fragment in e for e in errors), errors
+
+
+def test_load_packages_checks_dependency_overrides(stub_generators):
+    config = {"g": packages({"name": "p", "dependencies": {"build": [{"name": "x", "gamma": "y"}]}})}
+    with pytest.raises(utils.GenericError, match="'x' has unknown key\\(s\\) gamma"):
+        generate.load_packages(config, None)
+
+
+def test_generate_looks_dependencies_up_once(stub_generators, stub_dependencies, project, capsys):
+    root = project({"repositories": REPOSITORIES, "group": packages(
+        {"name": "lib"},
+        {"name": "app", "dependencies": {
+            "build": ["cmake"],
+            "libraries": ["glfw >= 3.4", "lib", {"name": "zlib", "alpha": "zlib1g-dev", "beta": False}],
+            "runtime": [{"name": "xhost", "alpha": "x11-xserver-utils"}]}},
+        {"name": "other", "dependencies": {"build": ["cmake"]}})})
+    assert generate.generate() == 0
+    jobs = stub_dependencies()
+    # Once, without the local package and the dependency every distribution names itself
+    assert len(jobs) == 1
+    assert jobs[0]["projects"] == ["cmake", "glfw", "xhost"]
+    assert jobs[0]["repositories"] == ["a", "b"]
+    assert jobs[0]["user_agent"].startswith("pkggen/")
+
+    alpha = json.loads((root / "pkggen-build" / "alpha" / "app.json").read_text())
+    assert alpha["releases"] == ["a"]
+    deps = alpha["dependencies"]
+    assert deps["build"] == [{"name": "cmake", "op": None, "version": None, "local": None,
+                              "releases": {"a": [{"srcname": "cmake", "version": "1"}]}}]
+    glfw, local, zlib = deps["libraries"]
+    assert (glfw["op"], glfw["version"]) == (">=", "3.4")
+    assert local == {"name": "lib", "op": None, "version": None, "releases": {},
+                     "local": {"name": "lib", "category": None, "packaged": True}}
+    assert zlib["override"] == "zlib1g-dev" and zlib["releases"] == {}
+    assert deps["runtime"][0]["override"] == "x11-xserver-utils"
+    assert deps["development"] == []
+    beta = json.loads((root / "pkggen-build" / "beta" / "app.json").read_text())["dependencies"]
+    assert beta["libraries"][2]["override"] is False
+    assert "override" not in beta["runtime"][0] and beta["runtime"][0]["releases"]
+
+    err = strip_ansi(capsys.readouterr().err)
+    assert err.count("Warning: an old answer") == 1
+    assert "looked up 3 dependencies on repology" in err
+
+
+def test_generate_without_dependencies_doesnt_look_anything_up(stub_generators, stub_dependencies, project):
+    project({"repositories": REPOSITORIES, "group": packages({"name": "one"})})
+    assert generate.generate() == 0
+    assert stub_dependencies() == []
+
+
+def test_a_failed_lookup_only_fails_packages_with_dependencies(stub_generators, stub_dependencies, project, capsys):
+    root = project({"repositories": REPOSITORIES, "group": packages(
+        {"name": "plain"}, {"name": "needy", "dependencies": {"build": ["fail-lookup"]}})})
+    assert generate.generate() == 1
+    assert (root / "pkggen-build" / "alpha" / "plain.json").exists()
+    assert not (root / "pkggen-build" / "alpha" / "needy.json").exists()
+    err = strip_ansi(capsys.readouterr().err)
+    assert "couldn't look its dependencies up: repology is down" in err
+
+
+def test_releases_come_from_the_package_then_the_test(stub_generators, stub_dependencies, project):
+    (stub_generators / "distributions" / "distributions.yaml").write_text(textwrap.dedent("""\
+        distributions:
+          - name: alpha
+            rp-names: [alpha_1, alpha_2, alpha_3]
+          - name: beta
+            rp-names: [beta_1]
+    """))
+    root = project({"repositories": REPOSITORIES,
+                    "test": {"distributions": {"alpha": {"versions": ["alpha-2", "alpha-3"]}}},
+                    "group": packages(
+                        {"name": "own", "distributions": {"alpha": {"versions": ["alpha-1"]}}},
+                        {"name": "tested", "dependencies": {"build": ["cmake"]}})})
+    assert generate.generate() == 0
+    job = lambda name: json.loads((root / "pkggen-build" / "alpha" / f"{name}.json").read_text())
+    assert job("own")["releases"] == ["alpha_1"]
+    assert job("tested")["releases"] == ["alpha_2", "alpha_3"]
+    assert set(job("tested")["dependencies"]["build"][0]["releases"]) == {"alpha_2", "alpha_3"}
+
+
+def test_package_filters_still_know_every_local_package(stub_generators, stub_dependencies, project):
+    root = project({"repositories": REPOSITORIES, "group": packages(
+        {"name": "lib", "gentoo": {"category": "dev-libs"}},
+        {"name": "app", "dependencies": {"libraries": ["lib"]}})})
+    assert generate.generate(["app"]) == 0
+    assert stub_dependencies() == []  # only a local package: nothing to look up
+    local = json.loads((root / "pkggen-build" / "alpha" / "app.json").read_text())["dependencies"]["libraries"][0]
+    assert local["local"] == {"name": "lib", "category": "dev-libs", "packaged": True}
+
+
+def test_package_dependencies_add_to_the_groups(stub_generators):
+    config = {"g": packages(
+        {"name": "p", "dependencies": {"build": [{"name": "cmake", "alpha": False}, "go >= 1.25"],
+                                       "runtime": ["xhost"]}},
+        {"name": "q"},
+        dependencies={"build": ["cmake", "pkgconf"], "libraries": ["glfw"]})}
+    loaded = {p["name"]: p["dependencies"] for p, _ in generate.load_packages(config, None)}
+    assert loaded["p"] == {"build": ["pkgconf", {"name": "cmake", "alpha": False}, "go >= 1.25"],
+                           "libraries": ["glfw"], "runtime": ["xhost"]}
+    assert loaded["q"] == {"build": ["cmake", "pkgconf"], "libraries": ["glfw"]}
+
+
+def test_packages_that_need_nothing_from_repology_dont_wait_for_it(stub_generators, stub_dependencies, project):
+    root = project({"repositories": REPOSITORIES, "group": packages(
+        {"name": "lib"},
+        {"name": "local-only", "dependencies": {"libraries": ["lib", {"name": "x", "alpha": "x", "beta": False}]}},
+        {"name": "needy", "dependencies": {"build": ["fail-lookup"]}})})
+    assert generate.generate() == 1
+    assert (root / "pkggen-build" / "alpha" / "local-only.json").exists()
+    assert not (root / "pkggen-build" / "alpha" / "needy.json").exists()

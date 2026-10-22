@@ -1,0 +1,29 @@
+{#- A prebuilt application (with its own Java runtime), shipped as an RPM in a tar. -#}
+{% extends "_base/ebuild.tmpl" %}
+{% set inherit = ["desktop", "rpm", "xdg"] %}
+{% block source_dir %}
+S="${WORKDIR}"
+{% endblock %}
+{% block fields %}
+RESTRICT="bindist mirror strip"
+QA_PREBUILT="opt/btrustbiss/*"
+{% endblock %}
+{% block functions %}
+
+src_unpack() {
+	default
+	rpm_unpack ./"${P}"-*.rpm
+}
+
+src_install() {
+	# Keep the bundle as it is, with its permissions
+	dodir /opt
+	cp -a opt/btrustbiss "${ED}/opt/" || die
+	dosym -r /opt/btrustbiss/bin/BISS /usr/bin/BISS
+	doicon opt/btrustbiss/lib/BISS.png
+	# Upstream's menu entry has Categories=Unknown, which isn't a valid category
+	sed -i 's/^Categories=Unknown;\{0,1\}$/Categories=Utility;Security;/' \
+		opt/btrustbiss/lib/btrustbiss-BISS.desktop || die
+	domenu opt/btrustbiss/lib/btrustbiss-BISS.desktop
+}
+{% endblock %}

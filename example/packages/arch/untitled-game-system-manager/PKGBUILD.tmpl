@@ -1,0 +1,12 @@
+{#- An UntitledImGuiFramework application with Go bindings to Incus. -#}
+{% extends "uimgui-app/PKGBUILD.tmpl" %}
+{% block fields %}
+# The Go part is a shared library, which makepkg's LTO flags break
+options=('!lto')
+{% endblock %}
+{% block build_parts %}
+	# The Incus bindings: a C shared library written in Go, with vendored modules
+	export CGO_CPPFLAGS="${CPPFLAGS}" CGO_CFLAGS="${CFLAGS}" CGO_CXXFLAGS="${CXXFLAGS}" CGO_LDFLAGS="${LDFLAGS}"
+	(cd IncusBindings && go build -mod=vendor -trimpath -modcacherw -buildmode=c-shared \
+		-o libUGM_Incus_InternalFuncs.so .)
+{% endblock %}

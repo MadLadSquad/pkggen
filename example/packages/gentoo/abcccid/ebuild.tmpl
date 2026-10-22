@@ -1,0 +1,28 @@
+{#- The release is a zip with the driver's source tarball inside. -#}
+{% extends "_base/ebuild.tmpl" %}
+{% set inherit = ["udev"] %}
+{% set base_depend = ["sys-apps/pcsc-lite", "virtual/libusb:1"] %}
+{% set base_bdepend = ["app-arch/unzip", "virtual/pkgconfig"] %}
+{% block source_dir %}
+S="${WORKDIR}/${P}"
+{% endblock %}
+{% block functions %}
+
+src_unpack() {
+	default
+	unpack "${WORKDIR}"/Circle_*/"${P}".tar.bz2
+}
+
+src_install() {
+	default
+	udev_dorules src/92_pcscd_abcccid.rules
+}
+
+pkg_postinst() {
+	udev_reload
+}
+
+pkg_postrm() {
+	udev_reload
+}
+{% endblock %}

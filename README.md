@@ -23,7 +23,7 @@ Here is how pkggen solves all your package deployment pain points:
 1. Completely automates away version bumps - it automatically fetches the latest release of your applications, downloads all sources, fetches checksums and verifies source integrity
 1. Templatize everything - pkggen pre-processes all your packages with Jinja 2, ships with many default variables and allows you to plug your own too
 1. Skip per-distribution boilerplate - pkggen automatically handles all distribution-specific setup logic so that you never have to worry about your development environment
-1. Dependency helpers - pkggen can help you add the correct dependencies for your package by cross-referencing with APIs like repology
+1. Write dependencies once - list them by their [repology](https://repology.org) name, and pkggen looks up what every distribution release calls them
 1. Develop once, test everywhere - pkggen allows you to automatically test all your packages and repositories on multiple operating systems in parallel
 1. Zero-click deployments - pkggen allows you to go through the entire package update, testing and deployment phases without any user interaction
 1. Modular design - whether you want to use your own scripts instead of the built-in ones, or you want to add a completely new platform, our modular design allows you to extend pkggen to fit any of your deployment needs
@@ -49,6 +49,9 @@ packages:
       homepage: "https://github.com/MadLadSquad/UntitledExec"
       license: "MIT"
       architectures: any               # or a list, by default [ amd64, arm64 ]
+      dependencies:                    # by repology project name, see below
+        build: [ cmake ]
+        libraries: [ "glfw >= 3.4" ]
       arch: { depends: [ "glibc" ] }   # distribution-specific values, available as `dist` in templates
       github:
         user: "MadLadSquad"
@@ -64,6 +67,19 @@ next to your `pkggen.yaml`. Each distribution has its own repository generator, 
 
 Finally, run `pkggen generate`. It fetches every package in parallel and renders its Jinja 2 templates from `packages/<distribution>/<package>/` into the repositories.
 If a package has no templates yet, pkggen creates sensible defaults for you to edit and warns you about it.
+
+Dependencies are written once, by their [repology](https://repology.org) project name, in four lists: `build` (tools needed to build), `libraries`
+(linked against: their development files are needed to build), `runtime` (needed to run) and `development` (development files needed to build and to
+run, for libraries other packages compile against). `pkggen generate` looks every dependency up and gives each distribution's templates its own names,
+e.g. `glfw >= 3.4` in `libraries` becomes `libglfw3-dev (>= 3.4)` in Debian's `Build-Depends`, `glfw-devel >= 3.4` in an RPM spec, `glfw>=3.4` in a
+PKGBUILD and `>=media-libs/glfw-3.4` in an ebuild. It warns when a release you build for has an older version than you need, and an entry can name
+the package itself where repology's name doesn't fit:
+```yaml
+dependencies:
+  build: [ cmake, { name: pkgconf, gentoo: "virtual/pkgconfig" } ]
+  runtime: [ { name: xhost, debian: "x11-xserver-utils" }, { name: incus, arch: false } ]   # false: not on Arch
+```
+`pkggen repology <name>` shows what a project is called, and which version it has, in every release. Your own packages are dependencies by their name.
 
 Once successful, you can run `pkggen test`. It starts a container for every release of every distribution you target (Fedora 43/44/rawhide, openSUSE, OpenMandriva, Debian, Ubuntu,
 Arch and Gentoo) and builds, installs and indexes every package in it, in parallel. The finished repositories land in `pkggen-build/test/<release>/`. It uses Podman (or Docker),
@@ -85,18 +101,10 @@ also write your own in python.
 ## Distribution/package support
 We currently support the following distributions and packaging formats:
 
-1. RedHat, Fedora and other RPM-based(RPMs) 🚧
-   - Generating packages 🚧
-   - Testing packages 🚧
-   - Deploying packages 🚧
-1. Arch Linux(PKGBUILDs) 🚧
-   - Generating packages 🚧
-   - Testing packages 🚧
-   - Deploying packages 🚧
-1. Gentoo Linux(Ebuilds) 🚧
-   - Generating packages 🚧
-   - Testing packages 🚧
-   - Deploying packages 🚧
+1. RedHat, Fedora and other RPM-based(RPMs)
+1. Debian, Ubuntu and other deb-based
+1. Arch Linux(PKGBUILDs)
+1. Gentoo Linux(Ebuilds)
 
 Planned future support:
 
@@ -104,7 +112,6 @@ Planned future support:
    - Homebrew
    - MacPorts
 1. Linux:
-   - Debian/Ubuntu(debs)
    - Void(templates)
    - Alpine(apks)
 1. BSD:

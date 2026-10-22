@@ -1,125 +1,92 @@
-#!/usr/bin/env python3
-import sys
-import os
-import json
-import re
-import requests
-from packaging.version import parse as parse_version, InvalidVersion
+"""`pkggen repology <project>`: what a dependency is called, and which version it has, in every release.
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+The lookup is the dependency generator's (generators/dependencies/repology.py),
+so it shows exactly what `pkggen generate` works with. In a folder with a
+pkggen.yaml its answers are kept in pkggen-build/cache, like generate's.
+"""
+import json
+import os
+import sys
+
+import dependencies
+import generate
 import utils
 
-def version_sort_key(version):
-    # Distro versions (e.g. "1.2.13.dfsg", "1.3_p1") often aren't PEP 440, so fall back to the leading numeric part
-    try:
-        return parse_version(version)
-    except InvalidVersion:
-        match = re.match(r"\d+(\.\d+)*", version)
-        return parse_version(match.group(0) if match else "0")
 
-def query_repology(package, is_raw, include_outdated):
+def release_rows(projects, name, distributions, include_outdated):
+    """One row per package, current releases first (in distributions.yaml order), then older ones."""
+    supported = [rp for dist in distributions for rp in dist.get("rp-names") or []]
+    found = projects.get(name) or {}
+    rows = []
+    for rp in supported + sorted(set(found) - set(supported)):
+        for package in found.get(rp) or []:
+            current = rp in supported
+            if not current and not include_outdated:
+                continue
+            rows.append({
+                "distribution": rp,
+                "distribution_type": "supported" if current else "discontinued",
+                "srcname": package.get("srcname") or "",
+                "binname": package.get("binname") or "",
+                "binnames": package.get("binnames") or [],
+                "repository": package.get("subrepo") or "",
+                "version": package.get("version") or "",
+                "status": package.get("status") or "",
+                "summary": package.get("summary") or "",
+            })
+    return rows
+
+
+def environment():
+    """Cache the answers in pkggen-build/cache inside a pkggen project, like `pkggen generate` does."""
+    if generate.CACHE_ENV in os.environ or os.path.isfile(os.path.join(utils.get_run_path(), "pkggen.yaml")):
+        return generate.fetch_environment()
+    env = dict(os.environ)
+    env[generate.CACHE_ENV] = ""
+    return env
+
+
+def print_table(rows):
+    blocks = [[
+        f"Distribution: {row['distribution']}",
+        f"Distribution support state: {row['distribution_type']}",
+        f"Repository: {row['repository'] or 'default'}",
+        f"Source package name: {row['srcname'] or '-'}",
+        f"Binary package names: {', '.join(row['binnames']) or row['binname'] or '-'}",
+        f"Version: {row['version']}",
+        f"Status: {row['status']}",
+        f"Summary: {row['summary']}",
+    ] for row in rows]
+    width = max(len(line) for block in blocks for line in block)
+    for i, block in enumerate(blocks):
+        print(("┏" if i == 0 else "┣") + "━" * (width + 2) + ("┓" if i == 0 else "┫"))
+        for line in block:
+            print(f"┃ {line.ljust(width)} ┃")
+    print("┗" + "━" * (width + 2) + "┛")
+
+
+def query_repology(name, is_raw, include_outdated):
+    """Print what repology knows about a project. Returns the exit code."""
     distributions = utils.load_distributions()
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15',
-    }
-    output = []
+    rp_names = [rp for dist in distributions for rp in dist.get("rp-names") or []]
+    wildcards = [w for dist in distributions for w in dist.get("rp-names-wildcards") or []] if include_outdated else []
+    try:
+        projects, warnings = dependencies.run_generator([name], rp_names, wildcards, env=environment())
+    except RuntimeError as e:
+        raise utils.GenericError(str(e))
+    for line in warnings:
+        print(f"\x1b[33m{line}\x1b[0m", file=sys.stderr)
 
-    response = requests.get(f"https://repology.org/api/v1/project/{package}", headers=headers)
-    if response.status_code == 200:
-        data = response.json()
-        for item in data:
-            for distribution in distributions:
-                b_skip = False
-                for release in distribution["rp-names"]:
-                    if item["repo"] == release and (
-                            ("binname" in item and item["binname"] == package) or 
-                            ("srcname" in item and item["srcname"] == package) or 
-                            ("visiblename" in item and item["visiblename"] == package)
-                        ):
-
-                        output.append({
-                            "distribution":         release,
-                            "distribution_type":    "supported",
-                            "srcname":              item["srcname"] if "srcname" in item else "",
-                            "binname":              item["binname"] if "binname" in item else "",
-                            "repository":           item["subrepo"] if "subrepo" in item else "",
-                            "version":              item["version"],
-                            "status":               item["status"],
-                            "summary":              item.get("summary", ""),
-                        })
-                        b_skip = True
-                        break
-
-                if b_skip:
-                    continue
-
-                if include_outdated:
-                    if "rp-names-wildcards" in distribution:
-                        for release in distribution["rp-names-wildcards"]:
-                            if release in item["repo"] and (
-                                    ("binname" in item and item["binname"] == package) or 
-                                    ("srcname" in item and item["srcname"] == package) or 
-                                    ("visiblename" in item and item["visiblename"] == package)
-                                ):
-
-                                output.append({
-                                    "distribution":         item["repo"],
-                                    "distribution_type":    "discontinued",
-                                    "srcname":              item["srcname"] if "srcname" in item else "None",
-                                    "binname":              item["binname"] if "binname" in item else "None",
-                                    "repository":           item["subrepo"] if "subrepo" in item else "Default",
-                                    "version":              item["version"],
-                                    "status":               item["status"],
-                                    "summary":              item.get("summary", ""),
-                                })
-
-        output.sort(key=lambda x: version_sort_key(x["version"]), reverse=True)
-        output.sort(key=lambda x: x["distribution_type"] != "supported")
+    rows = release_rows(projects, name, distributions, include_outdated)
+    if not rows:
         if is_raw:
-            print(json.dumps(output))
-            return
-
-        b_first = True
-        max_width = 0
-
-        def strings_do(f):
-            for i in output:
-                lines = [
-                    f"Distribution: {i['distribution']}",
-                    f"Distribution support state: {i['distribution_type']}",
-                    f"Repository: {i['repository']}",
-                    f"Source package name: {i['srcname']}",
-                    f"Binary package name: {i['binname']}",
-                    f"Version: {i['version']}",
-                    f"Status: {i['status']}",
-                    f"Summary: {i['summary']}"
-                ]
-                f(lines)
-
-        def get_max_width(lines):
-            nonlocal max_width
-            max_width = max(max_width, max(len(line) for line in lines))
-
-        def print_with_formatting(lines):
-            nonlocal b_first
-            nonlocal max_width
-
-            if b_first:
-                print("┏" + "━" * (max_width + 2) + "┓")
-                b_first = False
-            else:
-                print("┣" + "━" * (max_width + 2) + "┫")
-
-            for line in lines:
-                print(f"┃ {line.ljust(max_width)} ┃")
-
-
-        strings_do(get_max_width)
-        strings_do(print_with_formatting)
-        print("┗" + "━" * (max_width + 2) + "┛")
-
-    else:
-        if is_raw:
-            print(json.dumps({"error": "No such dependency", "response_code": response.status_code}))
+            print(json.dumps({"error": "No such dependency", "project": name}))
         else:
-            print("No such dependency! Response code:", response.status_code)
+            print(f"repology has no package of '{name}' in the releases pkggen supports. Look its project name up at "
+                  f"https://repology.org/projects/?search={name}")
+        return 1
+    if is_raw:
+        print(json.dumps(rows))
+    else:
+        print_table(rows)
+    return 0

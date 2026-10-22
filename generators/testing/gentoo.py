@@ -79,9 +79,12 @@ PKGGEN_EOF
 echo "*/*::$repo {keyword}" > /etc/portage/package.accept_keywords/pkggen
 touch {lib.REPO}/profiles/categories
 """
-    # Portage ignores categories that aren't listed in profiles/categories
+    # Portage ignores categories that aren't listed in profiles/categories, of
+    # the overlay or of the Gentoo repository it builds on
     for name in sorted({category(job, p) for p in job.packages}):
-        code += f"grep -qx {lib.shquote(name)} {lib.REPO}/profiles/categories || echo {lib.shquote(name)} >> {lib.REPO}/profiles/categories\n"
+        quoted = lib.shquote(name)
+        code += (f"grep -qx {quoted} {PORTAGE_TREE}/profiles/categories {lib.REPO}/profiles/categories || "
+                 f"echo {quoted} >> {lib.REPO}/profiles/categories\n")
     return [lib.step("register the overlay", code)]
 
 

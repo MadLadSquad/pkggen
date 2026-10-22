@@ -30,7 +30,9 @@ def test_example_against_github(example_project, github_secrets):
         assert run_cli("gen-repo", dist).code == 0
     result = run_cli("generate")
     assert result.code == 0, result.err
-    assert "Done: 2/2 packages fetched, 8/8 distribution packages generated" in result.err_plain
+    # Every package, every distribution (the two overlay packages only for Gentoo), with real repology data
+    assert "Done: 12/12 packages fetched, 42/42 distribution packages generated" in result.err_plain
+    assert "looked up 19 dependencies on repology" in result.err_plain
 
     build = example_project / "pkggen-build"
     for name in PACKAGES:
@@ -56,3 +58,18 @@ def test_repology():
     assert entries
     assert all(entry["distribution_type"] == "supported" for entry in entries)
     assert {"fedora_rawhide", "arch"} & {entry["distribution"] for entry in entries}
+
+
+def test_repology_dependencies_resolve(tmp_path):
+    """The real repology data still resolves glfw the way the packaging generators expect."""
+    from tests.support.helpers import load_generator, run_generator
+    rp_names = ["arch", "gentoo", "debian_13", "fedora_44", "opensuse_tumbleweed"]
+    found = run_generator("dependencies", "repology", {"projects": ["glfw"], "repositories": rp_names,
+                                                      "user_agent": "pkggen-tests"})
+    assert found.code == 0, found.err
+    releases = found.json["projects"]["glfw"]
+    assert set(rp_names) <= set(releases)
+    lib = load_generator("packaging", "lib")
+    assert lib.choose_package("glfw", releases["gentoo"])["srcname"] == "media-libs/glfw"
+    assert lib.dev_package(lib.choose_package("glfw", releases["debian_13"]), "glfw", "-dev") == "libglfw3-dev"
+    assert lib.dev_package(lib.choose_package("glfw", releases["fedora_44"]), "glfw", "-devel") == "glfw-devel"

@@ -1,0 +1,27 @@
+{#- UntitledImGuiFramework applications, built and installed by UVKBuildTool.
+    Applications with extra parts extend this file and fill `build_parts`. -#}
+{% extends "_base/PKGBUILD.tmpl" %}
+{% set src = "$srcdir/" ~ (source_dir | default(source.directory)) %}
+{% block functions %}
+
+{% include "_base/configure-project.sh" %}
+
+build() {
+	cd "{{ src }}"
+{% block build_parts %}
+{% endblock %}
+	UVKBuildTool --generate "{{ src }}"
+	_configure_project uvproj.yaml
+}
+
+package() {
+	cd "{{ src }}"
+	# UVKBuildTool compiles and installs in one step
+	export UIMGUI_JOBS="$(_make_jobs)"
+	UVKBuildTool --build "$pkgdir/usr" /usr "{{ src }}"
+	_check_installed uvproj.yaml "$pkgdir/usr/lib"
+	# The framework's copy of utfcpp comes from the utf8cpp package
+	rm -rf "$pkgdir"/usr/{include,share}/utf8cpp
+	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+{% endblock %}

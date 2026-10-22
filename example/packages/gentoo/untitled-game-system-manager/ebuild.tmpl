@@ -1,0 +1,19 @@
+{#- An UntitledImGuiFramework application with Go bindings to Incus (vendored modules). -#}
+{% extends "uimgui-app/ebuild.tmpl" %}
+{% set extra_inherit = ["go-module"] %}
+{% block functions %}
+
+# go-module_src_unpack runs `go mod verify` in ${S}, but the module is in
+# IncusBindings/, with its dependencies vendored
+src_unpack() {
+	default
+}
+
+src_compile() {
+	# The Incus bindings: a C shared library written in Go
+	pushd IncusBindings >/dev/null || die
+	ego build -mod=vendor -buildmode=c-shared -o libUGM_Incus_InternalFuncs.so .
+	popd >/dev/null || die
+	uimgui_src_compile
+}
+{% endblock %}

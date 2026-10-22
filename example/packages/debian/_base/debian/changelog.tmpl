@@ -1,0 +1,7 @@
+{#- pkggen test gives every release its own version suffix and codename
+    (1.0-1~deb13 trixie) in the build's copy of this file. -#}
+{{ name }} ({{ version }}-{{ dist.revision | default(1) }}) {{ repository.suites[0].codename }}; urgency=medium
+
+  * New upstream release {{ version }}.
+
+ -- {{ maintainer }}  {{ date | rfc2822 }}

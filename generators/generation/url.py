@@ -52,8 +52,6 @@ Output (JSON on stdout):
 import posixpath
 from urllib.parse import unquote, urlparse
 
-import requests
-
 import lib
 
 DEFAULT_HEADERS = {
@@ -101,7 +99,7 @@ def generate(package):
         alias = posixpath.basename(unquote(urlparse(url).path)) or f"{pkgname}-{version}"
 
     headers = {**DEFAULT_HEADERS, **(config.get("headers") or {})}
-    artifact = lib.download_and_hash(requests.Session(), url, headers=headers,
+    artifact = lib.download_and_hash(lib.session(), url, headers=headers,
                                      position=int(package.get("position", 0)), label=alias)
 
     locks = config.get("hash-locks")

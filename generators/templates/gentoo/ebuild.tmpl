@@ -2,6 +2,8 @@
     specific values come from the package's `gentoo:` block in pkggen.yaml
     (`dist` here), e.g.
       gentoo: { category: dev-libs, depend: [ dev-libs/foo ], keywords: "amd64 ~arm64" }
+    `deps` holds the package's `dependencies` as Gentoo atoms (deps.depend,
+    deps.rdepend, deps.bdepend); the `gentoo:` block's lists are added.
     `arches` is the package's `architectures` as Gentoo keywords. -#}
 {% if repository.copyright is defined %}
 # Copyright {{ repository.copyright.years }} {{ repository.copyright.owner }}
@@ -27,9 +29,9 @@ LICENSE={{ license | default("all-rights-reserved") | gentoo_license | dquote }}
 SLOT="0"
 KEYWORDS={{ dist.keywords | default("~" ~ arches | join(" ~")) | dquote }}
 
-DEPEND="{{ dist.depend | default([]) | join(" ") }}"
-RDEPEND="${DEPEND}{% for d in dist.rdepend | default([]) %} {{ d }}{% endfor %}"
-BDEPEND="{{ dist.bdepend | default([]) | join(" ") }}"
+DEPEND="{{ (deps.depend + dist.depend | default([])) | join(" ") }}"
+RDEPEND="${DEPEND}{% for d in deps.rdepend + dist.rdepend | default([]) %} {{ d }}{% endfor %}"
+BDEPEND="{{ (deps.bdepend + dist.bdepend | default([])) | join(" ") }}"
 
 # Uncomment and fill in the phases (and add an inherit line) if the
 # default ones don't build and install the package.

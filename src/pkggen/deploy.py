@@ -23,6 +23,10 @@ DEPLOY_DIR = "deploy"
 SCRIPT_ENV = {"PYTHONIOENCODING": "utf-8"}
 
 
+# Deployment generators that push with git
+GIT_GENERATORS = {"git", "aur"}
+
+
 class Deployment:
     def __init__(self, distribution, where, generator, config, ident):
         self.distribution = distribution
@@ -296,7 +300,7 @@ def deploy(package_filter=None, distribution_filter=None, target_filter=None, sk
     deployments = load_deployments(config, distribution_filter)
     if package_filter:
         generate.load_packages(config, package_filter)  # reports unknown names
-    if not shutil.which("git"):
+    if any(d.generator in GIT_GENERATORS for d in deployments) and not shutil.which("git"):
         raise utils.GenericError("pkggen deploy needs git: install it and run `pkggen deploy` again")
 
     results = testing.load_results()
