@@ -24,7 +24,7 @@ pytestmark = pytest.mark.containers
 
 PACKAGE = "untitled-cli-parser"
 DEFAULT_TARGETS = "arch debian-13 fedora-44 gentoo"
-DISTRIBUTIONS = ["arch", "debian", "gentoo", "rpm-based"]
+DISTRIBUTIONS = ["alpine", "arch", "debian", "gentoo", "rpm-based", "void"]
 
 
 def edit(path, old, new):
@@ -49,6 +49,10 @@ def one_file_templates(project):
     edit(spec, "# Install the package's files into %%{buildroot} here\n",
          "install -Dm644 README.md %{buildroot}%{_docdir}/%{name}/README.md\n")
     edit(spec, "%files\n", "%files\n%{_docdir}/%{name}/README.md\n")
+    edit(root / "alpine" / PACKAGE / "APKBUILD.tmpl", "\t# Install the package's files into \"$pkgdir\"\n\tmkdir -p \"$pkgdir\"\n",
+         '\tinstall -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"\n')
+    edit(root / "void" / PACKAGE / "template.tmpl", "\t# Install the package's files into \"$DESTDIR\"\n\tvmkdir usr\n",
+         "\tvdoc README.md\n")
     # The default ebuild already installs README.md with einstalldocs
 
 

@@ -3,6 +3,7 @@
 #   spec.tmpl        -> SPECS/<name>.spec
 #   everything else  -> SOURCES/ (patches, desktop files, ...)
 import os
+import re
 from collections import Counter
 
 import lib
@@ -26,6 +27,16 @@ FAMILIES = {
     "opensuse": "0%{?suse_version}",
     "openmandriva": "0%{?mdvver}",
 }
+DEV_SUFFIX = "-devel"
+# OpenMandriva names its libraries lib64<name> on 64-bit architectures
+LIBRARY_PREFIXES = ("lib", "lib64")
+# Subpackages a dependency never means (see lib.drop_unwanted()); -devel-doc and
+# -devel-static end in -doc and -static
+NOISE = ("-doc", "-docs", "-debuginfo", "-debugsource", "-static", "-src", "-test", "-tests", "-lang",
+         "-bash-completion", "-zsh-completion", "-fish-completion")
+# Packages for other targets: the MinGW toolchains (mingw-, mingw32-, mingw64-, ucrt64-) and openSUSE's and
+# Fedora's cross compilers (cross-aarch64-gcc14, cross-gcc)
+OTHER_TARGETS = re.compile(r"^(mingw(32|64)?-|ucrt64-|cross-)|-cross-")
 
 
 def family(rp_name):
@@ -34,11 +45,11 @@ def family(rp_name):
 
 def pick(job, dep, package, kind):
     if kind != "dev":
-        return lib.main_package(package, dep["name"])
+        return lib.main_package(package, dep["name"], DEV_SUFFIX, LIBRARY_PREFIXES)
     if lib.lists_binaries(package):
-        return lib.dev_package(package, dep["name"], "-devel")
+        return lib.dev_package(package, dep["name"], DEV_SUFFIX, LIBRARY_PREFIXES)
     # openSUSE Leap: repology only knows the binary package's own name, so go by the convention
-    guess = f"{lib.basename(package.get('srcname'))}-devel"
+    guess = f"{lib.srcname(package)}{DEV_SUFFIX}"
     job.warn(f"repology doesn't list the packages of {dep['name']} in {package.get('repo')}: guessed {guess}")
     return guess
 
@@ -85,10 +96,26 @@ def split_families(job, deps):
     deps["by_family"] = [blocks[name] for name in FAMILIES if name in blocks]
 
 
+# Version can't contain '-'; pkggen also replaces ':', '/' and whitespace, like Arch's pkgver
+pkgver = lib.substitute(r"[-:/\s]", "_")
+DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def rpmdate(value):
+    """The %changelog date: 'Mon Oct 19 2026' (always English, unlike strftime)."""
+    date = lib.date_of(value)
+    return f"{DAYS[date.weekday()]} {MONTHS[date.month - 1]} {date.day:02d} {date.year}"
+
+
+FILTERS = {"pkgver": pkgver, "rpmdate": rpmdate}
+
+
 def main(job):
     # "any" means no ExclusiveArch line
     job.context["arches"] = lib.architectures(job, ARCHITECTURES, [])
-    split_families(job, lib.dependencies(job, DEPENDENCY_FIELDS, pick, render))
+    split_families(job, lib.dependencies(job, DEPENDENCY_FIELDS, pick, render, noise=NOISE,
+                                         other_targets=OTHER_TARGETS))
     lib.ensure_templates(job, REQUIRED)
 
     def place(rel):
@@ -97,7 +124,7 @@ def main(job):
         return os.path.join(job.repository_path, "SOURCES", rel)
 
     job.output = job.repository_path
-    lib.render_tree(job, place)
+    lib.render_tree(job, place, filters=FILTERS)
 
 
 if __name__ == "__main__":

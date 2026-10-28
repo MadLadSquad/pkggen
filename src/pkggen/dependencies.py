@@ -127,16 +127,14 @@ def parse(package):
 
 
 def local_packages(packages, distributions, builds_for):
-    """pkggen.yaml's own packages, as dependencies: {name: {name, category, builds_for: [distributions]}}."""
-    result = {}
-    for package in packages:
-        gentoo = package.get("gentoo") if isinstance(package.get("gentoo"), dict) else {}
-        result[package["name"]] = {
-            "name": package["name"],
-            "category": gentoo.get("category") or package.get("category"),
-            "builds_for": [d for d in distributions if builds_for(package, d)],
-        }
-    return result
+    """pkggen.yaml's own packages, as dependencies: {name: {name, package, builds_for: [distributions]}}.
+
+    `package` is the package's pkggen.yaml settings: the packaging generators
+    read what they need from it (e.g. Gentoo's category).
+    """
+    return {package["name"]: {"name": package["name"], "package": package,
+                              "builds_for": [d for d in distributions if builds_for(package, d)]}
+            for package in packages}
 
 
 def projects(packages, distributions, local, builds_for):
@@ -154,12 +152,16 @@ def projects(packages, distributions, local, builds_for):
     return list(dict.fromkeys(names))
 
 
-def releases(versions, rp_names, test_versions, release_key):
-    """The releases a package is built for: its own `versions`, else the test's, else all of them."""
+def releases(versions, rp_names, test_versions, release_key, aliases=None):
+    """The releases a package is built for: its own `versions`, else the test's, else all of them.
+
+    `aliases` maps target names to their rp-name (distributions.yaml's `targets`).
+    """
     versions = versions or test_versions
     if not versions:
         return list(rp_names)
-    keys = {release_key(v) for v in versions}
+    by_key = {release_key(name): rp for name, rp in (aliases or {}).items()}
+    keys = {release_key(by_key.get(release_key(v), v)) for v in versions}
     return [rp for rp in rp_names if release_key(rp) in keys] or list(rp_names)
 
 
@@ -176,8 +178,8 @@ def for_job(package, distribution, chosen, resolved, local):
                 item["override"] = entry["overrides"][distribution]
             elif entry["name"] in local:
                 own = local[entry["name"]]
-                item["local"] = {"name": own["name"], "category": own["category"],
-                                 "packaged": distribution in own["builds_for"]}
+                item["local"] = {"name": own["name"], "packaged": distribution in own["builds_for"],
+                                 "package": own["package"]}
             else:
                 found = (resolved or {}).get(entry["name"]) or {}
                 item["releases"] = {rp: found[rp] for rp in chosen if found.get(rp)}

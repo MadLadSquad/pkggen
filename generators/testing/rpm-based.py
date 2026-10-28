@@ -80,6 +80,14 @@ def install(package, family):
     return [lib.step(f"install {package.name}", FAMILIES[family]["install"].format(files=files))]
 
 
+# dnf and zypper read repodata/repomd.xml (and its signature) first, then the files it lists
+PUBLISH = {
+    "indexes": [r"(^|/)repodata/"],
+    "metadata": [r"(^|/)repomd\.xml(\.asc|\.key)?$"],
+    "content_types": {".rpm": "application/x-rpm"},
+}
+
+
 def main(job):
     targets = []
     for rp, spec in lib.select_targets(job, TARGETS):
@@ -103,6 +111,8 @@ if [ -d {lib.REPO}/RPMS ]; then createrepo_c {lib.REPO}/RPMS; fi
             packages=[{"name": p.name, "build": build(p, spec["family"]), "install": install(p, spec["family"])}
                       for p in job.packages],
             finalize=finalize,
+            env={"RPM_BUILD_NCPUS": lib.JOBS},  # %{_smp_build_ncpus}
+            publish=PUBLISH,
         ))
     return targets
 

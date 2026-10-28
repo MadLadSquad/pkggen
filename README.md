@@ -72,7 +72,7 @@ Dependencies are written once, by their [repology](https://repology.org) project
 (linked against: their development files are needed to build), `runtime` (needed to run) and `development` (development files needed to build and to
 run, for libraries other packages compile against). `pkggen generate` looks every dependency up and gives each distribution's templates its own names,
 e.g. `glfw >= 3.4` in `libraries` becomes `libglfw3-dev (>= 3.4)` in Debian's `Build-Depends`, `glfw-devel >= 3.4` in an RPM spec, `glfw>=3.4` in a
-PKGBUILD and `>=media-libs/glfw-3.4` in an ebuild. It warns when a release you build for has an older version than you need, and an entry can name
+PKGBUILD, `glfw-dev>=3.4` in an APKBUILD, `glfw-devel` in a Void template and `>=media-libs/glfw-3.4` in an ebuild. It warns when a release you build for has an older version than you need, and an entry can name
 the package itself where repology's name doesn't fit:
 ```yaml
 dependencies:
@@ -82,7 +82,7 @@ dependencies:
 `pkggen repology <name>` shows what a project is called, and which version it has, in every release. Your own packages are dependencies by their name.
 
 Once successful, you can run `pkggen test`. It starts a container for every release of every distribution you target (Fedora 43/44/rawhide, openSUSE, OpenMandriva, Debian, Ubuntu,
-Arch and Gentoo) and builds, installs and indexes every package in it, in parallel. The finished repositories land in `pkggen-build/test/<release>/`. It uses Podman (or Docker),
+Arch, Gentoo, Alpine edge/3.24/3.23 and Void glibc/musl) and builds, installs and indexes every package in it, in parallel. The finished repositories land in `pkggen-build/test/<release>/`. It uses Podman (or Docker),
 and on macOS and Windows it starts a Linux VM for the containers itself. The `test` block of your `pkggen.yaml` sets how many CPUs and how much RAM it may use, and the shell
 commands to run in every container before the packages are built and after they're installed:
 ```yaml
@@ -95,8 +95,9 @@ test:
       setup: [ "apt-get install -y libfoo-dev" ]
 ```
 
-And if all tests pass, run `pkggen deploy` to automatically deploy your packages to all repositories. Deployment generators are also provided for popular platforms like the AUR, and you can
-also write your own in python.
+And if all tests pass, run `pkggen deploy` to automatically deploy your packages to all repositories. Deployment generators are also provided for popular platforms like the AUR, git remotes and S3-compatible
+buckets (Cloudflare R2, AWS, MinIO, ...), and you can also write your own in python. They sign apt and dnf repositories with your GPG key, and Alpine
+and Void repositories with your RSA key, on your machine: the keys never enter the test containers.
 
 ## Distribution/package support
 We currently support the following distributions and packaging formats:
@@ -105,15 +106,14 @@ We currently support the following distributions and packaging formats:
 1. Debian, Ubuntu and other deb-based
 1. Arch Linux(PKGBUILDs)
 1. Gentoo Linux(Ebuilds)
+1. Alpine Linux(APKBUILDs)
+1. Void Linux(xbps-src templates, glibc and musl)
 
 Planned future support:
 
 1. macOS:
    - Homebrew
    - MacPorts
-1. Linux:
-   - Void(templates)
-   - Alpine(apks)
 1. BSD:
    - FreeBSD(pkgs)
    - OpenBSD(ports)

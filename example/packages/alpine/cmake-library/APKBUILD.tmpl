@@ -1,0 +1,43 @@
+{#- The UntitledDesktop libraries: CMake projects that install with -DUIMGUI_INSTALL=ON.
+    Extra CMake options come from the package's `cmake: { args: [...] }` in pkggen.yaml.
+    abuild runs every function in $builddir. -#}
+{% extends "_base/APKBUILD.tmpl" %}
+{# abuild makes CMake use Ninja (CMAKE_GENERATOR): samurai is Alpine's #}
+{% set base_makedepends = ["samurai"] %}
+{% block functions %}
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON{% for arg in (cmake | default({})).args | default([]) %} \
+		{{ arg | shquote }}{% endfor %}
+
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+{% endblock %}

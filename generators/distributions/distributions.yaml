@@ -43,3 +43,19 @@ distributions:
     rp-names: [ "arch" ]
   - name: gentoo
     rp-names: [ "gentoo" ]
+  - name: alpine
+    # Edge and the two newest stable branches
+    rp-names:
+      - "alpine_edge"
+      - "alpine_3_24"
+      - "alpine_3_23"
+    rp-names-wildcards:
+      - "alpine"
+  - name: void
+    # Void is a rolling release: repology has one repository for it
+    rp-names: [ "void_x86_64" ]
+    # `targets` gives the test targets of an rp-name that has more than one. Their
+    # names can be used wherever an rp-name can (a package's `versions`, `-t`).
+    # Void's glibc and musl builds share repology's void_x86_64
+    targets:
+      void_x86_64: [ "void-glibc", "void-musl" ]

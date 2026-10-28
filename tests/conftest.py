@@ -71,7 +71,7 @@ def isolated_env(tmp_path_factory, monkeypatch):
                 "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "GNUPGHOME"):
         monkeypatch.delenv(var, raising=False)
     for var in [v for v in os.environ if v.startswith(("PKGGEN_PASSWORD_", "PKGGEN_SSH_KEY_", "PKGGEN_GPG_",
-                                                         "PKGGEN_S3_"))]:
+                                                         "PKGGEN_S3_", "PKGGEN_RSA_"))]:
         monkeypatch.delenv(var)
     return config
 

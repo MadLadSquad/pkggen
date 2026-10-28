@@ -79,6 +79,24 @@ def test_load_distributions_entry_without_name(monkeypatch, tmp_path):
         utils.load_distributions()
 
 
+def test_target_aliases(monkeypatch, tmp_path):
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(tmp_path))
+    write_distributions(tmp_path, "distributions:\n  - name: v\n    rp-names: [v_1, v_2]\n"
+                                  "    targets: { v_1: [v-glibc, v-musl] }\n")
+    dist = utils.load_distributions()[0]
+    assert utils.target_aliases(dist) == {"v-glibc": "v_1", "v-musl": "v_1"}
+    assert utils.release_names(dist) == ["v_1", "v_2", "v-glibc", "v-musl"]
+    assert utils.target_aliases({"name": "x"}) == {}
+
+
+@pytest.mark.parametrize("targets", ["[a]", "{ nope: [a] }", "{ v_1: [] }", "{ v_1: a }"])
+def test_invalid_targets(monkeypatch, tmp_path, targets):
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(tmp_path))
+    write_distributions(tmp_path, f"distributions:\n  - name: v\n    rp-names: [v_1]\n    targets: {targets}\n")
+    with pytest.raises(utils.GenericError, match="'targets' of v .* must map its rp-names to lists"):
+        utils.load_distributions()
+
+
 def test_load_distributions_empty_file(monkeypatch, tmp_path):
     monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(tmp_path))
     write_distributions(tmp_path, "")

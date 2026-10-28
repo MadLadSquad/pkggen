@@ -50,6 +50,8 @@ setup(
     packages=find_packages(include=["pkggen", "pkggen.*"]),
     package_data={"pkggen": ["pkggen"]},
     install_requires=[
+        # Signing Alpine and Void repositories (RSA) when deploying
+        "cryptography>=42",
         "Jinja2>=3.1",
         "packaging>=23.0",
         "PyYAML>=6.0",

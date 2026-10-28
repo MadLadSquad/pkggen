@@ -85,7 +85,7 @@ def make_job(tmp_path):
     """make_job(generator, deployment, targets=[...], **fields) -> a Job of that generator's lib."""
     def make(generator, deployment, targets=(), **fields):
         data = {
-            "id": "dist-gen", "where": "deployment.dist", "distribution": "dist", "deployment": deployment,
+            "id": "dist-gen", "where": "deployment.dist", "distribution": "debian", "deployment": deployment,
             "repository": {}, "run_path": str(tmp_path), "work_path": str(tmp_path / "work"),
             "targets": list(targets), "skipped_targets": [], "packages": None, "skip_tests": False,
             "interactive": False, "dry_run": False,
@@ -95,6 +95,20 @@ def make_job(tmp_path):
     return make
 
 
-def target(path, name="t1", ok=True, packages=None, reason=None, executables=None):
+# Target name prefix -> the testing generator whose `publish` its test results record
+TESTING_GENERATORS = {"debian-": "debian", "ubuntu-": "debian", "fedora-": "rpm-based", "opensuse-": "rpm-based",
+                      "openmandriva-": "rpm-based", "alpine-": "alpine", "void-": "void", "arch": "arch",
+                      "gentoo": "gentoo"}
+
+
+def publish_of(name):
+    """The `publish` pkggen test records for a target of this name ({} for other names)."""
+    for prefix, generator in TESTING_GENERATORS.items():
+        if name.startswith(prefix):
+            return load_generator("testing", generator).PUBLISH
+    return {}
+
+
+def target(path, name="t1", ok=True, packages=None, reason=None, publish=None, executables=None):
     return {"name": name, "path": str(path), "ok": ok, "reason": reason, "packages": packages or {},
-            "executables": executables}
+            "publish": publish_of(name) if publish is None else publish, "executables": executables}

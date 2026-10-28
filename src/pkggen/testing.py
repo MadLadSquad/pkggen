@@ -31,6 +31,9 @@ TEST_DIR = "test"
 # The outcome of every target's last run, read by `pkggen deploy`
 RESULTS_FILE = "results.json"
 NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+# Replaced in the values of a target's `env` by the number of jobs each container gets
+JOBS_PLACEHOLDER = "${PKGGEN_JOBS}"
+PUBLISH_PATTERNS = ("indexes", "metadata")
 
 
 class Cancelled(Exception):
@@ -174,6 +177,14 @@ def load_test_config(config, distributions):
     return settings
 
 
+def release_of(target, known):
+    """The release a chosen target is asked for by: its rp-name, or its name when the rp-name has several
+    targets (Void's glibc and musl builds are both void_x86_64)."""
+    rp = target.get("rp_name")
+    shared = [t for t in known if t["distribution"] == target["distribution"] and t.get("rp_name") == rp]
+    return rp if rp and len(shared) == 1 else target["name"]
+
+
 def testing_dir():
     return os.path.join(utils.get_generators_path(), "testing")
 
@@ -229,10 +240,41 @@ def describe(dist, payload):
     skipped = result.get("skipped") or []
     if not isinstance(skipped, list) or not all(isinstance(t, dict) and t.get("name") for t in skipped):
         raise RuntimeError(f"{os.path.basename(script)} returned a 'skipped' entry without a 'name'")
+    for t in targets:
+        problem = publish_problem(t.get("publish"))
+        if problem:
+            raise RuntimeError(f"{os.path.basename(script)} returned a target ({t['name']}) whose 'publish' {problem}")
     for t in targets + skipped:
         t["distribution"] = dist
     result["skipped"] = skipped
     return result
+
+
+def publish_problem(publish):
+    """Why a target's `publish` (how its repository is uploaded) is malformed, or None.
+
+    {indexes: [regexes], metadata: [regexes], content_types: {suffix: media type}}, all optional.
+    """
+    if publish is None:
+        return None
+    if not isinstance(publish, dict):
+        return "isn't a mapping"
+    unknown = sorted(set(publish) - set(PUBLISH_PATTERNS) - {"content_types"})
+    if unknown:
+        return f"has unknown keys: {', '.join(unknown)}"
+    for key in PUBLISH_PATTERNS:
+        patterns = publish.get(key) or []
+        if not isinstance(patterns, list) or not all(isinstance(p, str) and p for p in patterns):
+            return f"'{key}' isn't a list of regular expressions"
+        for pattern in patterns:
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                return f"'{key}' has an invalid regular expression {pattern!r}: {e}"
+    types = publish.get("content_types") or {}
+    if not isinstance(types, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in types.items()):
+        return "'content_types' isn't a mapping of file name suffixes to media types"
+    return None
 
 
 def payload(dist, config, settings, rp_names, host_arch, packages=()):
@@ -298,6 +340,7 @@ class TargetResult:
         self.executables = None   # files of the output that are executable in the container, relative to it
         self.package_status = {}  # package name -> True once it's built and installed
         self.excluded = []        # packages whose `distributions` leave out this release
+        self.publish = target.get("publish") or {}  # how deployment generators upload its repository
 
     @property
     def ok(self):
@@ -323,10 +366,14 @@ class Runner:
         self.repo_paths = {}
 
     def env(self, target):
+        """The container's environment: the job count, then the target's `env`.
+
+        Testing generators set their build tools' variables in `env`, with
+        ${PKGGEN_JOBS} for the job count (e.g. Gentoo's MAKEOPTS: -j${PKGGEN_JOBS}).
+        """
         threads = str(self.resources["threads"])
-        env = {"PKGGEN_JOBS": threads, "MAKEFLAGS": f"-j{threads}", "MAKEOPTS": f"-j{threads}",
-               "RPM_BUILD_NCPUS": threads, "DEB_BUILD_OPTIONS": f"parallel={threads}"}
-        env.update({str(k): str(v) for k, v in (target.get("env") or {}).items()})
+        env = {"PKGGEN_JOBS": threads, "MAKEFLAGS": f"-j{threads}"}
+        env.update({str(k): str(v).replace(JOBS_PLACEHOLDER, threads) for k, v in (target.get("env") or {}).items()})
         return env
 
     def run_steps(self, container, steps, log, result, package, what):
@@ -517,6 +564,7 @@ def write_results(results, host_skipped, contexts, host_arch):
             "output": os.path.basename(r.output) if r.output else None,
             "packages": {name: {"version": str((contexts.get(name) or {}).get("version", "")), "ok": ok}
                          for name, ok in r.package_status.items()},
+            "publish": r.publish,
         }
         if r.output and r.executables is not None:
             entry["executables"] = r.executables
@@ -586,7 +634,7 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
         # Ask again for only these releases, so the warnings are about them too
         dists = [d for d in dists if any(t["distribution"] == d for t in chosen)]
         for dist in dists:
-            settings["distributions"][dist]["versions"] = [t.get("rp_name") or t["name"] for t in chosen
+            settings["distributions"][dist]["versions"] = [release_of(t, known) for t in chosen
                                                            if t["distribution"] == dist]
         skipped = [t for t in skipped if t in chosen]
         matrix, _, found = describe_all(dists)

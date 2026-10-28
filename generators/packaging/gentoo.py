@@ -38,10 +38,15 @@ def as_list(value):
     return [str(v) for v in value]
 
 
+def package_category(package):
+    """The category a package sets in pkggen.yaml (`gentoo.category`, else `category`), or None."""
+    gentoo = package.get("gentoo") if isinstance(package.get("gentoo"), dict) else {}
+    return gentoo.get("category") or package.get("category")
+
+
 def get_category(job):
     categories = as_list(job.repository.get("categories"))
-    gentoo = job.context.get("gentoo") if isinstance(job.context.get("gentoo"), dict) else {}
-    category = gentoo.get("category") or job.context.get("category")
+    category = package_category(job.context)
 
     if not category:
         if not categories:
@@ -108,6 +113,14 @@ DEPENDENCY_FIELDS = {
 OPERATORS = {">=": ">=", "<=": "<=", "=": "~", ">": ">", "<": "<"}
 
 
+def source_name(package):
+    """Repology's srcname is the atom, category/name: the name is what's compared with the project."""
+    return lib.srcname(package).rsplit("/", 1)[-1]
+# Packages for other targets: the MinGW toolchain (dev-util/mingw64-toolchain). Cross compilers live in
+# cross-* categories, which crossdev creates locally, so repology doesn't list them
+OTHER_TARGETS = re.compile(r"^mingw(32|64)?-")
+
+
 def pick(job, dep, package, kind):
     srcname = package.get("srcname") or ""
     return srcname if "/" in srcname else None
@@ -127,11 +140,32 @@ def render(job, dep, names):
 
 def local_atom(job, local):
     """category/name of one of pkggen.yaml's own packages."""
-    category = local.get("category") or next(iter(as_list(job.repository.get("categories"))), None)
+    category = (package_category(local.get("package") or {})
+                or next(iter(as_list(job.repository.get("categories"))), None))
     if not category:
         raise lib.PackagingError(f"the dependency '{local['name']}' has no 'category' and "
                                  "'repositories.gentoo.categories' is empty. Set 'category' for it in pkggen.yaml")
     return f"{category}/{local['name']}"
+
+
+# SPDX id -> Gentoo license file name
+LICENSES = {
+    "GPL-2.0": "GPL-2", "GPL-2.0-only": "GPL-2", "GPL-2.0-or-later": "GPL-2+",
+    "GPL-3.0": "GPL-3", "GPL-3.0-only": "GPL-3", "GPL-3.0-or-later": "GPL-3+",
+    "LGPL-2.0": "LGPL-2", "LGPL-2.0-only": "LGPL-2", "LGPL-2.0-or-later": "LGPL-2+",
+    "LGPL-2.1": "LGPL-2.1", "LGPL-2.1-only": "LGPL-2.1", "LGPL-2.1-or-later": "LGPL-2.1+",
+    "LGPL-3.0": "LGPL-3", "LGPL-3.0-only": "LGPL-3", "LGPL-3.0-or-later": "LGPL-3+",
+    "AGPL-3.0": "AGPL-3", "AGPL-3.0-only": "AGPL-3", "AGPL-3.0-or-later": "AGPL-3+",
+    "BSD-2-Clause": "BSD-2", "BSD-3-Clause": "BSD",
+    "Zlib": "ZLIB", "BSL-1.0": "Boost-1.0",
+}
+
+
+def gentoo_license(value):
+    return LICENSES.get(str(value), str(value))
+
+
+FILTERS = {"gentoo_license": gentoo_license}
 
 
 def main(job):
@@ -141,7 +175,8 @@ def main(job):
 
     job.context["arches"] = lib.architectures(job, ARCHITECTURES, ALL_ARCHITECTURES,
                                               other=lambda arch: keyword(job, arch))
-    lib.dependencies(job, DEPENDENCY_FIELDS, pick, render, local=local_atom)
+    lib.dependencies(job, DEPENDENCY_FIELDS, pick, render, local=local_atom, other_targets=OTHER_TARGETS,
+                     source_name=source_name)
     lib.ensure_templates(job, REQUIRED)
     out = os.path.join(job.repository_path, get_category(job), job.name)
 
@@ -151,7 +186,7 @@ def main(job):
         return os.path.join(out, rel)
 
     job.output = out
-    lib.render_tree(job, place)
+    lib.render_tree(job, place, filters=FILTERS)
     write_manifest(job, out)
 
 

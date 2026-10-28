@@ -50,6 +50,10 @@ def cleanup(job):
     return code
 
 
+# pacman's databases: <name>.db, <name>.files, their .tar.zst and their signatures
+PUBLISH = {"indexes": [r"\.(db|files)(\.tar\.[a-z0-9]+)?(\.sig)?$"]}
+
+
 def main(job):
     repo_name = job.repository.get("name") or "pkggen"
     finalize = [
@@ -71,7 +75,8 @@ fi
                    setup=[SETUP],
                    prepare=[],
                    packages=[{"name": p.name, "build": build(p), "install": install(p)} for p in job.packages],
-                   finalize=finalize)
+                   finalize=finalize,
+                   publish=PUBLISH)
         for rp, spec in lib.select_targets(job, TARGETS)
     ]
 

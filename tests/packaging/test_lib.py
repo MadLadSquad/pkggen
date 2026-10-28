@@ -1,12 +1,13 @@
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
 import pytest
 
 from tests.conftest import SOURCE_DATE_EPOCH
-from tests.support.helpers import run_generator
+from tests.support.helpers import load_generator, run_generator
 
 # --- Job -----------------------------------------------------------------------------------
 
@@ -62,15 +63,19 @@ def test_source_date(plib, monkeypatch):
 
 
 def test_date_filters(plib, monkeypatch):
+    """The generators' date filters, on lib.date_of()."""
     monkeypatch.setenv("SOURCE_DATE_EPOCH", SOURCE_DATE_EPOCH)
-    assert plib.filter_rfc2822("2026-01-02T03:04:05Z") == "Fri, 02 Jan 2026 03:04:05 +0000"
-    assert plib.filter_rfc2822(None) == "Mon, 19 Oct 2026 12:00:00 +0000"
-    assert plib.filter_rpmdate("2026-01-02T03:04:05Z") == "Fri Jan 02 2026"
-    assert plib.filter_rpmdate(datetime(2026, 12, 6, tzinfo=timezone.utc)) == "Sun Dec 06 2026"
-    assert plib.filter_rpmdate("nope") == "Mon Oct 19 2026"
+    assert plib.date_of("2026-01-02T03:04:05Z") == datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    rfc2822 = load_generator("packaging", "debian").rfc2822
+    rpmdate = load_generator("packaging", "rpm-based").rpmdate
+    assert rfc2822("2026-01-02T03:04:05Z") == "Fri, 02 Jan 2026 03:04:05 +0000"
+    assert rfc2822(None) == "Mon, 19 Oct 2026 12:00:00 +0000"
+    assert rpmdate("2026-01-02T03:04:05Z") == "Fri Jan 02 2026"
+    assert rpmdate(datetime(2026, 12, 6, tzinfo=timezone.utc)) == "Sun Dec 06 2026"
+    assert rpmdate("nope") == "Mon Oct 19 2026"
 
 
-def test_rpmdate_ignores_locale(plib, monkeypatch):
+def test_rpmdate_ignores_locale(monkeypatch):
     import locale
     for name in ("de_DE.UTF-8", "fr_FR.UTF-8", "ru_RU.UTF-8"):
         try:
@@ -81,7 +86,7 @@ def test_rpmdate_ignores_locale(plib, monkeypatch):
     else:
         pytest.skip("no non-English locale installed")
     try:
-        assert plib.filter_rpmdate("2026-01-02T00:00:00Z") == "Fri Jan 02 2026"
+        assert load_generator("packaging", "rpm-based").rpmdate("2026-01-02T00:00:00Z") == "Fri Jan 02 2026"
     finally:
         locale.setlocale(locale.LC_TIME, "C")
 
@@ -101,16 +106,8 @@ def test_person_filters(plib, value, name, email):
 
 
 @pytest.mark.parametrize("filter_name, value, expected", [
-    ("pkgver", "1.0-rc1:2/x y", "1.0_rc1_2_x_y"),
-    ("pkgver", 3, "3"),
     ("spdx", "GPL-3.0", "GPL-3.0-only"),
     ("spdx", "MIT", "MIT"),
-    ("debian_license", "MIT", "Expat"),
-    ("debian_license", "GPL-2.0-or-later", "GPL-2+"),
-    ("debian_license", "Zlib", "Zlib"),
-    ("gentoo_license", "BSD-3-Clause", "BSD"),
-    ("gentoo_license", "BSL-1.0", "Boost-1.0"),
-    ("gentoo_license", "MIT", "MIT"),
     ("shquote", "it's", "'it'\\''s'"),
     ("shquote", "$HOME", "'$HOME'"),
     ("dquote", 'a "b" $c `d` \\e', '"a \\"b\\" \\$c \\`d\\` \\\\e"'),
@@ -119,9 +116,51 @@ def test_filters(plib, filter_name, value, expected):
     assert plib.FILTERS[filter_name](value) == expected
 
 
+@pytest.mark.parametrize("dist, filter_name, value, expected", [
+    ("arch", "pkgver", "1.0-rc1:2/x y", "1.0_rc1_2_x_y"),
+    ("rpm-based", "pkgver", "1.0-rc1:2/x y", "1.0_rc1_2_x_y"),
+    ("arch", "pkgver", 3, "3"),
+    ("debian", "debian_license", "MIT", "Expat"),
+    ("debian", "debian_license", "GPL-2.0-or-later", "GPL-2+"),
+    ("debian", "debian_license", "Zlib", "Zlib"),
+    ("gentoo", "gentoo_license", "BSD-3-Clause", "BSD"),
+    ("gentoo", "gentoo_license", "BSL-1.0", "Boost-1.0"),
+    ("gentoo", "gentoo_license", "MIT", "MIT"),
+])
+def test_generator_filters(dist, filter_name, value, expected):
+    assert load_generator("packaging", dist).FILTERS[filter_name](value) == expected
+
+
 def test_every_filter_is_registered(plib):
-    assert set(plib.FILTERS) == {"rfc2822", "rpmdate", "debian_license", "gentoo_license", "spdx", "pkgver",
-                                 "shquote", "dquote", "person_name", "person_email"}
+    # Format-specific filters belong to their generators
+    assert set(plib.FILTERS) == {"spdx", "shquote", "dquote", "person_name", "person_email"}
+    assert {dist: set(load_generator("packaging", dist).FILTERS)
+            for dist in ("arch", "debian", "gentoo", "rpm-based", "alpine", "void")} == {
+        "arch": {"pkgver"}, "debian": {"debian_license", "rfc2822"}, "gentoo": {"gentoo_license"},
+        "rpm-based": {"pkgver", "rpmdate"}, "alpine": {"apkver"}, "void": {"xbpsver"}}
+
+
+def test_substitute(plib):
+    assert plib.substitute(r"[-:]", "_")(" 1.0-rc1:2 ") == "1.0_rc1_2"
+    assert plib.substitute(r"\d+", lambda m: str(int(m.group(0)) + 1))(9) == "10"
+
+
+def test_generator_filters_are_added_to_the_shared_ones(plib, make_job):
+    job = plib.Job(make_job("alpine", package={"name": "p", "version": "1.0"}))
+    env = plib.make_environment(job, {"twice": lambda v: v * 2})
+    assert env.from_string("{{ 'ab' | twice }} {{ 'a b' | shquote }}").render() == "abab 'a b'"
+    assert "twice" not in plib.make_environment(job).filters
+
+
+def test_package_version_uses_the_block_and_fails_with_a_hint(plib, make_job):
+    translate, valid = str.upper, lambda version: version.isupper()
+    job = plib.Job(make_job("alpine", package={"name": "p", "version": "abc"}))
+    assert plib.package_version(job, "pkgver", translate, valid, "ABC") == "ABC"
+    job = plib.Job(make_job("alpine", package={"name": "p", "version": "weird", "alpine": {"pkgver": "2.0"}}))
+    assert plib.package_version(job, "pkgver", translate, re.compile(r"^\d"), "1.2.3") == "2.0"
+    job = plib.Job(make_job("alpine", package={"name": "p", "version": "weird"}))
+    with pytest.raises(plib.PackagingError, match=r"'weird' of p gives 'weird'.*alpine: \{ pkgver: \.\.\. \}"):
+        plib.package_version(job, "pkgver", str, re.compile(r"^\d"), "1.2.3")
 
 
 @pytest.mark.parametrize("value", ["it's a \"test\" with $vars and `cmds`", "\\", "", "multi\nline"])
@@ -240,7 +279,7 @@ def render_job(plib, make_job, tmp_path, templates, **package):
 
 def test_render_tree(plib, make_job, tmp_path):
     job = render_job(plib, make_job, tmp_path, {
-        "a.tmpl": "{% if true %}\n  {{ name }}-{{ version | pkgver }} {{ dist.x | default('none') }}\n{% endif %}\n",
+        "a.tmpl": "{% if true %}\n  {{ name }}-{{ version | spdx }} {{ dist.x | default('none') }}\n{% endif %}\n",
         "sub/raw.txt": "{{ not rendered }}\r\n",
     })
     out = tmp_path / "out"

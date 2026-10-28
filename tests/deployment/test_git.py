@@ -89,6 +89,13 @@ def check(git_generator, make_job, deployment, targets=("t1",), skipped=()):
     return git_generator.check(job)
 
 
+def test_check_needs_git(git_generator, make_job, monkeypatch):
+    """The git and AUR generators check for git themselves: pkggen's core doesn't know them."""
+    monkeypatch.setattr(git_generator.shutil, "which", lambda name: None)
+    errors = check(git_generator, make_job, config("/srv/repo.git"))
+    assert "'deployment.dist' needs git, which isn't installed" in errors[0]
+
+
 def test_check_accepts_a_complete_configuration(git_generator, make_job, secrets):
     secrets({"git_passwords": {"gh": "token"}})
     assert check(git_generator, make_job, config("https://github.com/me/r.git", password="gh", branch="pages",
@@ -107,7 +114,8 @@ def test_check_errors(git_generator, make_job, secrets, tmp_path, isolated_env):
     })
     assert errors == [
         "'deployment.dist' has unknown keys: typo (allowed: branch, email, exclude, generator, gpg-key, "
-        "gpg-passphrase, managed-key, message, password, path, preserve, prune, public-key, sign, ssh-key, targets, "
+        "gpg-passphrase, key-name, managed-key, message, password, path, preserve, prune, public-key, rsa-key, "
+            "rsa-passphrase, sign, signed-by, ssh-key, targets, "
         "url, username)",
         "'deployment.dist.username' is required",
         "'deployment.dist.email' must be a non-empty string",

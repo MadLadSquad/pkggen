@@ -14,7 +14,8 @@
 #     "work_path": "/abs/pkggen-build/deploy/rpm-based-git",  // the generator's own scratch space
 #     "targets": [ { "name": "fedora-44", "path": "/abs/pkggen-build/test/fedora-44", "ok": true,
 #                    "reason": null, "packages": { "foo": { "version": "1.2", "ok": true } },
-#                    "executables": [ "SOURCES/run.sh" ] } ],  // executable in the container (null: unknown)
+#                    "executables": [ "SOURCES/run.sh" ],  // executable in the container (null: unknown)
+#                    "publish": { "indexes": [regex], "metadata": [regex], "content_types": {...} } } ],
 #     "skipped_targets": [ "fedora-43" ],  // selected, but with no test output to deploy
 #     "packages": null,                // or the names given with -p
 #     "skip_tests": false,             // --skip-tests: deploy targets and packages that failed their tests
@@ -23,12 +24,14 @@
 #   }
 # Generators that publish whole repositories stage them first (stage_targets():
 # several targets may share a folder, `exclude` leaves files out), then sign
-# their metadata with GPG when `gpg-key` is set (sign_repository()).
+# them with the distribution's hook (hooks/<distribution>.py, see load_hook()):
+# GPG (`gpg-key`) for apt and dnf, RSA (`rsa-key`) for Alpine and Void.
 # Progress, prompts and errors go to stderr. It prints on stdout:
 #   check mode: { "errors": [...], "warnings": [...] }
 #   otherwise:  { "pushed": [names], "unchanged": [names], "failed": [{name, message}],
 #                 "skipped": [{name, reason}], "warnings": [...] }
 import filecmp
+import importlib.util
 import json
 import os
 import re
@@ -69,6 +72,8 @@ class Target:
         # file system may not have kept the bit (NTFS). None when the test run didn't list them.
         executables = data.get("executables")
         self.executables = None if executables is None else set(executables)
+        # From the testing generator: {indexes, metadata, content_types} of its repository format
+        self.publish = data.get("publish") or {}
 
     def executables_in(self, folder):
         """The executables below folder of the output, relative to it (None when unknown)."""
@@ -99,6 +104,14 @@ class Job:
         self.unchanged = []
         self.failed = []
         self.skipped = []
+        self._hook = None
+
+    @property
+    def hook(self):
+        """The distribution's deployment hook (hooks/<distribution>.py)."""
+        if self._hook is None:
+            self._hook = load_hook(self.distribution)
+        return self._hook
 
     def warn(self, message):
         if message not in self.warnings:
@@ -173,6 +186,9 @@ SECRET_KINDS = {
     # A key fingerprint (in the user's keyring), an armored private key's path, or the armored key itself
     "gpg-key": ("gpg_keys", "PKGGEN_GPG_KEY_", "GPG key"),
     "gpg-passphrase": ("gpg_passphrases", "PKGGEN_GPG_PASSPHRASE_", "GPG key passphrase"),
+    # A PEM private key's path, or the PEM key itself (Alpine's abuild-keygen, xbps' openssl genrsa)
+    "rsa-key": ("rsa_keys", "PKGGEN_RSA_KEY_", "RSA key"),
+    "rsa-passphrase": ("rsa_passphrases", "PKGGEN_RSA_PASSPHRASE_", "RSA key passphrase"),
 }
 
 
@@ -209,6 +225,9 @@ def secret_problem(kind, nickname):
                                   or os.path.isfile(os.path.expanduser(value))):
         return (f"the GPG key '{nickname}' must be a key fingerprint, the path of an armored private key "
                 f"(gpg --armor --export-secret-keys), or the armored key itself")
+    if kind == "rsa-key" and not (PEM_MARKER in value or os.path.isfile(os.path.expanduser(value))):
+        return (f"the RSA key '{nickname}' must be the path of a PEM private key (openssl genrsa -out key.pem 4096), "
+                f"or the PEM key itself")
     return None
 
 
@@ -479,12 +498,73 @@ def check_patterns(job, key, errors):
             errors.append(f"{job.key(key)} has an invalid regular expression {pattern!r}: {e}")
 
 
+# --- Distribution hooks ------------------------------------------------------------
+#
+# What depends on the repository format lives in hooks/<distribution>.py, which
+# run() loads for the job's distribution (load_hook()) as `job.hook`. Every hook
+# defines:
+#   SIGNING                       "gpg", "rsa" or None: the key (`gpg-key`, `rsa-key`) its repositories are signed with
+#   OPTIONS                       the other signing keys of the deployment block it reads (e.g. ("key-name",))
+#   check(job, errors)            its own checks of the deployment block, appended to errors
+#   sign(job, folder, published)  signs the repositories in folder; see sign_repository()
+# Hooks `import lib` to use the helpers below (this module, whatever its name).
+
+HOOKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hooks")
+HOOK_API = ("SIGNING", "OPTIONS", "check", "sign")
+HOOK_OPTIONS = ("key-name", "signed-by")  # what a hook's OPTIONS may name
+HOOK_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+SIGNING_KEYS = {"gpg": "gpg-key", "rsa": "rsa-key"}
+_hooks = {}
+
+
+def load_hook(distribution):
+    """The deployment hook of a distribution: hooks/<distribution>.py, imported once."""
+    if distribution in _hooks:
+        return _hooks[distribution]
+    path = os.path.join(HOOKS_PATH, f"{distribution}.py")
+    if not HOOK_NAME_RE.match(str(distribution)) or not os.path.isfile(path):
+        raise DeployError(f"there's no deployment hook for the distribution '{distribution}' (expected {path})")
+    spec = importlib.util.spec_from_file_location(f"pkggen_deployment_hook_{distribution.replace('-', '_')}", path)
+    module = importlib.util.module_from_spec(spec)
+    # The hook's `import lib` is this module, also when it was loaded under another name (as the tests do)
+    saved = sys.modules.get("lib")
+    sys.modules["lib"] = sys.modules[__name__]
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if saved is None:
+            sys.modules.pop("lib", None)
+        else:
+            sys.modules["lib"] = saved
+    missing = [name for name in HOOK_API if not hasattr(module, name)]
+    if missing:
+        raise DeployError(f"the deployment hook {path} doesn't define {', '.join(missing)}")
+    if module.SIGNING not in (None, *SIGNING_KEYS):
+        raise DeployError(f"the deployment hook {path} has SIGNING = {module.SIGNING!r}: use 'gpg', 'rsa' or None")
+    unknown = sorted(set(module.OPTIONS) - set(HOOK_OPTIONS))
+    if unknown:
+        raise DeployError(f"the deployment hook {path} has unknown OPTIONS: {', '.join(unknown)} (add them to "
+                          "lib.HOOK_OPTIONS)")
+    _hooks[distribution] = module
+    return module
+
+
+def read_relative(folder, relative):
+    with open(os.path.join(folder, *relative.split("/")), "rb") as f:
+        return f.read()
+
+
+def write_relative(folder, relative, data):
+    with open(os.path.join(folder, *relative.split("/")), "wb") as f:
+        f.write(data)
+
+
 # --- Signing repository metadata with GPG -----------------------------------------
 #
-# apt checks dists/<suite>/InRelease (or Release + Release.gpg), dnf and zypper
-# repodata/repomd.xml.asc. They're made on the host with the gpg command, so the
-# key never enters the test containers. A signature is only made again when
-# the file it signs changed, so unchanged repositories stay unchanged.
+# The hooks say which metadata files to sign (apt's dists/<suite>/Release, dnf's
+# repodata/repomd.xml); sign_gpg() signs them on the host with the gpg command,
+# so the key never enters the test containers. A signature is only made again
+# when the file it signs changed, so unchanged repositories stay unchanged.
 
 FINGERPRINT_RE = re.compile(r"^(0x)?([0-9A-Fa-f]{16}|[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$")
 ARMORED_KEY = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
@@ -495,23 +575,6 @@ def gpg_binary():
     if not path:
         raise DeployError("signing repositories needs GnuPG (the gpg command). Install it, or remove 'gpg-key'")
     return path
-
-
-def signed_files(folder):
-    """[(metadata file, [(signature file, kind)])] of the repositories in folder, as relative POSIX paths."""
-    result = []
-    for root, dirs, files in os.walk(folder):
-        dirs[:] = sorted(d for d in dirs if d != ".git")
-        relative_root = normalise(os.path.relpath(root, folder))
-        parts = relative_root.split("/") if relative_root else []
-        # dists/<suite>/Release, not the per-component Release files further down
-        if "Release" in files and len(parts) >= 2 and parts[-2] == "dists":
-            base = f"{relative_root}/Release"
-            result.append((base, [(f"{relative_root}/InRelease", "clearsign"), (f"{base}.gpg", "detach")]))
-        if "repomd.xml" in files and parts and parts[-1] == "repodata":
-            base = f"{relative_root}/repomd.xml"
-            result.append((base, [(f"{base}.asc", "detach"), (f"{base}.key", "public-key")]))
-    return sorted(result)
 
 
 class Signer:
@@ -586,67 +649,195 @@ class Signer:
             shutil.rmtree(self.home, ignore_errors=True)
 
 
-def sign_repository(job, folder, published):
-    """Sign the repository metadata in folder, and write the public key to `public-key`.
+def sign_gpg(job, folder, published, metadata, what):
+    """Sign the metadata files in folder with the deployment's `gpg-key`, for a hook's sign().
 
-    published(path) returns the bytes now published at a relative path, or
-    None: a file that didn't change keeps its published signatures, so
-    re-deploying an unchanged repository changes nothing. Returns the
-    relative paths of the files it added.
+    metadata: [(file, [(signature file, kind)])] as relative POSIX paths, kind
+    being "clearsign", "detach" or "public-key" (the armored public key). what
+    names the files in the warning when there are none.
     """
-    nickname = job.config.get("gpg-key")
-    if not nickname:
-        return []
+    nickname = job.config["gpg-key"]
     added = []
     signer = None
+
+    def get_signer():
+        nonlocal signer
+        signer = signer or Signer(job, nickname)
+        return signer
+
     try:
-        for base, signatures in signed_files(folder):
-            with open(os.path.join(folder, *base.split("/")), "rb") as f:
-                content = f.read()
+        for base, signatures in metadata:
             previous = [published(signature) for signature, _ in signatures]
-            if published(base) == content and all(p is not None for p in previous):
+            if published(base) == read_relative(folder, base) and all(p is not None for p in previous):
                 for (signature, _), data in zip(signatures, previous):
-                    with open(os.path.join(folder, *signature.split("/")), "wb") as f:
-                        f.write(data)
+                    write_relative(folder, signature, data)
             else:
-                signer = signer or Signer(job, nickname)
                 for signature, kind in signatures:
-                    signer.sign(os.path.join(folder, *base.split("/")), os.path.join(folder, *signature.split("/")),
-                                kind)
+                    get_signer().sign(os.path.join(folder, *base.split("/")),
+                                      os.path.join(folder, *signature.split("/")), kind)
             added += [signature for signature, _ in signatures]
-        public = job.config.get("public-key")
-        if public:
-            public = normalise(public)
-            target = os.path.join(folder, *public.split("/"))
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            signer = signer or Signer(job, nickname)
-            with open(target, "w", encoding="utf-8", newline="\n") as f:
-                f.write(signer.public_key())
-            added.append(public)
+        return finish_signing(job, folder, added, what, lambda: get_signer().public_key())
     finally:
         if signer:
             signer.close()
+
+
+def finish_signing(job, folder, added, what, public_key):
+    """End a hook's sign(): warn when nothing was signed, write `public-key` (public_key() is its text)."""
     if not added:
-        job.warn(f"{job.key('gpg-key')} is set, but there's no repository metadata to sign "
-                 "(dists/<suite>/Release or repodata/repomd.xml)")
+        key = SIGNING_KEYS[job.hook.SIGNING]
+        job.warn(f"{job.key(key)} is set, but there's no repository to sign ({what})")
+    if job.config.get("public-key"):
+        added.append(write_public_key(job, folder, public_key()))
     return added
 
 
+def write_public_key(job, folder, text):
+    """Write the public key to `public-key` (relative to the repository's root). Returns its path."""
+    public = normalise(job.config["public-key"])
+    target = os.path.join(folder, *public.split("/"))
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return public
+
+
+def signs(job):
+    """Whether the deployment signs its repositories (`gpg-key` or `rsa-key`)."""
+    return bool(job.config.get("gpg-key") or job.config.get("rsa-key"))
+
+
+def sign_repository(job, folder, published):
+    """Sign the repository metadata in folder, and write the public key to `public-key`.
+
+    The distribution's hook does the signing: its SIGNING says which key it
+    uses (`gpg-key` for apt and dnf metadata, `rsa-key` for Alpine's and Void's
+    packages and indexes). published(path) returns the bytes now published at
+    a relative path, or None: a file that didn't change keeps its published
+    signatures, so re-deploying an unchanged repository changes nothing.
+    Returns the relative paths of the files it added or re-signed.
+    """
+    if not signs(job):
+        return []
+    return job.hook.sign(job, folder, published)
+
+
 def check_signing(job, errors):
-    """The checks of `gpg-key`, `gpg-passphrase` and `public-key`."""
+    """The checks of `gpg-key`, `gpg-passphrase`, `rsa-key`, `rsa-passphrase`, `key-name`, `signed-by`, `public-key`.
+
+    The generic ones are here; the distribution's hook adds its own.
+    """
     nickname = check_string(job, "gpg-key", errors)
     check_string(job, "gpg-passphrase", errors)
+    rsa = check_string(job, "rsa-key", errors)
+    check_string(job, "rsa-passphrase", errors)
+    for key in HOOK_OPTIONS:
+        check_string(job, key, errors)
     public = check_string(job, "public-key", errors)
+    try:
+        hook = job.hook
+    except DeployError as e:
+        errors.append(str(e))
+        return
+    signing_key = SIGNING_KEYS.get(hook.SIGNING)
+    for kind, key in SIGNING_KEYS.items():
+        if job.config.get(key) and key != signing_key:
+            how = f"they're signed with {job.key(signing_key)}" if signing_key else "pkggen doesn't sign them"
+            errors.append(f"{job.key(key)} doesn't apply to {job.distribution} repositories: {how}")
+        passphrase = f"{kind}-passphrase"
+        if job.config.get(passphrase) and not job.config.get(key):
+            errors.append(f"{job.key(passphrase)} needs {job.key(key)}")
+    for key in HOOK_OPTIONS:
+        if not job.config.get(key):
+            continue
+        if key not in hook.OPTIONS:
+            errors.append(f"{job.key(key)} doesn't apply to {job.distribution} repositories")
+        elif signing_key and not job.config.get(signing_key):
+            errors.append(f"{job.key(key)} needs {job.key(signing_key)}")
     if public and (".." in normalise(public).split("/") or os.path.isabs(public)):
         errors.append(f"{job.key('public-key')} must be a path inside the repository, got {public!r}")
-    if public and not job.config.get("gpg-key"):
-        errors.append(f"{job.key('public-key')} needs {job.key('gpg-key')}: it's the public half of that key")
+    if public and not signs(job):
+        if signing_key:
+            errors.append(f"{job.key('public-key')} needs {job.key(signing_key)}: it's the public half of that key")
+        else:
+            errors.append(f"{job.key('public-key')} doesn't apply to {job.distribution} repositories: pkggen "
+                          "doesn't sign them")
     if nickname:
         problem = secret_problem("gpg-key", nickname)
         if problem:
             errors.append(f"{job.key('gpg-key')}: {problem}")
         if not (shutil.which("gpg") or shutil.which("gpg2")):
             errors.append(f"{job.key('gpg-key')} needs GnuPG (the gpg command), which isn't installed")
+    if rsa:
+        problem = secret_problem("rsa-key", rsa)
+        if problem:
+            errors.append(f"{job.key('rsa-key')}: {problem}")
+        if not have_cryptography():
+            errors.append(f"{job.key('rsa-key')} needs the Python package 'cryptography' (pip install cryptography)")
+    hook.check(job, errors)
+
+
+# --- Signing with RSA ------------------------------------------------------------------
+#
+# Alpine and Void sign with plain RSA keys (PKCS#1 v1.5). Their hooks sign on
+# the host with RsaSigner, which uses the Python package cryptography, so the
+# key never enters the test containers.
+
+PEM_MARKER = "-----BEGIN"
+
+
+def have_cryptography():
+    try:
+        import cryptography.hazmat.primitives.asymmetric.rsa  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+class RsaSigner:
+    """Signs with the deployment's `rsa-key`: a PEM private key (path or text), with `rsa-passphrase` if it has one."""
+
+    def __init__(self, job, nickname):
+        if not have_cryptography():
+            raise DeployError(f"{job.key('rsa-key')} needs the Python package 'cryptography' (pip install cryptography)")
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        problem = secret_problem("rsa-key", nickname)
+        if problem:
+            raise DeployError(f"{job.key('rsa-key')}: {problem}")
+        value = lookup_secret("rsa-key", nickname).strip()
+        if PEM_MARKER in value:
+            data = value.encode("utf-8")
+        else:
+            with open(os.path.expanduser(value), "rb") as f:
+                data = f.read()
+        passphrase = lookup_secret("rsa-passphrase", job.config.get("rsa-passphrase") or nickname)
+        try:
+            key = serialization.load_pem_private_key(data, passphrase.encode("utf-8") if passphrase else None)
+        except (ValueError, TypeError) as e:
+            hint = "" if passphrase else f" (if it has a passphrase, set {job.key('rsa-passphrase')})"
+            raise DeployError(f"{job.key('rsa-key')}: couldn't load the RSA key '{nickname}': {e}{hint}")
+        if not isinstance(key, rsa.RSAPrivateKey):
+            raise DeployError(f"{job.key('rsa-key')}: '{nickname}' isn't an RSA key")
+        self.key = key
+        self.nickname = nickname
+
+    def sign(self, data, digest="sha256"):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+        algorithm = {"sha1": hashes.SHA1, "sha256": hashes.SHA256}[digest]()
+        return self.key.sign(data, padding.PKCS1v15(), algorithm)
+
+    def public_key(self):
+        """The public key in PEM (SubjectPublicKeyInfo): Alpine's .rsa.pub files and xbps' index-meta.plist."""
+        from cryptography.hazmat.primitives import serialization
+        return self.key.public_key().public_bytes(serialization.Encoding.PEM,
+                                                  serialization.PublicFormat.SubjectPublicKeyInfo).decode("ascii")
+
+    @property
+    def bits(self):
+        return self.key.key_size
 
 
 # --- Configuration checks ----------------------------------------------------------
@@ -676,6 +867,7 @@ def run(main, check):
     try:
         data = json.loads(sys.stdin.buffer.read())
         job = Job(data)
+        job.hook  # load the distribution's hook up front: a missing one is an error in every mode
         if job.check:
             output = {"errors": check(job), "warnings": job.warnings}
         else:

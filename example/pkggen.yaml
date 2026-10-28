@@ -1,11 +1,23 @@
+# pkggen configuration of the UntitledDesktop project: the libraries, the
+# framework and the applications MadLadSquad packages for Arch Linux (AUR),
+# Gentoo (overlay), RPM-based and Debian-based distributions, Alpine Linux and
+# Void Linux (glibc and musl).
+#
+#   pkggen gen-repo <gentoo|rpm-based|debian|arch|alpine|void>   once, creates pkggen-build/<dist>
+#   pkggen generate                                  fetch the releases, write the package files
+#   pkggen test                                      build and install everything in containers
+#   pkggen deploy --dry-run                          see what would be pushed
+#
+# Packages are built in the order of this file, each one installed before the
+# next one builds: libraries first, then the framework, then the applications.
 repositories:
-  gentoo: 
+  gentoo:
     name: "untitled-desktop-overlay"
-    description: "An overlay containing Gentoo ebuilds and autogens for the applications and libraries part of the UntitledDesktop project"
-    homepage: https://github.com/MadLadSquad/UntitledDesktopOverlay.git
+    description: "An overlay containing Gentoo ebuilds for the applications and libraries part of the UntitledDesktop project"
+    homepage: https://github.com/MadLadSquad/UntitledDesktopOverlay
     quality: experimental
     status: unofficial
-    feed: https://github.com/MadLadSquad/UntitledDesktopOverlay.git
+    feed: https://github.com/MadLadSquad/UntitledDesktopOverlay/commits/master.atom
     priority: 10
     owners:
       - name: MadLadSquad
@@ -25,71 +37,421 @@ repositories:
       - ude-base
       - ude-apps
       - ude-misc
+    # Files the overlay needs that aren't packages: the uimgui eclass the
+    # applications inherit. Copied into the overlay by `pkggen gen-repo gentoo`
+    seed-files: repository-files/gentoo
   rpm-based:
     name: "untitled-desktop-rpm"
     description: "RPM packages for the UntitledDesktop project"
-    baseurl: https://rpms.madladsquad.com/
+    # Every Fedora release gets its own folder (see deployment.rpm-based.path)
+    baseurl: https://rpms.madladsquad.com/fedora-$releasever/RPMS/
     gpgkey: https://rpms.madladsquad.com/rpmkey.pub
+    # The repository metadata is signed when deploying, the packages aren't
+    gpgcheck: false
+    repo_gpgcheck: true
+    # The landing page and its icon, published at the bucket's root by the
+    # second deployment.rpm-based entry
+    seed-files: repository-files/rpm-based
   debian:
     name: "untitled-desktop-deb"
     origin: MadLadSquad
     label: UntitledDesktopDEB
     description: "Debian packages for the UntitledDesktop project"
-    architectures: [ amd64, arm64, source ]
+    architectures: [ amd64, arm64 ]
     components: [ main ]
-    sign-with: default
+    # One repository for every release: each suite's packages get the release's
+    # version suffix (1.0-1~deb13, 1.0-1~ubuntu24.04), so they share pool/
     suites:
       - codename: trixie
         suite: stable
+      - codename: sid
+        suite: unstable
       - codename: noble
+      - codename: resolute
     url: https://debs.madladsquad.com/
     keyring: /usr/share/keyrings/untitled-desktop.gpg
-  arch: {}
+    seed-files: repository-files/debian
+  arch:
+    name: "untitled-desktop"
+  alpine:
+    # abuild's name for the repository (its packages' folder while building)
+    name: "untitled-desktop"
+    # The landing page and its icon, published at the bucket's root by the
+    # second deployment.alpine entry (each release has its own folder)
+    seed-files: repository-files/alpine
+  void:
+    name: "untitled-desktop"
+    description: "Void Linux packages for the UntitledDesktop project"
+    # The glibc and musl packages share one repository: gen-repo writes the
+    # xbps.d file users copy to /etc/xbps.d/
+    url: https://xbps.madladsquad.com/binpkgs
+    seed-files: repository-files/void
+
 test:
-  cpus: 4
-  memory: 16G
-  setup:
-    - "echo 'Setting up the test container'"
-  post-setup:
-    - name: "show the release"
-      run: "cat /etc/os-release"
-# `pkggen deploy` pushes what `pkggen test` built and checked (pkggen-build/test/<target>/)
-#deployment:
-#  arch:
-#    generator: "aur"             # every PKGBUILD folder to its own AUR repository
-#    username: "MadLadSquad"
-#    email: "contact@madladsquad.com"
-#  rpm-based:
-#    generator: "git"             # the compiled repositories, each target in its own folder
-#    url: "git@github.com:MadLadSquad/UntitledDesktopRPM.git"
-#    username: "MadLadSquad"
-#    email: "contact@madladsquad.com"
-#    targets: [ fedora-44, opensuse-tumbleweed ]
-#    prune: true                  # delete files the new repositories don't have...
-#    preserve: [ '^README\.md$' ] # ...except these
-pkggen:
+  distributions:
+    debian:
+      versions: [ debian-13, debian-unstable, ubuntu-24.04, ubuntu-26.04 ]
+    rpm-based:
+      # openSUSE Leap 15.6 has GCC 7, which can't build C++20
+      versions: [ fedora-44, fedora-43, fedora-rawhide, opensuse-tumbleweed ]
+    gentoo:
+      setup:
+        - name: "USE flags the framework needs"
+          run: |
+            mkdir -p /etc/portage/package.use
+            cat > /etc/portage/package.use/untitled-imgui-framework <<'EOF'
+            media-libs/glfw X wayland
+            media-libs/libglvnd X
+            EOF
+        - name: "USE flags incus needs"
+          run: |
+            mkdir -p /etc/portage/package.use
+            cat > /etc/portage/package.use/incus <<'EOF'
+            dev-util/xdelta lzma
+            dev-libs/raft lz4
+            net-firewall/nftables json
+            sys-fs/squashfs-tools lzma
+            sys-libs/libcap static-libs
+            EOF
+        - name: "accept the B-Trust license"
+          run: |
+            mkdir -p /etc/portage/package.license
+            echo "app-crypt/btrustbiss B-Trust-EULA" > /etc/portage/package.license/btrustbiss
+
+# `pkggen deploy` pushes what `pkggen test` built and checked (pkggen-build/test/<target>/).
+# Secrets (SSH keys, R2 credentials, the GPG key) come from secrets.yaml or the
+# environment, see CLAUDE.md. Try it with `pkggen deploy --dry-run` first.
+deployment:
+  arch:
+    generator: "aur"                 # every PKGBUILD folder to its own AUR repository
+    username: "MadLadSquad"
+    email: "contact@madladsquad.com"
+  gentoo:
+    generator: "git"
+    url: "git@github.com:MadLadSquad/UntitledDesktopOverlay.git"
+    username: "MadLadSquad"
+    email: "contact@madladsquad.com"
+    path: ""                         # the overlay is the repository's root
+    exclude: [ '^binpkgs/' ]         # the binary packages the test made
+    prune: true
+    preserve: [ '^README\.md$', '^LICENSE$', '^\.github/' ]
+  rpm-based:
+    - generator: "s3"                # Cloudflare R2
+      bucket: "untitled-desktop-rpms"
+      credentials: "r2"
+      path: "{target}"               # fedora-44/RPMS/..., matching the .repo file's fedora-$releasever
+      targets: [ fedora-44, fedora-43 ]
+      exclude: [ '^(BUILD|BUILDROOT|SOURCES|SPECS|SRPMS)/', '^(index\.html|favicon\.png)$' ]
+      gpg-key: "madladsquad"
+      public-key: "rpmkey.pub"
+      prune: true
+    # The landing page lives at the bucket's root, outside every release's folder:
+    # take it from one release's output and leave everything else out
+    - generator: "s3"
+      bucket: "untitled-desktop-rpms"
+      credentials: "r2"
+      path: ""
+      targets: [ fedora-44 ]
+      exclude: [ '^(?!(index\.html|favicon\.png)$)' ]
+  debian:
+    generator: "s3"
+    bucket: "untitled-desktop-debs"
+    credentials: "r2"
+    path: ""                         # every release in one repository (dists/<codename>, one pool/)
+    exclude: [ '^(conf|db|packages)/' ]
+    gpg-key: "madladsquad"
+    public-key: "keys/public.asc"
+    prune: true
+  alpine:
+    # Every release in its own folder: https://apks.madladsquad.com/alpine-3.24 in
+    # /etc/apk/repositories, which adds <arch>/APKINDEX.tar.gz
+    - generator: "s3"
+      bucket: "untitled-desktop-apks"
+      credentials: "r2"
+      path: "{target}"
+      exclude: [ '^(?!(x86_64|aarch64)/)' ]  # only the apk repositories, not the APKBUILDs
+      # The packages and indexes are signed again with this RSA key (abuild-keygen
+      # makes one); users put the public key into /etc/apk/keys/
+      rsa-key: "madladsquad-rsa"
+      key-name: "madladsquad.rsa.pub"
+      public-key: "madladsquad.rsa.pub"
+      prune: true
+    - generator: "s3"
+      bucket: "untitled-desktop-apks"
+      credentials: "r2"
+      path: ""
+      targets: [ alpine-3.24 ]
+      exclude: [ '^(?!(index\.html|favicon\.png)$)' ]
+  void:
+    generator: "s3"
+    bucket: "untitled-desktop-xbps"
+    credentials: "r2"
+    path: ""                         # glibc and musl in one repository (binpkgs/, x86_64-repodata and x86_64-musl-repodata)
+    exclude: [ '^(srcpkgs|common)/', '^\.gitignore$' ]
+    # Signs the packages (.sig2) and puts the public key into the repodata, where
+    # xbps-install finds it when a user first adds the repository
+    rsa-key: "madladsquad-rsa"
+    signed-by: "MadLadSquad <contact@madladsquad.com>"
+    prune: true
+
+# --- Packages ----------------------------------------------------------------------
+#
+# `dependencies` are written once, by repology project name (`pkggen repology <name>`
+# shows what a project is called in every release), and pkggen.yaml's own packages
+# by their name. `pkggen generate` looks them up and writes each distribution's names:
+#   build:       tools needed to build
+#   libraries:   linked against: the development files to build
+#   runtime:     needed to run
+#   development: the development files, to build and to run (for libraries used by
+#                the applications built against them)
+# `<distribution>: "<name>"` gives an entry its name there (used as it is), false
+# leaves it out. A package's lists add to its group's.
+
+# The libraries: plain CMake projects, sharing packages/<dist>/cmake-library/.
+# `cmake.args` are extra CMake options (a package's `gentoo.cmake-args` replace them there)
+ude-libraries:
   generator: "github"
+  templates: "cmake-library"
+  license: "MIT"
+  github:
+    user: "MadLadSquad"
+    query: "releases"
+    artifacts: [ "{pkgname}-{version}.tar.xz" ]
+    transforms:
+      - [ "^v", "" ]
+  gentoo:
+    category: "ude-base"
+  dependencies:
+    # pkg-config: Gentoo's virtual, and the RPM capability whose package has the pkg-config command
+    build: [ cmake, &pkgconf { name: pkgconf, gentoo: "virtual/pkgconfig", rpm-based: "pkgconfig" } ]
   packages:
     - name: "untitled-cli-parser"
-      maintainer: "MadLadSquad <contact@madladsquad.com>"
-      author: "MadLadSquad <contact@madladsquad.com>"
-      # "any", or a list of architectures. amd64 and arm64 work everywhere, other
-      # names (ppc64, riscv, ...) are only used by distributions that know them, like Gentoo
+      maintainer: &maintainer "MadLadSquad <contact@madladsquad.com>"
+      author: &author "MadLadSquad <contact@madladsquad.com>"
+      description: "C and C++ parser for CLI arguments"
+      homepage: "https://github.com/MadLadSquad/UntitledCLIParser"
+      github: { repo: "UntitledCLIParser" }
+    - name: "untitled-xdg-basedir"
+      maintainer: *maintainer
+      author: *author
+      description: "C and C++ implementation of the XDG base directory specification"
+      homepage: "https://github.com/MadLadSquad/UntitledXDGBasedir"
+      github: { repo: "UntitledXDGBasedir" }
+      # Don't create missing directories and ignore relative paths, as the specification says
+      cmake: { args: [ "-DCREATE_DIRS=OFF", "-DNO_IGNORE_RELATIVE_DIRS=OFF" ] }
+      gentoo:
+        iuse: "create_dirs +ignore_relative_dirs"
+        use-flags:
+          create_dirs: "Create missing XDG directories automatically"
+          ignore_relative_dirs: "Ignore relative paths in the XDG variables, as the specification says"
+        cmake-args: [ "-DCREATE_DIRS=$(usex create_dirs)", "-DNO_IGNORE_RELATIVE_DIRS=$(usex ignore_relative_dirs OFF ON)" ]
+    - name: "untitled-exec"
+      maintainer: *maintainer
+      author: *author
+      description: "Cross-platform C and C++ library for running applications as separate processes"
+      homepage: "https://github.com/MadLadSquad/UntitledExec"
+      github: { repo: "UntitledExec" }
+    - name: "untitled-i18n"
+      maintainer: *maintainer
+      author: *author
+      description: "Next generation C and C++ internationalisation library"
+      homepage: "https://github.com/MadLadSquad/UntitledI18N"
+      github: { repo: "UntitledI18N" }
+      # The bundled rapidyaml is linked in statically and isn't installed (Fedora's
+      # %cmake and Gentoo's cmake.eclass turn BUILD_SHARED_LIBS on)
+      cmake: { args: [ "-DBUILD_SHARED_LIBS=OFF" ] }
+    - name: "untitled-dbus-utils"
+      maintainer: *maintainer
+      author: *author
+      description: "Type and memory safe C++ wrapper around the low level D-Bus C API"
+      homepage: "https://github.com/MadLadSquad/UntitledDBusUtils"
+      github: { repo: "UntitledDBusUtils" }
+      # Its headers include D-Bus's
+      dependencies: { development: [ dbus ] }
+    - name: "untitled-open"
+      maintainer: *maintainer
+      author: *author
+      description: "Cross-platform C and C++ library for opening links and native file pickers"
+      homepage: "https://github.com/MadLadSquad/UntitledOpen"
+      github: { repo: "UntitledOpen" }
+      # The bundled file dialog library is linked in statically and isn't installed
+      cmake: { args: [ "-DBUILD_SHARED_LIBS=OFF" ] }
+      dependencies:
+        libraries: [ dbus, wayland ]
+        runtime: [ xdg-desktop-portal ]
+      # Elsewhere wayland-scanner comes with Wayland's development files
+      gentoo: { bdepend: [ "dev-util/wayland-scanner" ] }
+
+# The framework, which also installs its build tool, UVKBuildTool
+ude-framework:
+  generator: "github"
+  # The framework needs GLFW 3.4, which Ubuntu 24.04 doesn't have
+  distributions: &needs-glfw-3-4
+    arch: {}
+    gentoo: {}
+    rpm-based: {}
+    debian: { versions: [ debian-13, debian-unstable, ubuntu-26.04 ] }
+    alpine: {}
+    void: {}
+  license: "MIT"
+  github:
+    user: "MadLadSquad"
+    query: "releases"
+    artifacts: [ "{pkgname}-{version}.tar.xz" ]
+    transforms:
+      - [ "^v", "" ]
+  gentoo:
+    category: "ude-base"
+  packages:
+    - name: "untitled-imgui-framework"
+      maintainer: *maintainer
+      author: *author
+      description: "Cross-platform desktop application framework based on dear imgui"
+      homepage: "https://github.com/MadLadSquad/UntitledImGuiFramework"
+      github: { repo: "UntitledImGuiFramework" }
+      dependencies:
+        build: [ cmake, *pkgconf ]
+        # Applications compile against the framework, so it also needs the
+        # development files of what it uses to run
+        development:
+          - utfcpp
+          - { name: vulkan-headers, debian: false }     # in Debian's libvulkan-dev
+          - vulkan-loader
+          # Both of GLFW's backends: the framework calls the Wayland functions unguarded
+          - { name: glfw, version: ">= 3.4", gentoo: ">=media-libs/glfw-3.4[X,wayland]" }
+          - freetype
+          - fontconfig
+          # Alpine has no libglvnd: Mesa provides libGL there
+          - { name: libglvnd, gentoo: "media-libs/libglvnd[X]", alpine: "mesa-dev" }
+          - wayland
+          - libx11
+          - libxrandr
+          - untitled-dbus-utils
+          - untitled-cli-parser
+          - untitled-exec
+          - untitled-i18n
+          - untitled-open
+          - untitled-xdg-basedir
+
+# The applications, built with UVKBuildTool. They share packages/<dist>/uimgui-app/;
+# the ones with Go or Rust parts have their own folder that extends it
+ude-apps:
+  generator: "github"
+  distributions: *needs-glfw-3-4
+  templates: "uimgui-app"
+  license: "MIT"
+  github:
+    user: "MadLadSquad"
+    query: "releases"
+    artifacts: [ "{pkgname}-{version}.tar.xz" ]
+    transforms:
+      - [ "^v", "" ]
+  gentoo:
+    category: "ude-apps"
+  dependencies:
+    # On Gentoo the uimgui eclass depends on these itself
+    build: [ { name: cmake, gentoo: false }, { <<: *pkgconf, gentoo: false } ]
+    # The applications are built against the framework and run with it
+    development: [ { name: untitled-imgui-framework, gentoo: false } ]
+  packages:
+    - name: "ude-session-logout"
+      maintainer: *maintainer
+      author: *author
+      description: "A log out prompt for the UntitledDesktopEnvironment"
+      homepage: "https://github.com/MadLadSquad/UntitledDESessionLogout"
+      github: { repo: "UntitledDESessionLogout" }
+      gentoo: { rdepend: [ "|| ( sys-auth/elogind sys-apps/systemd )" ] }
+      rpm-based:
+        files:
+          - "%{_bindir}/ude-session-logout"
+          - "%{_libdir}/libude-session-logoutLib.so"
+          - "%{_datadir}/config/ude-session-logout/"
+          - "%{_includedir}/ude-session-logout/"
+          - "%{_datadir}/applications/com.madladsquad.ude-session-logout.desktop"
+          - "%{_datadir}/icons/ude-session-logout.png"
+    - name: "untitled-game-system-manager"
+      maintainer: *maintainer
+      author: *author
+      description: "A manager for containerised Linux gaming systems based on Incus"
+      homepage: "https://github.com/MadLadSquad/UntitledGameSystemManager"
+      github: { repo: "UntitledGameSystemManager" }
+      templates: "untitled-game-system-manager"
+      # The Incus bindings need Go 1.25; Debian 13 has 1.24
+      distributions: { debian: { versions: [ debian-unstable, ubuntu-26.04 ] } }
+      dependencies:
+        # Debian's and the RPM families' Go packages are versioned (golang-1.25, go1.25):
+        # name the packages that always point at the newest one
+        build: [ { name: go, version: ">= 1.25", debian: "golang-go (>= 2:1.25~)", rpm-based: "go >= 1.25" } ]
+        runtime: [ incus, { name: xhost, debian: "x11-xserver-utils" } ]
+      rpm-based:
+        files:
+          - "%{_bindir}/UntitledGameSystemManager"
+          - "%{_libdir}/libUntitledGameSystemManagerLib.so"
+          - "%{_libdir}/libUGM_Incus_InternalFuncs.so"
+          - "%{_datadir}/config/UntitledGameSystemManager/"
+          - "%{_includedir}/UntitledGameSystemManager/"
+          - "%{_datadir}/applications/com.madladsquad.UntitledGameSystemManager.desktop"
+          - "%{_datadir}/icons/untitled-game-system-manager.png"
+    - name: "untitled-ibus-handwriting"
+      maintainer: *maintainer
+      author: *author
+      description: "A handwriting recognition input method for IBus"
+      homepage: "https://github.com/MadLadSquad/UntitledIBusHandwriting"
+      github: { repo: "UntitledIBusHandwriting" }
+      templates: "untitled-ibus-handwriting"
+      dependencies:
+        # cargo is part of repology's rust (Arch's rust package has it; the rust eclass brings it on Gentoo)
+        build: [ { name: rust, debian: "cargo", rpm-based: "cargo", alpine: "cargo", void: "cargo", gentoo: false } ]
+        libraries: [ ibus ]
+        # On Gentoo RDEPEND already has DEPEND
+        runtime: [ { name: ibus, gentoo: false } ]
+      rpm-based:
+        files:
+          - "%{_libexecdir}/UntitledIBusHandwriting"
+          - "%{_libdir}/libUntitledIBusHandwritingLib.so"
+          - "%{_libdir}/UntitledIBusHandwriting/"
+          - "%{_datadir}/config/UntitledIBusHandwriting/"
+          - "%{_includedir}/UntitledIBusHandwriting/"
+          - "%{_datadir}/ibus/component/UntitledIBusHandwriting.xml"
+          - "%{_datadir}/icons/untitled-ibus-handwriting.png"
+
+# Gentoo-only packages of the overlay
+overlay-github:
+  generator: "github"
+  distributions: [ gentoo ]
+  gentoo:
+    category: "app-crypt"
+  packages:
+    - name: "abcccid"
+      maintainer: *maintainer
+      description: "AB Circle CCID smart card reader driver"
+      homepage: "https://www.abcircle.com/en/"
+      license: "LGPL-2.0-only"
       architectures: [ amd64, arm64 ]
       github:
-        user: "MadLadSquad"
-        repo: "UntitledCLIParser"
+        user: "invakid404"
+        repo: "abcccid"
         query: "releases"
-        artifacts: [ "untitled-cli-parser-{version}.tar.xz" ]
-        transforms:
-          - [ "v", "" ]
-    - name: "untitled-imgui-framework"
-      maintainer: "MadLadSquad <contact@madladsquad.com>"
-      author: "MadLadSquad <contact@madladsquad.com>"
-      github:
-        user: "MadLadSquad"
-        repo: "UntitledImGuiFramework"
-        query: "releases"
-        artifacts: [ "untitled-imgui-framework-{version}.tar.xz" ]
-        transforms:
-          - [ "v", "" ]
+        artifacts: [ "Circle_Linux_Mac_Driver_v{version}.zip" ]
+overlay-url:
+  generator: "url"
+  distributions: [ gentoo ]
+  gentoo:
+    category: "app-crypt"
+  packages:
+    - name: "btrustbiss"
+      maintainer: *maintainer
+      description: "B-Trust Browser Independent Signing Service, for signing files with a qualified electronic signature"
+      homepage: "https://www.b-trust.bg/services/software"
+      # The overlay ships licenses/B-Trust-EULA (a seed file)
+      license: "LicenseRef-B-Trust-EULA"
+      gentoo: { license: "B-Trust-EULA", keywords: "-* ~amd64" }
+      # A prebuilt x86_64 application
+      architectures: [ amd64 ]
+      url-generator:
+        url: "https://www.b-trust.bg/attachments/BtrustPrivateFile/146/docs/B-TrustBISS.tar"
+        # The URL has no version, so the download is locked to its hash: when B-Trust
+        # publishes a new release, the fetch fails until both are updated
+        version: "3.46"
+        hash-locks: [ "0afec10974e6910b2e422458888558dd4dee53b158125770ae3d0acbf8250ea7" ]
+        alias: "B-TrustBISS-{version}.tar"

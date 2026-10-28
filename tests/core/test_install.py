@@ -14,7 +14,7 @@ import pytest
 
 from tests.support import paths
 
-DISTRIBUTIONS = ["arch", "debian", "gentoo", "rpm-based"]
+DISTRIBUTIONS = ["alpine", "arch", "debian", "gentoo", "rpm-based", "void"]
 
 
 def sh(*args, cwd=None, env=None):

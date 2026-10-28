@@ -13,7 +13,8 @@ def test_every_release_by_default(describe):
         "debian-unstable", "debian-14", "debian-13", "debian-12",
         "ubuntu-26.10", "ubuntu-26.04", "ubuntu-24.04", "ubuntu-22.04"]
     assert by_name(targets)["ubuntu-24.04"]["image"] == "docker.io/library/ubuntu:24.04"
-    assert all(t["env"] == {"DEBIAN_FRONTEND": "noninteractive"} for t in targets)
+    assert all(t["env"] == {"DEBIAN_FRONTEND": "noninteractive", "DEB_BUILD_OPTIONS": "parallel=${PKGGEN_JOBS}"}
+               for t in targets)
 
 
 def test_suite_from_the_repository_config(describe, example_config):

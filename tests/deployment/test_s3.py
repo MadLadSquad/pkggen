@@ -149,6 +149,28 @@ def test_every_target_in_its_own_folder(s3_generator, make_job, s3, tmp_path):
     assert sorted(s3.objects) == ["fedora-43/RPMS/x86_64/foo.rpm", "fedora-44/RPMS/x86_64/foo.rpm"]
 
 
+def test_upload_order_and_types_come_from_each_targets_publish(s3_generator, make_job, s3, tmp_path, capfd):
+    """s3.py knows no repository format: each target's `publish` (from its testing generator) names them."""
+    publish = {"indexes": ["^index/"], "metadata": ["^top$"], "content_types": {".pkg": "application/x-pkg"}}
+    a = write_tree(tmp_path / "test" / "a", {"top": "t", "index/list": "l", "z.pkg": "p", "notes.txt": "n"})
+    b = write_tree(tmp_path / "test" / "b", {"top": "t", "z.pkg": "p"})
+    deploy(s3_generator, make_job, config(), [target(a, "a", publish=publish), target(b, "b", publish={})])
+    assert s3.uploads() == ["a/notes.txt", "a/z.pkg", "b/top", "b/z.pkg", "a/index/list", "a/top"]
+    assert s3.headers["a/z.pkg"]["Content-Type"] == "application/x-pkg"
+    assert s3.headers["b/z.pkg"]["Content-Type"] == "application/octet-stream"  # b's publish doesn't name it
+    assert s3.headers["a/notes.txt"]["Content-Type"] == "text/plain"
+    assert s3.headers["a/top"]["Cache-Control"] == "no-cache" and "Cache-Control" not in s3.headers["b/top"]
+    # Results from before pkggen recorded `publish`
+    assert "the test results of b don't say which files are the repository's indexes" in capfd.readouterr().err
+
+
+def test_an_invalid_publish_pattern_fails(s3_generator, make_job, s3, tmp_path):
+    output = write_tree(tmp_path / "test" / "a", {"x": "x"})
+    job = make_job(s3_generator, config(), targets=[target(output, "a", publish={"indexes": ["("]})])
+    with pytest.raises(s3_generator.lib.DeployError, match=r"invalid 'publish' pattern.*pkggen test -t a"):
+        s3_generator.main(job)
+
+
 def test_dry_run_changes_nothing(s3_generator, make_job, s3, tmp_path, capfd):
     s3.objects["pool/stale.deb"] = b"old"
     job = deploy(s3_generator, make_job, DEBIAN, [target(apt_output(tmp_path, "debian-13", "trixie", "1"), "debian-13")],
@@ -303,7 +325,7 @@ def test_signed_rpm_repositories(s3_generator, make_job, s3, tmp_path, gpg_key):
     output = write_tree(tmp_path / "test" / "fedora-44", {"RPMS/repodata/repomd.xml": "<repomd/>",
                                                           "RPMS/x86_64/foo.rpm": "rpm"})
     deploy(s3_generator, make_job, config(**{"gpg-key": "test", "public-key": "rpmkey.pub"}),
-           [target(output, "fedora-44")])
+           [target(output, "fedora-44")], distribution="rpm-based")
     # The public key is at the root, where the .repo file's gpgkey points
     assert {"fedora-44/RPMS/repodata/repomd.xml.asc", "fedora-44/RPMS/repodata/repomd.xml.key",
             "rpmkey.pub"} <= set(s3.objects)
@@ -311,5 +333,5 @@ def test_signed_rpm_repositories(s3_generator, make_job, s3, tmp_path, gpg_key):
     assert s3.objects["fedora-44/RPMS/repodata/repomd.xml.key"] == s3.objects["rpmkey.pub"]
     s3.log.clear()
     job = deploy(s3_generator, make_job, config(**{"gpg-key": "test", "public-key": "rpmkey.pub"}),
-                 [target(output, "fedora-44")])
+                 [target(output, "fedora-44")], distribution="rpm-based")
     assert job.unchanged == ["dist-gen"] and s3.uploads() == []

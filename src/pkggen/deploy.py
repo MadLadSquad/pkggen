@@ -9,7 +9,6 @@
 # before anything is pushed; then the deployments run one after the other.
 import json
 import os
-import shutil
 import subprocess
 import sys
 import threading
@@ -24,7 +23,6 @@ SCRIPT_ENV = {"PYTHONIOENCODING": "utf-8"}
 
 
 # Deployment generators that push with git
-GIT_GENERATORS = {"git", "aur"}
 
 
 class Deployment:
@@ -166,6 +164,8 @@ def select_targets(deployments, results, target_filter, skip_tests):
                 "reason": None if entry.get("ok") else not_passed_reason(entry),
                 "packages": entry.get("packages") or {},
                 "executables": entry.get("executables"),
+                # How its repository is uploaded, from its testing generator
+                "publish": entry.get("publish") or {},
             })
         if not dep.targets and not names:
             dep.skipped.append(("*", f"{dep.distribution} has no tested target: run `pkggen test -d {dep.distribution}`"))
@@ -300,8 +300,6 @@ def deploy(package_filter=None, distribution_filter=None, target_filter=None, sk
     deployments = load_deployments(config, distribution_filter)
     if package_filter:
         generate.load_packages(config, package_filter)  # reports unknown names
-    if any(d.generator in GIT_GENERATORS for d in deployments) and not shutil.which("git"):
-        raise utils.GenericError("pkggen deploy needs git: install it and run `pkggen deploy` again")
 
     results = testing.load_results()
     if results is None:

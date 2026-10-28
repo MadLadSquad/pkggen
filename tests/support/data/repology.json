@@ -213,6 +213,16 @@
    "subrepo": "stonking/universe",
    "version": "0.91.0",
    "visiblename": "rust-cargo"
+  },
+  {
+   "binname": "cargo",
+   "repo": "void_x86_64",
+   "srcname": "cargo",
+   "status": "incorrect",
+   "subrepo": "x86_64",
+   "summary": "Rust package manager",
+   "version": "1.99.0",
+   "visiblename": "cargo"
   }
  ],
  "cmake": [
@@ -702,6 +712,206 @@
    "subrepo": "stonking/main",
    "version": "4.3.4",
    "visiblename": "cmake"
+  },
+  {
+   "binname": "ccmake",
+   "repo": "alpine_3_23",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (ccmake configurator)",
+   "version": "4.1.3",
+   "visiblename": "ccmake"
+  },
+  {
+   "binname": "cmake",
+   "repo": "alpine_3_23",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system",
+   "version": "4.1.3",
+   "visiblename": "cmake"
+  },
+  {
+   "binname": "cmake-bash-completion",
+   "repo": "alpine_3_23",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Bash completions for cmake",
+   "version": "4.1.3",
+   "visiblename": "cmake-bash-completion"
+  },
+  {
+   "binname": "cmake-doc",
+   "repo": "alpine_3_23",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (documentation)",
+   "version": "4.1.3",
+   "visiblename": "cmake-doc"
+  },
+  {
+   "binname": "cmake-emacs",
+   "repo": "alpine_3_23",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (emacs mode)",
+   "version": "4.1.3",
+   "visiblename": "cmake-emacs"
+  },
+  {
+   "binname": "cmake-vim",
+   "repo": "alpine_3_23",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (vim files)",
+   "version": "4.1.3",
+   "visiblename": "cmake-vim"
+  },
+  {
+   "binname": "ccmake",
+   "repo": "alpine_3_24",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (ccmake configurator)",
+   "version": "4.2.3",
+   "visiblename": "ccmake"
+  },
+  {
+   "binname": "cmake",
+   "repo": "alpine_3_24",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system",
+   "version": "4.2.3",
+   "visiblename": "cmake"
+  },
+  {
+   "binname": "cmake-bash-completion",
+   "repo": "alpine_3_24",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Bash completions for cmake",
+   "version": "4.2.3",
+   "visiblename": "cmake-bash-completion"
+  },
+  {
+   "binname": "cmake-doc",
+   "repo": "alpine_3_24",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (documentation)",
+   "version": "4.2.3",
+   "visiblename": "cmake-doc"
+  },
+  {
+   "binname": "cmake-emacs",
+   "repo": "alpine_3_24",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (emacs mode)",
+   "version": "4.2.3",
+   "visiblename": "cmake-emacs"
+  },
+  {
+   "binname": "cmake-vim",
+   "repo": "alpine_3_24",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (vim files)",
+   "version": "4.2.3",
+   "visiblename": "cmake-vim"
+  },
+  {
+   "binname": "ccmake",
+   "repo": "alpine_edge",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (ccmake configurator)",
+   "version": "4.3.4",
+   "visiblename": "ccmake"
+  },
+  {
+   "binname": "cmake",
+   "repo": "alpine_edge",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system",
+   "version": "4.3.4",
+   "visiblename": "cmake"
+  },
+  {
+   "binname": "cmake-bash-completion",
+   "repo": "alpine_edge",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Bash completions for cmake",
+   "version": "4.3.4",
+   "visiblename": "cmake-bash-completion"
+  },
+  {
+   "binname": "cmake-doc",
+   "repo": "alpine_edge",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (documentation)",
+   "version": "4.3.4",
+   "visiblename": "cmake-doc"
+  },
+  {
+   "binname": "cmake-emacs",
+   "repo": "alpine_edge",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (emacs mode)",
+   "version": "4.3.4",
+   "visiblename": "cmake-emacs"
+  },
+  {
+   "binname": "cmake-vim",
+   "repo": "alpine_edge",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Cross-platform, open-source make system (vim files)",
+   "version": "4.3.4",
+   "visiblename": "cmake-vim"
+  },
+  {
+   "binname": "cmake",
+   "repo": "void_x86_64",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Cross-platform, open-source build system",
+   "version": "4.2.2",
+   "visiblename": "cmake"
+  },
+  {
+   "binname": "cmake-gui",
+   "repo": "void_x86_64",
+   "srcname": "cmake",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Cross-platform, open-source build system",
+   "version": "4.2.2",
+   "visiblename": "cmake-gui"
   }
  ],
  "dbus": [
@@ -1282,6 +1492,286 @@
    "subrepo": "jammy-updates/main",
    "version": "1.12.20",
    "visiblename": "dbus"
+  },
+  {
+   "binname": "dbus-x11",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 add-ons for D-BUS",
+   "version": "1.16.2",
+   "visiblename": "dbus-x11"
+  },
+  {
+   "binname": "dbus",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system",
+   "version": "1.16.2",
+   "visiblename": "dbus"
+  },
+  {
+   "binname": "dbus-daemon-launch-helper",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "DBus SUID launch helper for autospawning",
+   "version": "1.16.2",
+   "visiblename": "dbus-daemon-launch-helper"
+  },
+  {
+   "binname": "dbus-dev",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (development files)",
+   "version": "1.16.2",
+   "visiblename": "dbus-dev"
+  },
+  {
+   "binname": "dbus-doc",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (documentation)",
+   "version": "1.16.2",
+   "visiblename": "dbus-doc"
+  },
+  {
+   "binname": "dbus-libs",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "D-BUS access libraries",
+   "version": "1.16.2",
+   "visiblename": "dbus-libs"
+  },
+  {
+   "binname": "dbus-openrc",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (OpenRC init scripts)",
+   "version": "1.16.2",
+   "visiblename": "dbus-openrc"
+  },
+  {
+   "binname": "dbus-x11",
+   "repo": "alpine_3_23",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 add-ons for D-BUS",
+   "version": "1.16.2",
+   "visiblename": "dbus-x11"
+  },
+  {
+   "binname": "dbus",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system",
+   "version": "1.16.2",
+   "visiblename": "dbus"
+  },
+  {
+   "binname": "dbus-daemon-launch-helper",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "DBus SUID launch helper for autospawning",
+   "version": "1.16.2",
+   "visiblename": "dbus-daemon-launch-helper"
+  },
+  {
+   "binname": "dbus-dev",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (development files)",
+   "version": "1.16.2",
+   "visiblename": "dbus-dev"
+  },
+  {
+   "binname": "dbus-doc",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (documentation)",
+   "version": "1.16.2",
+   "visiblename": "dbus-doc"
+  },
+  {
+   "binname": "dbus-libs",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "D-BUS access libraries",
+   "version": "1.16.2",
+   "visiblename": "dbus-libs"
+  },
+  {
+   "binname": "dbus-openrc",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (OpenRC init scripts)",
+   "version": "1.16.2",
+   "visiblename": "dbus-openrc"
+  },
+  {
+   "binname": "dbus-x11",
+   "repo": "alpine_3_24",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 add-ons for D-BUS",
+   "version": "1.16.2",
+   "visiblename": "dbus-x11"
+  },
+  {
+   "binname": "dbus",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system",
+   "version": "1.16.2",
+   "visiblename": "dbus"
+  },
+  {
+   "binname": "dbus-daemon-launch-helper",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "DBus SUID launch helper for autospawning",
+   "version": "1.16.2",
+   "visiblename": "dbus-daemon-launch-helper"
+  },
+  {
+   "binname": "dbus-dev",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (development files)",
+   "version": "1.16.2",
+   "visiblename": "dbus-dev"
+  },
+  {
+   "binname": "dbus-doc",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (documentation)",
+   "version": "1.16.2",
+   "visiblename": "dbus-doc"
+  },
+  {
+   "binname": "dbus-libs",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "D-BUS access libraries",
+   "version": "1.16.2",
+   "visiblename": "dbus-libs"
+  },
+  {
+   "binname": "dbus-openrc",
+   "repo": "alpine_edge",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Freedesktop.org message bus system (OpenRC init scripts)",
+   "version": "1.16.2",
+   "visiblename": "dbus-openrc"
+  },
+  {
+   "binname": "dbus",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system",
+   "version": "1.16.2",
+   "visiblename": "dbus"
+  },
+  {
+   "binname": "dbus-devel",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system - development files",
+   "version": "1.16.2",
+   "visiblename": "dbus-devel"
+  },
+  {
+   "binname": "dbus-elogind",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system (transitional dummy package)",
+   "version": "1.16.2",
+   "visiblename": "dbus-elogind"
+  },
+  {
+   "binname": "dbus-elogind-libs",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system - shared libraries (transitional dummy package)",
+   "version": "1.16.2",
+   "visiblename": "dbus-elogind-libs"
+  },
+  {
+   "binname": "dbus-elogind-x11",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system - X11 support (transitional dummy package)",
+   "version": "1.16.2",
+   "visiblename": "dbus-elogind-x11"
+  },
+  {
+   "binname": "dbus-libs",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system - shared libraries",
+   "version": "1.16.2",
+   "visiblename": "dbus-libs"
+  },
+  {
+   "binname": "dbus-x11",
+   "repo": "void_x86_64",
+   "srcname": "dbus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Message bus system - X11 support",
+   "version": "1.16.2",
+   "visiblename": "dbus-x11"
   }
  ],
  "fontconfig": [
@@ -1660,6 +2150,156 @@
    "summary": "Font configuration and customization library",
    "version": "2.17.0",
    "visiblename": "fontconfig"
+  },
+  {
+   "binname": "fontconfig",
+   "repo": "alpine_3_23",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access",
+   "version": "2.17.1",
+   "visiblename": "fontconfig"
+  },
+  {
+   "binname": "fontconfig-dev",
+   "repo": "alpine_3_23",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (development files)",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-dev"
+  },
+  {
+   "binname": "fontconfig-doc",
+   "repo": "alpine_3_23",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (documentation)",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-doc"
+  },
+  {
+   "binname": "fontconfig-static",
+   "repo": "alpine_3_23",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (static library)",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-static"
+  },
+  {
+   "binname": "fontconfig",
+   "repo": "alpine_3_24",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access",
+   "version": "2.17.1",
+   "visiblename": "fontconfig"
+  },
+  {
+   "binname": "fontconfig-dev",
+   "repo": "alpine_3_24",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (development files)",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-dev"
+  },
+  {
+   "binname": "fontconfig-doc",
+   "repo": "alpine_3_24",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (documentation)",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-doc"
+  },
+  {
+   "binname": "fontconfig-static",
+   "repo": "alpine_3_24",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (static library)",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-static"
+  },
+  {
+   "binname": "fontconfig",
+   "repo": "alpine_edge",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access",
+   "version": "2.18.1",
+   "visiblename": "fontconfig"
+  },
+  {
+   "binname": "fontconfig-dev",
+   "repo": "alpine_edge",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (development files)",
+   "version": "2.18.1",
+   "visiblename": "fontconfig-dev"
+  },
+  {
+   "binname": "fontconfig-doc",
+   "repo": "alpine_edge",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (documentation)",
+   "version": "2.18.1",
+   "visiblename": "fontconfig-doc"
+  },
+  {
+   "binname": "fontconfig-static",
+   "repo": "alpine_edge",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Library for configuring and customizing font access (static library)",
+   "version": "2.18.1",
+   "visiblename": "fontconfig-static"
+  },
+  {
+   "binname": "fontconfig",
+   "repo": "void_x86_64",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Library for configuring and customizing font access",
+   "version": "2.17.1",
+   "visiblename": "fontconfig"
+  },
+  {
+   "binname": "fontconfig-devel",
+   "repo": "void_x86_64",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Library for configuring and customizing font access - development files",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-devel"
+  },
+  {
+   "binname": "fontconfig-doc",
+   "repo": "void_x86_64",
+   "srcname": "fontconfig",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Library for configuring and customizing font access - documentation",
+   "version": "2.17.1",
+   "visiblename": "fontconfig-doc"
   }
  ],
  "freetype": [
@@ -2184,6 +2824,176 @@
    "subrepo": "noble/main",
    "version": "2.13.2",
    "visiblename": "freetype"
+  },
+  {
+   "binname": "freetype",
+   "repo": "alpine_3_23",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library",
+   "version": "2.14.3",
+   "visiblename": "freetype"
+  },
+  {
+   "binname": "freetype-demos",
+   "repo": "alpine_3_23",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A collection of FreeType demos",
+   "version": "2.14.3",
+   "visiblename": "freetype-demos"
+  },
+  {
+   "binname": "freetype-dev",
+   "repo": "alpine_3_23",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (development files)",
+   "version": "2.14.3",
+   "visiblename": "freetype-dev"
+  },
+  {
+   "binname": "freetype-doc",
+   "repo": "alpine_3_23",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (documentation)",
+   "version": "2.14.3",
+   "visiblename": "freetype-doc"
+  },
+  {
+   "binname": "freetype-static",
+   "repo": "alpine_3_23",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (static library)",
+   "version": "2.14.3",
+   "visiblename": "freetype-static"
+  },
+  {
+   "binname": "freetype",
+   "repo": "alpine_3_24",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library",
+   "version": "2.14.3",
+   "visiblename": "freetype"
+  },
+  {
+   "binname": "freetype-demos",
+   "repo": "alpine_3_24",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A collection of FreeType demos",
+   "version": "2.14.3",
+   "visiblename": "freetype-demos"
+  },
+  {
+   "binname": "freetype-dev",
+   "repo": "alpine_3_24",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (development files)",
+   "version": "2.14.3",
+   "visiblename": "freetype-dev"
+  },
+  {
+   "binname": "freetype-doc",
+   "repo": "alpine_3_24",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (documentation)",
+   "version": "2.14.3",
+   "visiblename": "freetype-doc"
+  },
+  {
+   "binname": "freetype-static",
+   "repo": "alpine_3_24",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (static library)",
+   "version": "2.14.3",
+   "visiblename": "freetype-static"
+  },
+  {
+   "binname": "freetype",
+   "repo": "alpine_edge",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library",
+   "version": "2.14.3",
+   "visiblename": "freetype"
+  },
+  {
+   "binname": "freetype-demos",
+   "repo": "alpine_edge",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A collection of FreeType demos",
+   "version": "2.14.3",
+   "visiblename": "freetype-demos"
+  },
+  {
+   "binname": "freetype-dev",
+   "repo": "alpine_edge",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (development files)",
+   "version": "2.14.3",
+   "visiblename": "freetype-dev"
+  },
+  {
+   "binname": "freetype-doc",
+   "repo": "alpine_edge",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (documentation)",
+   "version": "2.14.3",
+   "visiblename": "freetype-doc"
+  },
+  {
+   "binname": "freetype-static",
+   "repo": "alpine_edge",
+   "srcname": "freetype",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "TrueType font rendering library (static library)",
+   "version": "2.14.3",
+   "visiblename": "freetype-static"
+  },
+  {
+   "binname": "freetype",
+   "repo": "void_x86_64",
+   "srcname": "freetype",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Font rendering engine and library API",
+   "version": "2.15.0",
+   "visiblename": "freetype"
+  },
+  {
+   "binname": "freetype-devel",
+   "repo": "void_x86_64",
+   "srcname": "freetype",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Font rendering engine and library API - development files",
+   "version": "2.15.0",
+   "visiblename": "freetype-devel"
   }
  ],
  "glfw": [
@@ -2475,6 +3285,156 @@
    "subrepo": "stonking/universe",
    "version": "3.5.1",
    "visiblename": "glfw3"
+  },
+  {
+   "binname": "glfw",
+   "repo": "alpine_3_23",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development",
+   "version": "3.4",
+   "visiblename": "glfw"
+  },
+  {
+   "binname": "glfw-dbg",
+   "repo": "alpine_3_23",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (debug symbols)",
+   "version": "3.4",
+   "visiblename": "glfw-dbg"
+  },
+  {
+   "binname": "glfw-dev",
+   "repo": "alpine_3_23",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (development files)",
+   "version": "3.4",
+   "visiblename": "glfw-dev"
+  },
+  {
+   "binname": "glfw",
+   "repo": "alpine_3_24",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development",
+   "version": "3.4",
+   "visiblename": "glfw"
+  },
+  {
+   "binname": "glfw-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (debug symbols)",
+   "version": "3.4",
+   "visiblename": "glfw-dbg"
+  },
+  {
+   "binname": "glfw-dev",
+   "repo": "alpine_3_24",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (development files)",
+   "version": "3.4",
+   "visiblename": "glfw-dev"
+  },
+  {
+   "binname": "glfw-wayland",
+   "repo": "alpine_edge",
+   "srcname": "glfw-wayland",
+   "status": "outdated",
+   "subrepo": "testing",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (Wayland)",
+   "version": "3.3.8",
+   "visiblename": "glfw-wayland"
+  },
+  {
+   "binname": "glfw-wayland-dbg",
+   "repo": "alpine_edge",
+   "srcname": "glfw-wayland",
+   "status": "outdated",
+   "subrepo": "testing",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (Wayland) (debug symbols)",
+   "version": "3.3.8",
+   "visiblename": "glfw-wayland-dbg"
+  },
+  {
+   "binname": "glfw-wayland-dev",
+   "repo": "alpine_edge",
+   "srcname": "glfw-wayland",
+   "status": "outdated",
+   "subrepo": "testing",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (Wayland) (development files)",
+   "version": "3.3.8",
+   "visiblename": "glfw-wayland-dev"
+  },
+  {
+   "binname": "glfw",
+   "repo": "alpine_edge",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development",
+   "version": "3.4",
+   "visiblename": "glfw"
+  },
+  {
+   "binname": "glfw-dbg",
+   "repo": "alpine_edge",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (debug symbols)",
+   "version": "3.4",
+   "visiblename": "glfw-dbg"
+  },
+  {
+   "binname": "glfw-dev",
+   "repo": "alpine_edge",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Multi-platform library for OpenGL and Vulkan application development (development files)",
+   "version": "3.4",
+   "visiblename": "glfw-dev"
+  },
+  {
+   "binname": "glfw",
+   "repo": "void_x86_64",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Multi-platform library for creating windows with OpenGL contexts",
+   "version": "3.4",
+   "visiblename": "glfw"
+  },
+  {
+   "binname": "glfw-devel",
+   "repo": "void_x86_64",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Multi-platform library for creating windows with OpenGL contexts - development files",
+   "version": "3.4",
+   "visiblename": "glfw-devel"
+  },
+  {
+   "binname": "glfw-wayland",
+   "repo": "void_x86_64",
+   "srcname": "glfw",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Multi-platform library for creating windows with OpenGL contexts - (transitional dummy package)",
+   "version": "3.4",
+   "visiblename": "glfw-wayland"
   }
  ],
  "go": [
@@ -4569,6 +5529,86 @@
    "subrepo": "resolute/main",
    "version": "1.26.0",
    "visiblename": "golang-1.26"
+  },
+  {
+   "binname": "go",
+   "repo": "alpine_3_24",
+   "srcname": "go",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Go programming language compiler",
+   "version": "1.26.9",
+   "visiblename": "go"
+  },
+  {
+   "binname": "go-doc",
+   "repo": "alpine_3_24",
+   "srcname": "go",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Go programming language compiler (documentation)",
+   "version": "1.26.9",
+   "visiblename": "go-doc"
+  },
+  {
+   "binname": "go",
+   "repo": "alpine_edge",
+   "srcname": "go",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Go programming language compiler",
+   "version": "1.27.2",
+   "visiblename": "go"
+  },
+  {
+   "binname": "go-doc",
+   "repo": "alpine_edge",
+   "srcname": "go",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Go programming language compiler (documentation)",
+   "version": "1.27.2",
+   "visiblename": "go-doc"
+  },
+  {
+   "binname": "go",
+   "repo": "void_x86_64",
+   "srcname": "go",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Go Programming Language",
+   "version": "1.27.3",
+   "visiblename": "go"
+  },
+  {
+   "binname": "go",
+   "repo": "alpine_3_23",
+   "srcname": "go",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Go programming language compiler",
+   "version": "1.25.10",
+   "visiblename": "go"
+  },
+  {
+   "binname": "go-doc",
+   "repo": "alpine_3_23",
+   "srcname": "go",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Go programming language compiler (documentation)",
+   "version": "1.25.10",
+   "visiblename": "go-doc"
+  },
+  {
+   "binname": "go1.20",
+   "repo": "void_x86_64",
+   "srcname": "go1.20",
+   "status": "legacy",
+   "subrepo": "x86_64",
+   "summary": "Go Programming Language",
+   "version": "1.20.7",
+   "visiblename": "go1.20"
   }
  ],
  "ibus": [
@@ -4989,6 +6029,346 @@
    "subrepo": "stonking/main",
    "version": "1.5.34",
    "visiblename": "ibus"
+  },
+  {
+   "binname": "ibus",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.33",
+   "visiblename": "ibus"
+  },
+  {
+   "binname": "ibus-bash-completion",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Bash completions for ibus",
+   "version": "1.5.33",
+   "visiblename": "ibus-bash-completion"
+  },
+  {
+   "binname": "ibus-dev",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (development files)",
+   "version": "1.5.33",
+   "visiblename": "ibus-dev"
+  },
+  {
+   "binname": "ibus-doc",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (documentation)",
+   "version": "1.5.33",
+   "visiblename": "ibus-doc"
+  },
+  {
+   "binname": "ibus-emoji",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (emojis)",
+   "version": "1.5.33",
+   "visiblename": "ibus-emoji"
+  },
+  {
+   "binname": "ibus-gtk2",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.33",
+   "visiblename": "ibus-gtk2"
+  },
+  {
+   "binname": "ibus-gtk3",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.33",
+   "visiblename": "ibus-gtk3"
+  },
+  {
+   "binname": "ibus-gtk4",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.33",
+   "visiblename": "ibus-gtk4"
+  },
+  {
+   "binname": "ibus-lang",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Languages for package ibus",
+   "version": "1.5.33",
+   "visiblename": "ibus-lang"
+  },
+  {
+   "binname": "ibus-pyc",
+   "repo": "alpine_3_23",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Precompiled Python bytecode for ibus",
+   "version": "1.5.33",
+   "visiblename": "ibus-pyc"
+  },
+  {
+   "binname": "ibus",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.34",
+   "visiblename": "ibus"
+  },
+  {
+   "binname": "ibus-bash-completion",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Bash completions for ibus",
+   "version": "1.5.34",
+   "visiblename": "ibus-bash-completion"
+  },
+  {
+   "binname": "ibus-dev",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (development files)",
+   "version": "1.5.34",
+   "visiblename": "ibus-dev"
+  },
+  {
+   "binname": "ibus-doc",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (documentation)",
+   "version": "1.5.34",
+   "visiblename": "ibus-doc"
+  },
+  {
+   "binname": "ibus-emoji",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (emojis)",
+   "version": "1.5.34",
+   "visiblename": "ibus-emoji"
+  },
+  {
+   "binname": "ibus-gtk3",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.34",
+   "visiblename": "ibus-gtk3"
+  },
+  {
+   "binname": "ibus-gtk4",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.34",
+   "visiblename": "ibus-gtk4"
+  },
+  {
+   "binname": "ibus-lang",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Languages for package ibus",
+   "version": "1.5.34",
+   "visiblename": "ibus-lang"
+  },
+  {
+   "binname": "ibus-pyc",
+   "repo": "alpine_3_24",
+   "srcname": "ibus",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Precompiled Python bytecode for ibus",
+   "version": "1.5.34",
+   "visiblename": "ibus-pyc"
+  },
+  {
+   "binname": "ibus",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus"
+  },
+  {
+   "binname": "ibus-bash-completion",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Bash completions for ibus",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-bash-completion"
+  },
+  {
+   "binname": "ibus-dev",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (development files)",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-dev"
+  },
+  {
+   "binname": "ibus-doc",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (documentation)",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-doc"
+  },
+  {
+   "binname": "ibus-emoji",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux (emojis)",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-emoji"
+  },
+  {
+   "binname": "ibus-gtk3",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-gtk3"
+  },
+  {
+   "binname": "ibus-gtk4",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Next Generation Input Bus for Linux",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-gtk4"
+  },
+  {
+   "binname": "ibus-lang",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Languages for package ibus",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-lang"
+  },
+  {
+   "binname": "ibus-pyc",
+   "repo": "alpine_edge",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Precompiled Python bytecode for ibus",
+   "version": "1.5.35_beta2",
+   "visiblename": "ibus-pyc"
+  },
+  {
+   "binname": "ibus",
+   "repo": "void_x86_64",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Intelligent Input Bus",
+   "version": "1.5.32",
+   "visiblename": "ibus"
+  },
+  {
+   "binname": "ibus-devel",
+   "repo": "void_x86_64",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Intelligent Input Bus - development files",
+   "version": "1.5.32",
+   "visiblename": "ibus-devel"
+  },
+  {
+   "binname": "ibus-gtk+",
+   "repo": "void_x86_64",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Intelligent Input Bus - GTK+ IME plugin (X11)",
+   "version": "1.5.32",
+   "visiblename": "ibus-gtk+"
+  },
+  {
+   "binname": "ibus-gtk+3",
+   "repo": "void_x86_64",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Intelligent Input Bus - GTK+3 IME plugin (X11)",
+   "version": "1.5.32",
+   "visiblename": "ibus-gtk+3"
+  },
+  {
+   "binname": "ibus-gtk4",
+   "repo": "void_x86_64",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Intelligent Input Bus - GTK4 IME plugin (X11)",
+   "version": "1.5.32",
+   "visiblename": "ibus-gtk4"
+  },
+  {
+   "binname": "libibus",
+   "repo": "void_x86_64",
+   "srcname": "ibus",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Intelligent Input Bus - libraries",
+   "version": "1.5.32",
+   "visiblename": "libibus"
   }
  ],
  "incus": [
@@ -5373,6 +6753,366 @@
    "subrepo": "stonking/universe",
    "version": "7.0.1",
    "visiblename": "incus"
+  },
+  {
+   "binname": "incus",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Powerful system container and virtual machine manager",
+   "version": "6.0.6",
+   "visiblename": "incus"
+  },
+  {
+   "binname": "incus-agent",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus agent",
+   "version": "6.0.6",
+   "visiblename": "incus-agent"
+  },
+  {
+   "binname": "incus-agent-openrc",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus agent OpenRC scripts",
+   "version": "6.0.6",
+   "visiblename": "incus-agent-openrc"
+  },
+  {
+   "binname": "incus-bash-completion",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Bash completions for incus",
+   "version": "6.0.6",
+   "visiblename": "incus-bash-completion"
+  },
+  {
+   "binname": "incus-client",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus CLI client",
+   "version": "6.0.6",
+   "visiblename": "incus-client"
+  },
+  {
+   "binname": "incus-conversion",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Tools to convert a prior lxc/lxd instance to incus",
+   "version": "6.0.6",
+   "visiblename": "incus-conversion"
+  },
+  {
+   "binname": "incus-openrc",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Powerful system container and virtual machine manager (OpenRC init scripts)",
+   "version": "6.0.6",
+   "visiblename": "incus-openrc"
+  },
+  {
+   "binname": "incus-user",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus user project daemon",
+   "version": "6.0.6",
+   "visiblename": "incus-user"
+  },
+  {
+   "binname": "incus-user-openrc",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus user project daemon OpenRC scripts",
+   "version": "6.0.6",
+   "visiblename": "incus-user-openrc"
+  },
+  {
+   "binname": "incus-utils",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus utilities and scripts",
+   "version": "6.0.6",
+   "visiblename": "incus-utils"
+  },
+  {
+   "binname": "incus-vm",
+   "repo": "alpine_3_23",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Install packages required to run VMs under Incus",
+   "version": "6.0.6",
+   "visiblename": "incus-vm"
+  },
+  {
+   "binname": "incus",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Powerful system container and virtual machine manager",
+   "version": "7.0.1",
+   "visiblename": "incus"
+  },
+  {
+   "binname": "incus-agent",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus agent",
+   "version": "7.0.1",
+   "visiblename": "incus-agent"
+  },
+  {
+   "binname": "incus-agent-openrc",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus agent OpenRC scripts",
+   "version": "7.0.1",
+   "visiblename": "incus-agent-openrc"
+  },
+  {
+   "binname": "incus-bash-completion",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Bash completions for incus",
+   "version": "7.0.1",
+   "visiblename": "incus-bash-completion"
+  },
+  {
+   "binname": "incus-client",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus CLI client",
+   "version": "7.0.1",
+   "visiblename": "incus-client"
+  },
+  {
+   "binname": "incus-conversion",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Tools to convert a prior lxc/lxd instance to incus",
+   "version": "7.0.1",
+   "visiblename": "incus-conversion"
+  },
+  {
+   "binname": "incus-openrc",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Powerful system container and virtual machine manager (OpenRC init scripts)",
+   "version": "7.0.1",
+   "visiblename": "incus-openrc"
+  },
+  {
+   "binname": "incus-user",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus user project daemon",
+   "version": "7.0.1",
+   "visiblename": "incus-user"
+  },
+  {
+   "binname": "incus-user-openrc",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus user project daemon OpenRC scripts",
+   "version": "7.0.1",
+   "visiblename": "incus-user-openrc"
+  },
+  {
+   "binname": "incus-utils",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus utilities and scripts",
+   "version": "7.0.1",
+   "visiblename": "incus-utils"
+  },
+  {
+   "binname": "incus-vm",
+   "repo": "alpine_3_24",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Install packages required to run VMs under Incus",
+   "version": "7.0.1",
+   "visiblename": "incus-vm"
+  },
+  {
+   "binname": "incus",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Powerful system container and virtual machine manager",
+   "version": "7.0.1",
+   "visiblename": "incus"
+  },
+  {
+   "binname": "incus-agent",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus agent",
+   "version": "7.0.1",
+   "visiblename": "incus-agent"
+  },
+  {
+   "binname": "incus-agent-openrc",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus agent OpenRC scripts",
+   "version": "7.0.1",
+   "visiblename": "incus-agent-openrc"
+  },
+  {
+   "binname": "incus-bash-completion",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Bash completions for incus",
+   "version": "7.0.1",
+   "visiblename": "incus-bash-completion"
+  },
+  {
+   "binname": "incus-client",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus CLI client",
+   "version": "7.0.1",
+   "visiblename": "incus-client"
+  },
+  {
+   "binname": "incus-conversion",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Tools to convert a prior lxc/lxd instance to incus",
+   "version": "7.0.1",
+   "visiblename": "incus-conversion"
+  },
+  {
+   "binname": "incus-openrc",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Powerful system container and virtual machine manager (OpenRC init scripts)",
+   "version": "7.0.1",
+   "visiblename": "incus-openrc"
+  },
+  {
+   "binname": "incus-user",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus user project daemon",
+   "version": "7.0.1",
+   "visiblename": "incus-user"
+  },
+  {
+   "binname": "incus-user-openrc",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus user project daemon OpenRC scripts",
+   "version": "7.0.1",
+   "visiblename": "incus-user-openrc"
+  },
+  {
+   "binname": "incus-utils",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Incus utilities and scripts",
+   "version": "7.0.1",
+   "visiblename": "incus-utils"
+  },
+  {
+   "binname": "incus-vm",
+   "repo": "alpine_edge",
+   "srcname": "incus",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Install packages required to run VMs under Incus",
+   "version": "7.0.1",
+   "visiblename": "incus-vm"
+  },
+  {
+   "binname": "incus",
+   "repo": "void_x86_64",
+   "srcname": "incus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Powerful system container and virtual machine manager",
+   "version": "7.5.1",
+   "visiblename": "incus"
+  },
+  {
+   "binname": "incus-client",
+   "repo": "void_x86_64",
+   "srcname": "incus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Powerful system container and virtual machine manager - client",
+   "version": "7.5.1",
+   "visiblename": "incus-client"
+  },
+  {
+   "binname": "incus-tools",
+   "repo": "void_x86_64",
+   "srcname": "incus",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Powerful system container and virtual machine manager - tools",
+   "version": "7.5.1",
+   "visiblename": "incus-tools"
   }
  ],
  "libglvnd": [
@@ -5729,6 +7469,26 @@
    "subrepo": "stonking/main",
    "version": "1.7.0",
    "visiblename": "libglvnd"
+  },
+  {
+   "binname": "libglvnd",
+   "repo": "void_x86_64",
+   "srcname": "libglvnd",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "GL Vendor-Neutral Dispatch library",
+   "version": "1.7.0",
+   "visiblename": "libglvnd"
+  },
+  {
+   "binname": "libglvnd-devel",
+   "repo": "void_x86_64",
+   "srcname": "libglvnd",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "GL Vendor-Neutral Dispatch library - development files",
+   "version": "1.7.0",
+   "visiblename": "libglvnd-devel"
   }
  ],
  "libx11": [
@@ -6172,6 +7932,176 @@
    "subrepo": "jammy/main",
    "version": "1.7.5",
    "visiblename": "libx11"
+  },
+  {
+   "binname": "libx11",
+   "repo": "alpine_3_23",
+   "srcname": "libx11",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 client-side library",
+   "version": "1.8.12",
+   "visiblename": "libx11"
+  },
+  {
+   "binname": "libx11-dbg",
+   "repo": "alpine_3_23",
+   "srcname": "libx11",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 client-side library (debug symbols)",
+   "version": "1.8.12",
+   "visiblename": "libx11-dbg"
+  },
+  {
+   "binname": "libx11-dev",
+   "repo": "alpine_3_23",
+   "srcname": "libx11",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 client-side library (development files)",
+   "version": "1.8.12",
+   "visiblename": "libx11-dev"
+  },
+  {
+   "binname": "libx11-doc",
+   "repo": "alpine_3_23",
+   "srcname": "libx11",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 client-side library (documentation)",
+   "version": "1.8.12",
+   "visiblename": "libx11-doc"
+  },
+  {
+   "binname": "libx11-static",
+   "repo": "alpine_3_23",
+   "srcname": "libx11",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 client-side library (static library)",
+   "version": "1.8.12",
+   "visiblename": "libx11-static"
+  },
+  {
+   "binname": "libx11",
+   "repo": "alpine_3_24",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library",
+   "version": "1.8.14",
+   "visiblename": "libx11"
+  },
+  {
+   "binname": "libx11-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (debug symbols)",
+   "version": "1.8.14",
+   "visiblename": "libx11-dbg"
+  },
+  {
+   "binname": "libx11-dev",
+   "repo": "alpine_3_24",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (development files)",
+   "version": "1.8.14",
+   "visiblename": "libx11-dev"
+  },
+  {
+   "binname": "libx11-doc",
+   "repo": "alpine_3_24",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (documentation)",
+   "version": "1.8.14",
+   "visiblename": "libx11-doc"
+  },
+  {
+   "binname": "libx11-static",
+   "repo": "alpine_3_24",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (static library)",
+   "version": "1.8.14",
+   "visiblename": "libx11-static"
+  },
+  {
+   "binname": "libx11",
+   "repo": "alpine_edge",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library",
+   "version": "1.8.14",
+   "visiblename": "libx11"
+  },
+  {
+   "binname": "libx11-dbg",
+   "repo": "alpine_edge",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (debug symbols)",
+   "version": "1.8.14",
+   "visiblename": "libx11-dbg"
+  },
+  {
+   "binname": "libx11-dev",
+   "repo": "alpine_edge",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (development files)",
+   "version": "1.8.14",
+   "visiblename": "libx11-dev"
+  },
+  {
+   "binname": "libx11-doc",
+   "repo": "alpine_edge",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (documentation)",
+   "version": "1.8.14",
+   "visiblename": "libx11-doc"
+  },
+  {
+   "binname": "libx11-static",
+   "repo": "alpine_edge",
+   "srcname": "libx11",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 client-side library (static library)",
+   "version": "1.8.14",
+   "visiblename": "libx11-static"
+  },
+  {
+   "binname": "libX11",
+   "repo": "void_x86_64",
+   "srcname": "libX11",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Base X libraries from Xorg",
+   "version": "1.8.14",
+   "visiblename": "libX11"
+  },
+  {
+   "binname": "libX11-devel",
+   "repo": "void_x86_64",
+   "srcname": "libX11",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Base X libraries from Xorg - development files",
+   "version": "1.8.14",
+   "visiblename": "libX11-devel"
   }
  ],
  "libxrandr": [
@@ -6396,6 +8326,116 @@
    "subrepo": "stonking/main",
    "version": "1.5.4",
    "visiblename": "libxrandr"
+  },
+  {
+   "binname": "libxrandr",
+   "repo": "alpine_3_23",
+   "srcname": "libxrandr",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library",
+   "version": "1.5.4",
+   "visiblename": "libxrandr"
+  },
+  {
+   "binname": "libxrandr-dev",
+   "repo": "alpine_3_23",
+   "srcname": "libxrandr",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library (development files)",
+   "version": "1.5.4",
+   "visiblename": "libxrandr-dev"
+  },
+  {
+   "binname": "libxrandr-doc",
+   "repo": "alpine_3_23",
+   "srcname": "libxrandr",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library (documentation)",
+   "version": "1.5.4",
+   "visiblename": "libxrandr-doc"
+  },
+  {
+   "binname": "libxrandr",
+   "repo": "alpine_3_24",
+   "srcname": "libxrandr",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library",
+   "version": "1.5.5",
+   "visiblename": "libxrandr"
+  },
+  {
+   "binname": "libxrandr-dev",
+   "repo": "alpine_3_24",
+   "srcname": "libxrandr",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library (development files)",
+   "version": "1.5.5",
+   "visiblename": "libxrandr-dev"
+  },
+  {
+   "binname": "libxrandr-doc",
+   "repo": "alpine_3_24",
+   "srcname": "libxrandr",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library (documentation)",
+   "version": "1.5.5",
+   "visiblename": "libxrandr-doc"
+  },
+  {
+   "binname": "libxrandr",
+   "repo": "alpine_edge",
+   "srcname": "libxrandr",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library",
+   "version": "1.5.5",
+   "visiblename": "libxrandr"
+  },
+  {
+   "binname": "libxrandr-dev",
+   "repo": "alpine_edge",
+   "srcname": "libxrandr",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library (development files)",
+   "version": "1.5.5",
+   "visiblename": "libxrandr-dev"
+  },
+  {
+   "binname": "libxrandr-doc",
+   "repo": "alpine_edge",
+   "srcname": "libxrandr",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "X11 RandR extension library (documentation)",
+   "version": "1.5.5",
+   "visiblename": "libxrandr-doc"
+  },
+  {
+   "binname": "libXrandr",
+   "repo": "void_x86_64",
+   "srcname": "libXrandr",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "X RandR Library from X.org",
+   "version": "1.5.5",
+   "visiblename": "libXrandr"
+  },
+  {
+   "binname": "libXrandr-devel",
+   "repo": "void_x86_64",
+   "srcname": "libXrandr",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "X RandR Library from X.org - development files",
+   "version": "1.5.5",
+   "visiblename": "libXrandr-devel"
   }
  ],
  "pkgconf": [
@@ -6769,6 +8809,126 @@
    "subrepo": "noble/main",
    "version": "1.8.1",
    "visiblename": "pkgconf"
+  },
+  {
+   "binname": "pkgconf",
+   "repo": "alpine_3_23",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "development framework configuration tools",
+   "version": "2.5.1",
+   "visiblename": "pkgconf"
+  },
+  {
+   "binname": "pkgconf-dev",
+   "repo": "alpine_3_23",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "development framework configuration tools (development files)",
+   "version": "2.5.1",
+   "visiblename": "pkgconf-dev"
+  },
+  {
+   "binname": "pkgconf-doc",
+   "repo": "alpine_3_23",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "development framework configuration tools (documentation)",
+   "version": "2.5.1",
+   "visiblename": "pkgconf-doc"
+  },
+  {
+   "binname": "pkgconf",
+   "repo": "alpine_3_24",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "development framework configuration tools",
+   "version": "2.5.1",
+   "visiblename": "pkgconf"
+  },
+  {
+   "binname": "pkgconf-dev",
+   "repo": "alpine_3_24",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "development framework configuration tools (development files)",
+   "version": "2.5.1",
+   "visiblename": "pkgconf-dev"
+  },
+  {
+   "binname": "pkgconf-doc",
+   "repo": "alpine_3_24",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "development framework configuration tools (documentation)",
+   "version": "2.5.1",
+   "visiblename": "pkgconf-doc"
+  },
+  {
+   "binname": "pkgconf",
+   "repo": "alpine_edge",
+   "srcname": "pkgconf",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "development framework configuration tools",
+   "version": "3.0.10",
+   "visiblename": "pkgconf"
+  },
+  {
+   "binname": "pkgconf-dev",
+   "repo": "alpine_edge",
+   "srcname": "pkgconf",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "development framework configuration tools (development files)",
+   "version": "3.0.10",
+   "visiblename": "pkgconf-dev"
+  },
+  {
+   "binname": "pkgconf-doc",
+   "repo": "alpine_edge",
+   "srcname": "pkgconf",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "development framework configuration tools (documentation)",
+   "version": "3.0.10",
+   "visiblename": "pkgconf-doc"
+  },
+  {
+   "binname": "libpkgconf",
+   "repo": "void_x86_64",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Provides compiler and linker configuration - runtime library",
+   "version": "3.0.7",
+   "visiblename": "libpkgconf"
+  },
+  {
+   "binname": "pkgconf",
+   "repo": "void_x86_64",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Provides compiler and linker configuration",
+   "version": "3.0.7",
+   "visiblename": "pkgconf"
+  },
+  {
+   "binname": "pkgconf-devel",
+   "repo": "void_x86_64",
+   "srcname": "pkgconf",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Provides compiler and linker configuration - development files",
+   "version": "3.0.7",
+   "visiblename": "pkgconf-devel"
   }
  ],
  "rust": [
@@ -9704,6 +11864,596 @@
    "subrepo": "noble/main",
    "version": "1.75.0+dfsg0ubuntu1",
    "visiblename": "rustc"
+  },
+  {
+   "binname": "cargo",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "The Rust package manager",
+   "version": "1.91.1",
+   "visiblename": "cargo"
+  },
+  {
+   "binname": "cargo-bash-completions",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Bash completions for cargo",
+   "version": "1.91.1",
+   "visiblename": "cargo-bash-completions"
+  },
+  {
+   "binname": "cargo-doc",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "The Rust package manager (documentation)",
+   "version": "1.91.1",
+   "visiblename": "cargo-doc"
+  },
+  {
+   "binname": "cargo-zsh-completion",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "ZSH completions for cargo",
+   "version": "1.91.1",
+   "visiblename": "cargo-zsh-completion"
+  },
+  {
+   "binname": "rust",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain",
+   "version": "1.91.1",
+   "visiblename": "rust"
+  },
+  {
+   "binname": "rust-clippy",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Lints to catch common mistakes and improve your Rust code",
+   "version": "1.91.1",
+   "visiblename": "rust-clippy"
+  },
+  {
+   "binname": "rust-clippy-doc",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Code Linter (documentation)",
+   "version": "1.91.1",
+   "visiblename": "rust-clippy-doc"
+  },
+  {
+   "binname": "rust-dbg",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (debug symbols)",
+   "version": "1.91.1",
+   "visiblename": "rust-dbg"
+  },
+  {
+   "binname": "rust-doc",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (documentation)",
+   "version": "1.91.1",
+   "visiblename": "rust-doc"
+  },
+  {
+   "binname": "rust-gdb",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "GDB pretty printers for Rust",
+   "version": "1.91.1",
+   "visiblename": "rust-gdb"
+  },
+  {
+   "binname": "rust-lldb",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "LLDB pretty printers for Rust",
+   "version": "1.91.1",
+   "visiblename": "rust-lldb"
+  },
+  {
+   "binname": "rust-clippy",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Lints to catch common mistakes and improve your Rust code",
+   "version": "1.96.1",
+   "visiblename": "rust-clippy"
+  },
+  {
+   "binname": "rust-src",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (source code)",
+   "version": "1.91.1",
+   "visiblename": "rust-src"
+  },
+  {
+   "binname": "rust-uefi",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "UEFI targets for rust",
+   "version": "1.91.1",
+   "visiblename": "rust-uefi"
+  },
+  {
+   "binname": "rust-wasm",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "WebAssembly targets for rust",
+   "version": "1.91.1",
+   "visiblename": "rust-wasm"
+  },
+  {
+   "binname": "rustc-dev",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (compiler libraries)",
+   "version": "1.91.1",
+   "visiblename": "rustc-dev"
+  },
+  {
+   "binname": "rustfmt",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Code Formatter",
+   "version": "1.91.1",
+   "visiblename": "rustfmt"
+  },
+  {
+   "binname": "rustfmt-doc",
+   "repo": "alpine_3_23",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Code Formatter (documentation)",
+   "version": "1.91.1",
+   "visiblename": "rustfmt-doc"
+  },
+  {
+   "binname": "cargo",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "The Rust package manager",
+   "version": "1.96.1",
+   "visiblename": "cargo"
+  },
+  {
+   "binname": "cargo-bash-completions",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Bash completions for cargo",
+   "version": "1.96.1",
+   "visiblename": "cargo-bash-completions"
+  },
+  {
+   "binname": "cargo-doc",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "The Rust package manager (documentation)",
+   "version": "1.96.1",
+   "visiblename": "cargo-doc"
+  },
+  {
+   "binname": "cargo-zsh-completion",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "ZSH completions for cargo",
+   "version": "1.96.1",
+   "visiblename": "cargo-zsh-completion"
+  },
+  {
+   "binname": "rust",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain",
+   "version": "1.96.1",
+   "visiblename": "rust"
+  },
+  {
+   "binname": "rust-clippy-doc",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Code Linter (documentation)",
+   "version": "1.96.1",
+   "visiblename": "rust-clippy-doc"
+  },
+  {
+   "binname": "rust-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (debug symbols)",
+   "version": "1.96.1",
+   "visiblename": "rust-dbg"
+  },
+  {
+   "binname": "rust-doc",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (documentation)",
+   "version": "1.96.1",
+   "visiblename": "rust-doc"
+  },
+  {
+   "binname": "rust-gdb",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "GDB pretty printers for Rust",
+   "version": "1.96.1",
+   "visiblename": "rust-gdb"
+  },
+  {
+   "binname": "rust-lldb",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "LLDB pretty printers for Rust",
+   "version": "1.96.1",
+   "visiblename": "rust-lldb"
+  },
+  {
+   "binname": "rust-src",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (source code)",
+   "version": "1.96.1",
+   "visiblename": "rust-src"
+  },
+  {
+   "binname": "rust-uefi",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "UEFI targets for rust",
+   "version": "1.96.1",
+   "visiblename": "rust-uefi"
+  },
+  {
+   "binname": "rust-wasm",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "WebAssembly targets for rust",
+   "version": "1.96.1",
+   "visiblename": "rust-wasm"
+  },
+  {
+   "binname": "rustc-dev",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (compiler libraries)",
+   "version": "1.96.1",
+   "visiblename": "rustc-dev"
+  },
+  {
+   "binname": "rustfmt",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Code Formatter",
+   "version": "1.96.1",
+   "visiblename": "rustfmt"
+  },
+  {
+   "binname": "rustfmt-doc",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Rust Code Formatter (documentation)",
+   "version": "1.96.1",
+   "visiblename": "rustfmt-doc"
+  },
+  {
+   "binname": "wasm-component-ld",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Command line linker for creating WebAssembly components",
+   "version": "1.96.1",
+   "visiblename": "wasm-component-ld"
+  },
+  {
+   "binname": "wasm-component-ld-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Command line linker for creating WebAssembly components (debug info)",
+   "version": "1.96.1",
+   "visiblename": "wasm-component-ld-dbg"
+  },
+  {
+   "binname": "cargo",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "The Rust package manager",
+   "version": "1.99.1",
+   "visiblename": "cargo"
+  },
+  {
+   "binname": "cargo-bash-completions",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Bash completions for cargo",
+   "version": "1.99.1",
+   "visiblename": "cargo-bash-completions"
+  },
+  {
+   "binname": "cargo-doc",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "The Rust package manager (documentation)",
+   "version": "1.99.1",
+   "visiblename": "cargo-doc"
+  },
+  {
+   "binname": "cargo-zsh-completion",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "ZSH completions for cargo",
+   "version": "1.99.1",
+   "visiblename": "cargo-zsh-completion"
+  },
+  {
+   "binname": "rust",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain",
+   "version": "1.99.1",
+   "visiblename": "rust"
+  },
+  {
+   "binname": "rust-clippy",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Lints to catch common mistakes and improve your Rust code",
+   "version": "1.99.1",
+   "visiblename": "rust-clippy"
+  },
+  {
+   "binname": "rust-clippy-doc",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Code Linter (documentation)",
+   "version": "1.99.1",
+   "visiblename": "rust-clippy-doc"
+  },
+  {
+   "binname": "rust-dbg",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (debug symbols)",
+   "version": "1.99.1",
+   "visiblename": "rust-dbg"
+  },
+  {
+   "binname": "rust-doc",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (documentation)",
+   "version": "1.99.1",
+   "visiblename": "rust-doc"
+  },
+  {
+   "binname": "rust-gdb",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "GDB pretty printers for Rust",
+   "version": "1.99.1",
+   "visiblename": "rust-gdb"
+  },
+  {
+   "binname": "rust-lldb",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "LLDB pretty printers for Rust",
+   "version": "1.99.1",
+   "visiblename": "rust-lldb"
+  },
+  {
+   "binname": "rust-src",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (source code)",
+   "version": "1.99.1",
+   "visiblename": "rust-src"
+  },
+  {
+   "binname": "rust-uefi",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "UEFI targets for rust",
+   "version": "1.99.1",
+   "visiblename": "rust-uefi"
+  },
+  {
+   "binname": "rust-wasm",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "WebAssembly targets for rust",
+   "version": "1.99.1",
+   "visiblename": "rust-wasm"
+  },
+  {
+   "binname": "rustc-dev",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Programming Language toolchain (compiler libraries)",
+   "version": "1.99.1",
+   "visiblename": "rustc-dev"
+  },
+  {
+   "binname": "rustfmt",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Code Formatter",
+   "version": "1.99.1",
+   "visiblename": "rustfmt"
+  },
+  {
+   "binname": "rustfmt-doc",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Rust Code Formatter (documentation)",
+   "version": "1.99.1",
+   "visiblename": "rustfmt-doc"
+  },
+  {
+   "binname": "wasm-component-ld",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Command line linker for creating WebAssembly components",
+   "version": "1.99.1",
+   "visiblename": "wasm-component-ld"
+  },
+  {
+   "binname": "wasm-component-ld-dbg",
+   "repo": "alpine_edge",
+   "srcname": "rust",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "Command line linker for creating WebAssembly components (debug info)",
+   "version": "1.99.1",
+   "visiblename": "wasm-component-ld-dbg"
+  },
+  {
+   "binname": "rust",
+   "repo": "void_x86_64",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Safe, concurrent, practical systems language",
+   "version": "1.99.0",
+   "visiblename": "rust"
+  },
+  {
+   "binname": "rust-doc",
+   "repo": "void_x86_64",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Safe, concurrent, practical systems language - documentation",
+   "version": "1.99.0",
+   "visiblename": "rust-doc"
+  },
+  {
+   "binname": "rust-src",
+   "repo": "void_x86_64",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Safe, concurrent, practical systems language - source code",
+   "version": "1.99.0",
+   "visiblename": "rust-src"
+  },
+  {
+   "binname": "rust-std",
+   "repo": "void_x86_64",
+   "srcname": "rust",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Safe, concurrent, practical systems language - standard library",
+   "version": "1.99.0",
+   "visiblename": "rust-std"
   }
  ],
  "utf8cpp": [],
@@ -9930,6 +12680,46 @@
    "subrepo": "stonking/universe",
    "version": "4.1.1",
    "visiblename": "utfcpp"
+  },
+  {
+   "binname": "utfcpp",
+   "repo": "alpine_3_23",
+   "srcname": "utfcpp",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "UTF-8 with C++ in a portable way",
+   "version": "4.0.8",
+   "visiblename": "utfcpp"
+  },
+  {
+   "binname": "utfcpp",
+   "repo": "alpine_3_24",
+   "srcname": "utfcpp",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "UTF-8 with C++ in a portable way",
+   "version": "4.1.1",
+   "visiblename": "utfcpp"
+  },
+  {
+   "binname": "utfcpp",
+   "repo": "alpine_edge",
+   "srcname": "utfcpp",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "UTF-8 with C++ in a portable way",
+   "version": "4.2.1",
+   "visiblename": "utfcpp"
+  },
+  {
+   "binname": "utfcpp",
+   "repo": "void_x86_64",
+   "srcname": "utfcpp",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Generic library that handles UTF-8 encoded strings",
+   "version": "4.2.1",
+   "visiblename": "utfcpp"
   }
  ],
  "vulkan-headers": [
@@ -10106,6 +12896,46 @@
    "summary": "Vulkan C and C++ API header files",
    "version": "1.4.363",
    "visiblename": "vulkan-headers"
+  },
+  {
+   "binname": "vulkan-headers",
+   "repo": "alpine_3_23",
+   "srcname": "vulkan-headers",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan header files",
+   "version": "1.4.321.0",
+   "visiblename": "vulkan-headers"
+  },
+  {
+   "binname": "vulkan-headers",
+   "repo": "alpine_3_24",
+   "srcname": "vulkan-headers",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan header files",
+   "version": "1.4.347",
+   "visiblename": "vulkan-headers"
+  },
+  {
+   "binname": "vulkan-headers",
+   "repo": "alpine_edge",
+   "srcname": "vulkan-headers",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan header files",
+   "version": "1.4.360",
+   "visiblename": "vulkan-headers"
+  },
+  {
+   "binname": "Vulkan-Headers",
+   "repo": "void_x86_64",
+   "srcname": "Vulkan-Headers",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Vulkan header files",
+   "version": "1.4.363.0",
+   "visiblename": "Vulkan-Headers"
   }
  ],
  "vulkan-loader": [
@@ -10405,6 +13235,116 @@
    "subrepo": "stonking/main",
    "version": "1.4.357.0",
    "visiblename": "vulkan-loader"
+  },
+  {
+   "binname": "vulkan-loader",
+   "repo": "alpine_3_23",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader",
+   "version": "1.4.321.0",
+   "visiblename": "vulkan-loader"
+  },
+  {
+   "binname": "vulkan-loader-dbg",
+   "repo": "alpine_3_23",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader (debug symbols)",
+   "version": "1.4.321.0",
+   "visiblename": "vulkan-loader-dbg"
+  },
+  {
+   "binname": "vulkan-loader-dev",
+   "repo": "alpine_3_23",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader (development files)",
+   "version": "1.4.321.0",
+   "visiblename": "vulkan-loader-dev"
+  },
+  {
+   "binname": "vulkan-loader",
+   "repo": "alpine_3_24",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader",
+   "version": "1.4.347",
+   "visiblename": "vulkan-loader"
+  },
+  {
+   "binname": "vulkan-loader-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader (debug symbols)",
+   "version": "1.4.347",
+   "visiblename": "vulkan-loader-dbg"
+  },
+  {
+   "binname": "vulkan-loader-dev",
+   "repo": "alpine_3_24",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader (development files)",
+   "version": "1.4.347",
+   "visiblename": "vulkan-loader-dev"
+  },
+  {
+   "binname": "vulkan-loader",
+   "repo": "alpine_edge",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader",
+   "version": "1.4.360",
+   "visiblename": "vulkan-loader"
+  },
+  {
+   "binname": "vulkan-loader-dbg",
+   "repo": "alpine_edge",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader (debug symbols)",
+   "version": "1.4.360",
+   "visiblename": "vulkan-loader-dbg"
+  },
+  {
+   "binname": "vulkan-loader-dev",
+   "repo": "alpine_edge",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "Vulkan Installable Client Driver (ICD) Loader (development files)",
+   "version": "1.4.360",
+   "visiblename": "vulkan-loader-dev"
+  },
+  {
+   "binname": "vulkan-loader",
+   "repo": "void_x86_64",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Vulkan Installable Client Driver (ICD) loader",
+   "version": "1.4.363.0",
+   "visiblename": "vulkan-loader"
+  },
+  {
+   "binname": "vulkan-loader-devel",
+   "repo": "void_x86_64",
+   "srcname": "vulkan-loader",
+   "status": "outdated",
+   "subrepo": "x86_64",
+   "summary": "Vulkan Installable Client Driver (ICD) loader - development files",
+   "version": "1.4.363.0",
+   "visiblename": "vulkan-loader-devel"
   }
  ],
  "wayland": [
@@ -10782,6 +13722,266 @@
    "subrepo": "jammy-updates/main",
    "version": "1.20.0",
    "visiblename": "wayland"
+  },
+  {
+   "binname": "wayland",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol",
+   "version": "1.24.0",
+   "visiblename": "wayland"
+  },
+  {
+   "binname": "wayland-dbg",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (debug symbols)",
+   "version": "1.24.0",
+   "visiblename": "wayland-dbg"
+  },
+  {
+   "binname": "wayland-dev",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (development files)",
+   "version": "1.24.0",
+   "visiblename": "wayland-dev"
+  },
+  {
+   "binname": "wayland-libs-client",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (client library)",
+   "version": "1.24.0",
+   "visiblename": "wayland-libs-client"
+  },
+  {
+   "binname": "wayland-libs-cursor",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (cursor library)",
+   "version": "1.24.0",
+   "visiblename": "wayland-libs-cursor"
+  },
+  {
+   "binname": "wayland-libs-egl",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (egl library)",
+   "version": "1.24.0",
+   "visiblename": "wayland-libs-egl"
+  },
+  {
+   "binname": "wayland-libs-server",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (server library)",
+   "version": "1.24.0",
+   "visiblename": "wayland-libs-server"
+  },
+  {
+   "binname": "wayland-static",
+   "repo": "alpine_3_23",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (static library)",
+   "version": "1.24.0",
+   "visiblename": "wayland-static"
+  },
+  {
+   "binname": "wayland",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol",
+   "version": "1.25.0",
+   "visiblename": "wayland"
+  },
+  {
+   "binname": "wayland-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (debug symbols)",
+   "version": "1.25.0",
+   "visiblename": "wayland-dbg"
+  },
+  {
+   "binname": "wayland-dev",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (development files)",
+   "version": "1.25.0",
+   "visiblename": "wayland-dev"
+  },
+  {
+   "binname": "wayland-libs-client",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (client library)",
+   "version": "1.25.0",
+   "visiblename": "wayland-libs-client"
+  },
+  {
+   "binname": "wayland-libs-cursor",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (cursor library)",
+   "version": "1.25.0",
+   "visiblename": "wayland-libs-cursor"
+  },
+  {
+   "binname": "wayland-libs-egl",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (egl library)",
+   "version": "1.25.0",
+   "visiblename": "wayland-libs-egl"
+  },
+  {
+   "binname": "wayland-libs-server",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (server library)",
+   "version": "1.25.0",
+   "visiblename": "wayland-libs-server"
+  },
+  {
+   "binname": "wayland-static",
+   "repo": "alpine_3_24",
+   "srcname": "wayland",
+   "status": "outdated",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (static library)",
+   "version": "1.25.0",
+   "visiblename": "wayland-static"
+  },
+  {
+   "binname": "wayland",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol",
+   "version": "1.26.0",
+   "visiblename": "wayland"
+  },
+  {
+   "binname": "wayland-dbg",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (debug symbols)",
+   "version": "1.26.0",
+   "visiblename": "wayland-dbg"
+  },
+  {
+   "binname": "wayland-dev",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (development files)",
+   "version": "1.26.0",
+   "visiblename": "wayland-dev"
+  },
+  {
+   "binname": "wayland-libs-client",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (client library)",
+   "version": "1.26.0",
+   "visiblename": "wayland-libs-client"
+  },
+  {
+   "binname": "wayland-libs-cursor",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (cursor library)",
+   "version": "1.26.0",
+   "visiblename": "wayland-libs-cursor"
+  },
+  {
+   "binname": "wayland-libs-egl",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (egl library)",
+   "version": "1.26.0",
+   "visiblename": "wayland-libs-egl"
+  },
+  {
+   "binname": "wayland-libs-server",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (server library)",
+   "version": "1.26.0",
+   "visiblename": "wayland-libs-server"
+  },
+  {
+   "binname": "wayland-static",
+   "repo": "alpine_edge",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "main",
+   "summary": "A computer display server protocol (static library)",
+   "version": "1.26.0",
+   "visiblename": "wayland-static"
+  },
+  {
+   "binname": "wayland",
+   "repo": "void_x86_64",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Core Wayland window system code and protocol",
+   "version": "1.26.0",
+   "visiblename": "wayland"
+  },
+  {
+   "binname": "wayland-devel",
+   "repo": "void_x86_64",
+   "srcname": "wayland",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Core Wayland window system code and protocol - development files",
+   "version": "1.26.0",
+   "visiblename": "wayland-devel"
   }
  ],
  "wayland-scanner": [
@@ -11096,6 +14296,286 @@
    "subrepo": "stonking/main",
    "version": "1.21.1",
    "visiblename": "xdg-desktop-portal"
+  },
+  {
+   "binname": "xdg-desktop-portal",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal"
+  },
+  {
+   "binname": "xdg-desktop-portal-dbg",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (debug symbols)",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal-dbg"
+  },
+  {
+   "binname": "xdg-desktop-portal-dev",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (development files)",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal-dev"
+  },
+  {
+   "binname": "xdg-desktop-portal-doc",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (documentation)",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal-doc"
+  },
+  {
+   "binname": "xdg-desktop-portal-lang",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Languages for package xdg-desktop-portal",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal-lang"
+  },
+  {
+   "binname": "xdg-desktop-portal-openrc",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (OpenRC init scripts)",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal-openrc"
+  },
+  {
+   "binname": "xdg-desktop-portal-systemd",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (systemd files)",
+   "version": "1.20.3",
+   "visiblename": "xdg-desktop-portal-systemd"
+  },
+  {
+   "binname": "xdg-document-portal",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (document portal)",
+   "version": "1.20.3",
+   "visiblename": "xdg-document-portal"
+  },
+  {
+   "binname": "xdg-document-portal-openrc",
+   "repo": "alpine_3_23",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (document portal) (OpenRC init scripts)",
+   "version": "1.20.3",
+   "visiblename": "xdg-document-portal-openrc"
+  },
+  {
+   "binname": "xdg-desktop-portal",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal"
+  },
+  {
+   "binname": "xdg-desktop-portal-dbg",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (debug symbols)",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal-dbg"
+  },
+  {
+   "binname": "xdg-desktop-portal-dev",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (development files)",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal-dev"
+  },
+  {
+   "binname": "xdg-desktop-portal-doc",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (documentation)",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal-doc"
+  },
+  {
+   "binname": "xdg-desktop-portal-lang",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Languages for package xdg-desktop-portal",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal-lang"
+  },
+  {
+   "binname": "xdg-desktop-portal-openrc",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (OpenRC init scripts)",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal-openrc"
+  },
+  {
+   "binname": "xdg-desktop-portal-systemd",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (systemd files)",
+   "version": "1.21.2",
+   "visiblename": "xdg-desktop-portal-systemd"
+  },
+  {
+   "binname": "xdg-document-portal",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (document portal)",
+   "version": "1.21.2",
+   "visiblename": "xdg-document-portal"
+  },
+  {
+   "binname": "xdg-document-portal-openrc",
+   "repo": "alpine_3_24",
+   "srcname": "xdg-desktop-portal",
+   "status": "outdated",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (document portal) (OpenRC init scripts)",
+   "version": "1.21.2",
+   "visiblename": "xdg-document-portal-openrc"
+  },
+  {
+   "binname": "xdg-desktop-portal",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal"
+  },
+  {
+   "binname": "xdg-desktop-portal-dbg",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (debug symbols)",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal-dbg"
+  },
+  {
+   "binname": "xdg-desktop-portal-dev",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (development files)",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal-dev"
+  },
+  {
+   "binname": "xdg-desktop-portal-doc",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (documentation)",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal-doc"
+  },
+  {
+   "binname": "xdg-desktop-portal-lang",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Languages for package xdg-desktop-portal",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal-lang"
+  },
+  {
+   "binname": "xdg-desktop-portal-openrc",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (OpenRC init scripts)",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal-openrc"
+  },
+  {
+   "binname": "xdg-desktop-portal-systemd",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (systemd files)",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal-systemd"
+  },
+  {
+   "binname": "xdg-document-portal",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (document portal)",
+   "version": "1.22.1",
+   "visiblename": "xdg-document-portal"
+  },
+  {
+   "binname": "xdg-document-portal-openrc",
+   "repo": "alpine_edge",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Desktop integration portal (document portal) (OpenRC init scripts)",
+   "version": "1.22.1",
+   "visiblename": "xdg-document-portal-openrc"
+  },
+  {
+   "binname": "xdg-desktop-portal",
+   "repo": "void_x86_64",
+   "srcname": "xdg-desktop-portal",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Portal frontend service for Flatpak",
+   "version": "1.22.1",
+   "visiblename": "xdg-desktop-portal"
   }
  ],
  "xhost": [
@@ -11197,6 +14677,76 @@
    "status": "newest",
    "subrepo": "src-oss",
    "summary": "Utility to control X server access",
+   "version": "1.0.10",
+   "visiblename": "xhost"
+  },
+  {
+   "binname": "xhost",
+   "repo": "alpine_3_23",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Controls host and/or user access to a running X server",
+   "version": "1.0.10",
+   "visiblename": "xhost"
+  },
+  {
+   "binname": "xhost-doc",
+   "repo": "alpine_3_23",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Controls host and/or user access to a running X server (documentation)",
+   "version": "1.0.10",
+   "visiblename": "xhost-doc"
+  },
+  {
+   "binname": "xhost",
+   "repo": "alpine_3_24",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Controls host and/or user access to a running X server",
+   "version": "1.0.10",
+   "visiblename": "xhost"
+  },
+  {
+   "binname": "xhost-doc",
+   "repo": "alpine_3_24",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Controls host and/or user access to a running X server (documentation)",
+   "version": "1.0.10",
+   "visiblename": "xhost-doc"
+  },
+  {
+   "binname": "xhost",
+   "repo": "alpine_edge",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Controls host and/or user access to a running X server",
+   "version": "1.0.10",
+   "visiblename": "xhost"
+  },
+  {
+   "binname": "xhost-doc",
+   "repo": "alpine_edge",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "community",
+   "summary": "Controls host and/or user access to a running X server (documentation)",
+   "version": "1.0.10",
+   "visiblename": "xhost-doc"
+  },
+  {
+   "binname": "xhost",
+   "repo": "void_x86_64",
+   "srcname": "xhost",
+   "status": "newest",
+   "subrepo": "x86_64",
+   "summary": "Server access control program for X",
    "version": "1.0.10",
    "visiblename": "xhost"
   }

@@ -10,7 +10,7 @@ from tests.support import paths
 
 
 def test_get_distributions_lists_dists_with_a_repository_generator():
-    assert sorted(gen_repo.get_distributions()) == ["arch", "debian", "gentoo", "rpm-based"]
+    assert sorted(gen_repo.get_distributions()) == ["alpine", "arch", "debian", "gentoo", "rpm-based", "void"]
 
 
 def test_get_distributions_skips_dists_without_generator(monkeypatch, tmp_path):

@@ -63,7 +63,7 @@ def run():
     test_parser.add_argument("--keep", help="Don't remove the containers afterwards, for debugging", action="store_true")
 
     deploy_parser = subparsers.add_parser("deploy", help="Push the tested packages to their production repositories")
-    deploy_parser.add_argument("-p", "--packages", help="Only deploy these packages (AUR)", nargs='+')
+    deploy_parser.add_argument("-p", "--packages", help="Only deploy these packages (for deployment generators that publish packages one by one)", nargs='+')
     deploy_parser.add_argument("-d", "--distributions", help="Only deploy these distributions", nargs='+')
     deploy_parser.add_argument("-t", "--targets", help="Only deploy these test targets (e.g. fedora-44)", nargs='+')
     deploy_parser.add_argument("--skip-tests", help="Also deploy targets and packages whose last test failed",

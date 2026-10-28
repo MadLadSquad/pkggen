@@ -98,6 +98,10 @@ fi
 ]
 
 
+# The binary package host's index: binpkgs/Packages
+PUBLISH = {"indexes": [r"(^|/)binpkgs/Packages$"]}
+
+
 def main(job):
     return [
         lib.target(job, rp, spec,
@@ -106,7 +110,9 @@ def main(job):
                    packages=[{"name": p.name, "build": build(job, p), "install": install(job, p)}
                              for p in job.packages],
                    finalize=FINALIZE,
-                   data_images=DATA_IMAGES)
+                   data_images=DATA_IMAGES,
+                   env={"MAKEOPTS": f"-j{lib.JOBS}"},
+                   publish=PUBLISH)
         for rp, spec in lib.select_targets(job, TARGETS)
     ]
 

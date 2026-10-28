@@ -142,6 +142,14 @@ def install(package):
     return [lib.step(f"install {package.name}", f"apt-get install -y {DEBS}/{package.name}/*.deb\n")]
 
 
+# apt reads dists/<suite>/InRelease (or Release + Release.gpg) first, then the indexes it lists
+PUBLISH = {
+    "indexes": [r"(^|/)dists/"],
+    "metadata": [r"(^|/)(InRelease|Release|Release\.gpg)$"],
+    "content_types": {".deb": "application/vnd.debian.binary-package"},
+}
+
+
 def main(job):
     targets = []
     unconfigured = []
@@ -174,7 +182,8 @@ if [ -e "$1" ]; then reprepro -b {lib.REPO} includedeb {lib.shquote(codename)} "
             packages=[{"name": p.name, "build": build(p, suffix, codename), "install": install(p)}
                       for p in job.packages],
             finalize=finalize,
-            env={"DEBIAN_FRONTEND": "noninteractive"},
+            env={"DEBIAN_FRONTEND": "noninteractive", "DEB_BUILD_OPTIONS": f"parallel={lib.JOBS}"},
+            publish=PUBLISH,
         ))
 
     if unconfigured and job.repository.get("suites"):

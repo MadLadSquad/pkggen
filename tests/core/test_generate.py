@@ -275,7 +275,7 @@ def test_load_targets_real_generators(example_project, example_config):
     failures = []
     targets = generate.load_targets(example_config, None, failures)
     assert [t.name for t in targets] == ["arch"]
-    assert sorted(f.distribution for f in failures) == ["debian", "gentoo", "rpm-based"]
+    assert sorted(f.distribution for f in failures) == ["alpine", "debian", "gentoo", "rpm-based", "void"]
 
 
 # --- Small helpers -----------------------------------------------------------------
@@ -620,7 +620,8 @@ def test_generate_looks_dependencies_up_once(stub_generators, stub_dependencies,
     glfw, local, zlib = deps["libraries"]
     assert (glfw["op"], glfw["version"]) == (">=", "3.4")
     assert local == {"name": "lib", "op": None, "version": None, "releases": {},
-                     "local": {"name": "lib", "category": None, "packaged": True}}
+                     "local": {"name": "lib", "packaged": True, "package": local["local"]["package"]}}
+    assert local["local"]["package"]["name"] == "lib"  # its pkggen.yaml settings, for the packaging generators
     assert zlib["override"] == "zlib1g-dev" and zlib["releases"] == {}
     assert deps["runtime"][0]["override"] == "x11-xserver-utils"
     assert deps["development"] == []
@@ -669,6 +670,30 @@ def test_releases_come_from_the_package_then_the_test(stub_generators, stub_depe
     assert set(job("tested")["dependencies"]["build"][0]["releases"]) == {"alpha_2", "alpha_3"}
 
 
+def test_target_names_of_shared_rp_names(stub_generators, stub_dependencies, project):
+    """distributions.yaml's `targets`: one rp-name tested as several targets (Void's glibc and musl)."""
+    (stub_generators / "distributions" / "distributions.yaml").write_text(textwrap.dedent("""\
+        distributions:
+          - name: alpha
+            rp-names: [alpha_1, alpha_2]
+            targets: { alpha_1: [alpha-glibc, alpha-musl] }
+          - name: beta
+            rp-names: [beta_1]
+    """))
+    root = project({"repositories": REPOSITORIES, "group": packages(
+        {"name": "musl-only", "distributions": {"alpha": {"versions": ["alpha-musl"]}},
+         "dependencies": {"build": ["cmake"]}})})
+    assert generate.generate() == 0
+    job = json.loads((root / "pkggen-build" / "alpha" / "musl-only.json").read_text())
+    assert job["releases"] == ["alpha_1"]
+    package = {"distributions": {"alpha": {"versions": ["alpha-musl"]}}}
+    assert generate.tested_on(package, "alpha", "alpha-musl", "alpha_1")
+    assert not generate.tested_on(package, "alpha", "alpha-glibc", "alpha_1")
+    errors = generate.check_package({"name": "p", "distributions": {"alpha": {"versions": ["alpha-x"]}}},
+                                    {"alpha": ["alpha_1", "alpha-glibc", "alpha-musl"]})
+    assert errors and "known: alpha_1, alpha-glibc, alpha-musl" in errors[0]
+
+
 def test_package_filters_still_know_every_local_package(stub_generators, stub_dependencies, project):
     root = project({"repositories": REPOSITORIES, "group": packages(
         {"name": "lib", "gentoo": {"category": "dev-libs"}},
@@ -676,7 +701,8 @@ def test_package_filters_still_know_every_local_package(stub_generators, stub_de
     assert generate.generate(["app"]) == 0
     assert stub_dependencies() == []  # only a local package: nothing to look up
     local = json.loads((root / "pkggen-build" / "alpha" / "app.json").read_text())["dependencies"]["libraries"][0]
-    assert local["local"] == {"name": "lib", "category": "dev-libs", "packaged": True}
+    assert local["local"]["name"] == "lib" and local["local"]["packaged"] is True
+    assert local["local"]["package"]["gentoo"] == {"category": "dev-libs"}
 
 
 def test_package_dependencies_add_to_the_groups(stub_generators):

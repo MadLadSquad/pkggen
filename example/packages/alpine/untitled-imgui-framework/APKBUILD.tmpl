@@ -1,0 +1,56 @@
+{#- The framework and its build tool, UVKBuildTool. Upstream has no plain
+    install step for the framework: it's installed by building an empty
+    project with install-framework: true, whose own files are then removed. -#}
+{% extends "_base/APKBUILD.tmpl" %}
+{# The framework's scripts are bash scripts; the applications run the installed export.sh #}
+{% set base_depends = ["bash"] %}
+{% set base_makedepends = ["bash"] %}
+{% block functions %}
+
+{% include "_base/configure-project.sh" %}
+
+prepare() {
+	default_prepare
+	# The framework's pkg-config file, in /usr/lib like the library
+	sed -i 's|^libdir=.*|libdir="${prefix}/lib"|' Framework/cmake/UntitledImGuiFramework.pc.in
+	# The build scripts run make with one job per CPU, which can run out of
+	# memory: let UIMGUI_JOBS set the count (the installed export.sh too, which
+	# builds the applications)
+	sed -i 's/^\([[:space:]]*\)\(cpus\|jobs\)=\$(grep -c processor .*$/&\n\1[ -z "${UIMGUI_JOBS}" ] || \2="${UIMGUI_JOBS}"/' \
+		install.sh export.sh create-project.sh UVKBuildTool/ci.sh
+	grep -q UIMGUI_JOBS export.sh
+}
+
+build() {
+	# abuild makes CMake use Ninja, but the framework's scripts and UVKBuildTool run make
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	# Builds UVKBuildTool in UVKBuildTool/build
+	./install.sh ci
+	# The empty project that installs the framework
+	./create-project.sh pkg --skip-compilation
+	_configure_project Projects/pkg/uvproj.yaml true
+}
+
+package() {
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	(cd UVKBuildTool/build && ./UVKBuildTool --build "$pkgdir/usr" /usr ../../Projects/pkg)
+	_check_installed Projects/pkg/uvproj.yaml "$pkgdir/usr/lib"
+	test -e "$pkgdir/usr/lib/libUntitledImGuiFramework.so"
+	# Only keep the framework, not the project that installed it
+	rm -rf "$pkgdir"/usr/lib/libpkgLib.so "$pkgdir"/usr/bin/pkg "$pkgdir"/usr/share/config/pkg \
+		"$pkgdir"/usr/include/pkg "$pkgdir"/usr/include/utf8cpp "$pkgdir"/usr/share/utf8cpp
+
+	# UVKBuildTool itself, built again for its system-wide location
+	cmake -B "$srcdir/uvkbuildtool" -S UVKBuildTool \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DUBT_INSTALL=ON \
+		-DUBT_FRAMEWORK_DIR=/usr/include/UntitledImGuiFramework/ \
+		-DUBT_DATA_INSTALL_PREFIX=/usr/share/
+	cmake --build "$srcdir/uvkbuildtool"
+	DESTDIR="$pkgdir" cmake --install "$srcdir/uvkbuildtool"
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+{% endblock %}

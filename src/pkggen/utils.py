@@ -45,7 +45,26 @@ def load_distributions():
     for dist in distributions:
         if not isinstance(dist, dict) or "name" not in dist:
             raise GenericError(f"Every entry in {dist_file} needs a 'name' key!")
+        targets = dist.get("targets")
+        if targets is not None and not (isinstance(targets, dict) and all(
+                rp in (dist.get("rp-names") or []) and isinstance(names, list) and names
+                and all(isinstance(n, str) and n for n in names) for rp, names in targets.items())):
+            raise GenericError(f"'targets' of {dist['name']} in {dist_file} must map its rp-names to lists of "
+                               "test target names")
     return distributions
+
+def target_aliases(dist):
+    """{target name: rp-name} of a distribution's `targets` in distributions.yaml.
+
+    A release repology lists once can be tested as several targets (Void's
+    glibc and musl builds are both void_x86_64): their names can be used
+    wherever an rp-name can.
+    """
+    return {name: rp for rp, names in (dist.get("targets") or {}).items() for name in names}
+
+def release_names(dist):
+    """A distribution's rp-names, then the target names of its `targets`."""
+    return list(dist.get("rp-names") or []) + list(target_aliases(dist))
 
 def get_run_path():
     """The directory containing pkggen.yaml."""

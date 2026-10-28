@@ -7,7 +7,7 @@
 # pushed. Files that only exist upstream are kept unless `prune` is set;
 # `preserve` regexes exempt paths from pruning. Targets may share a folder
 # (their files are merged), `exclude` leaves files of the test output out, and
-# `gpg-key` signs the repository metadata (apt's Release, dnf's repomd.xml).
+# `gpg-key` or `rsa-key` sign the repositories (lib.sign_repository()).
 # Executable bits come from the test containers' list when there is one, so
 # they survive file systems without them (NTFS, where Git for Windows has
 # core.filemode=false).
@@ -22,7 +22,8 @@ from urllib.parse import unquote, urlsplit
 import lib
 
 KEYS = {"generator", "url", "branch", "username", "email", "ssh-key", "password", "managed-key", "targets",
-        "path", "prune", "preserve", "exclude", "message", "sign", "gpg-key", "gpg-passphrase", "public-key"}
+        "path", "prune", "preserve", "exclude", "message", "sign", "gpg-key", "gpg-passphrase", "rsa-key",
+        "rsa-passphrase", "key-name", "signed-by", "public-key"}
 DEFAULT_BRANCH = "main"
 DEFAULT_PATH = "{target}"
 
@@ -268,8 +269,8 @@ def published_file(work, relative):
 
 
 def signed(job, work, staged):
-    """The staged files with the repository metadata signed, when `gpg-key` is set."""
-    if not job.config.get("gpg-key"):
+    """The staged files with the repository metadata signed, when `gpg-key` or `rsa-key` is set."""
+    if not lib.signs(job):
         return staged
     folder = lib.write_staged(staged, work.rstrip("/\\") + ".signed")
     lib.sign_repository(job, folder, lambda relative: published_file(work, relative))
@@ -388,6 +389,8 @@ def check_common(job, allowed, errors, rejected=()):
     """The checks the git and AUR generators share. rejected keys get their own error from the caller."""
     config = job.config
     lib.check_keys(job, set(allowed) | set(rejected), errors)
+    if not shutil.which("git"):
+        errors.append(f"'{job.where}' needs git, which isn't installed: install it and run `pkggen deploy` again")
     lib.check_string(job, "username", errors, required=True)
     lib.check_string(job, "email", errors, required=True)
     lib.check_string(job, "message", errors)

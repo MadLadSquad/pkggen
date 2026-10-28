@@ -3,12 +3,13 @@
 # an S3-compatible bucket: Cloudflare R2, AWS S3, MinIO, Backblaze B2, ...
 #
 # Every target goes to its own folder (`path`, default `{target}`), or several
-# share one (their files are merged, e.g. one apt repository with a suite per
-# release). `exclude` leaves files of the test output out, `gpg-key` signs the
-# repository metadata. Only changed files are uploaded: packages first, then the
-# indexes, then the signed metadata, so clients never see an index that points
-# at a missing file. With `prune`, objects no target has any more are deleted
-# last, except `preserve` matches.
+# share one (their files are merged, e.g. one repository with a section per
+# release). `exclude` leaves files of the test output out, `gpg-key` or
+# `rsa-key` sign the repositories. Only changed files are uploaded: packages
+# first, then the indexes, then the metadata clients read first (each target's
+# `publish`, from its testing generator, says which files those are), so
+# clients never see an index that points at a missing file. With `prune`,
+# objects no target has any more are deleted last, except `preserve` matches.
 #
 # Requests are signed with AWS Signature Version 4, using requests (no SDK).
 import base64
@@ -27,24 +28,60 @@ import lib
 
 
 KEYS = {"generator", "bucket", "endpoint", "region", "credentials", "addressing", "path", "targets", "prune",
-        "preserve", "exclude", "gpg-key", "gpg-passphrase", "public-key"}
+        "preserve", "exclude", "gpg-key", "gpg-passphrase", "rsa-key", "rsa-passphrase", "key-name", "signed-by",
+        "public-key"}
 DEFAULT_PATH = "{target}"
 TIMEOUT = 120
 S3_NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 
-# Upload order: packages, then indexes, then what clients read first
-SIGNED_METADATA = {"InRelease", "Release", "Release.gpg", "repomd.xml", "repomd.xml.asc", "repomd.xml.key"}
-INDEX_RE = re.compile(r"(^|/)(dists|repodata)/|\.(db|files)(\.tar\.[a-z0-9]+)?(\.sig)?$")
-CONTENT_TYPES = {".deb": "application/vnd.debian.binary-package", ".rpm": "application/x-rpm",
-                 ".asc": "text/plain", ".gpg": "application/pgp-signature", ".zst": "application/zstd"}
+# Media types mimetypes doesn't know; the targets' `publish` adds their formats' own
+CONTENT_TYPES = {".asc": "text/plain", ".gpg": "application/pgp-signature", ".zst": "application/zstd"}
+PACKAGE, INDEX, METADATA = 0, 1, 2  # upload order
 
 
-def tier(path):
-    name = path.rsplit("/", 1)[-1]
-    if name in SIGNED_METADATA:
-        return 2
-    return 1 if INDEX_RE.search(path) else 0
+class Layout:
+    """Which files of the bucket are indexes and metadata, by the `publish` of the targets they belong to."""
+
+    def __init__(self, job, targets, paths):
+        self.rules = []
+        undescribed = []
+        for t in targets:
+            publish = t.publish or {}
+            if not publish:
+                undescribed.append(t.name)
+            try:
+                compiled = {key: [re.compile(p) for p in publish.get(key) or ()] for key in ("indexes", "metadata")}
+            except re.error as e:
+                raise lib.DeployError(f"the test results of {t.name} have an invalid 'publish' pattern ({e}): run "
+                                      f"`pkggen test -t {t.name}` again")
+            self.rules.append((paths[t.name], compiled, publish.get("content_types") or {}))
+        if undescribed:
+            job.warn(f"the test results of {', '.join(undescribed)} don't say which files are the repository's "
+                     "indexes, so their files are uploaded in name order: run `pkggen test` again to record it")
+
+    def matching(self, relative):
+        """(path inside the target's folder, patterns, content types) of every target the path belongs to."""
+        for folder, patterns, types in self.rules:
+            if lib.under(relative, folder):
+                yield (relative[len(folder) + 1:] if folder else relative), patterns, types
+
+    def tier(self, relative):
+        result = PACKAGE
+        for inner, patterns, _ in self.matching(relative):
+            if any(p.search(inner) for p in patterns["metadata"]):
+                return METADATA
+            if any(p.search(inner) for p in patterns["indexes"]):
+                result = INDEX
+        return result
+
+    def content_type(self, relative):
+        for _, _, types in self.matching(relative):
+            for suffix in sorted(types, key=len, reverse=True):
+                if relative.endswith(suffix):
+                    return types[suffix]
+        return (CONTENT_TYPES.get(os.path.splitext(relative)[1]) or mimetypes.guess_type(relative)[0]
+                or "application/octet-stream")
 
 
 # --- Credentials ---------------------------------------------------------------------
@@ -183,9 +220,7 @@ class Bucket:
         response = self.request("GET", key)
         return None if response.status_code == 404 else response.content
 
-    def put(self, key, data, metadata):
-        content_type = (CONTENT_TYPES.get(os.path.splitext(key)[1])
-                        or mimetypes.guess_type(key)[0] or "application/octet-stream")
+    def put(self, key, data, metadata, content_type):
         headers = {"Content-Type": content_type,
                    "Content-MD5": base64.b64encode(hashlib.md5(data).digest()).decode("ascii")}
         if metadata:
@@ -257,6 +292,7 @@ def main(job):
     def published(relative):
         return bucket.get(relative) if relative in remote else None
 
+    layout = Layout(job, targets, paths)
     folder = lib.write_staged(staged, os.path.join(job.work_path, "stage"))
     lib.sign_repository(job, folder, published)
 
@@ -266,7 +302,7 @@ def main(job):
             path = os.path.join(root, name)
             files[lib.normalise(os.path.relpath(path, folder))] = path
     changed = sorted((relative for relative, path in files.items() if remote.get(relative) != md5_file(path)),
-                     key=lambda relative: (tier(relative), relative))
+                     key=lambda relative: (layout.tier(relative), relative))
     patterns = [re.compile(p) for p in config.get("preserve") or ()]
     protected = [paths[name] for name in skipped]
     stale = []
@@ -293,7 +329,7 @@ def main(job):
     job.say(f"{summary}")
     for relative in changed:
         with open(files[relative], "rb") as f:
-            bucket.put(relative, f.read(), tier(relative) > 0)
+            bucket.put(relative, f.read(), layout.tier(relative) > PACKAGE, layout.content_type(relative))
     for relative in stale:
         bucket.delete(relative)
     job.say(f"uploaded {len(changed)}, deleted {len(stale)}")

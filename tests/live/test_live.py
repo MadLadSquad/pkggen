@@ -14,7 +14,7 @@ from tests.support.helpers import run_cli
 
 pytestmark = pytest.mark.live
 
-DISTRIBUTIONS = ["arch", "debian", "gentoo", "rpm-based"]
+DISTRIBUTIONS = ["alpine", "arch", "debian", "gentoo", "rpm-based", "void"]
 PACKAGES = ["untitled-cli-parser", "untitled-imgui-framework"]
 
 
@@ -31,7 +31,7 @@ def test_example_against_github(example_project, github_secrets):
     result = run_cli("generate")
     assert result.code == 0, result.err
     # Every package, every distribution (the two overlay packages only for Gentoo), with real repology data
-    assert "Done: 12/12 packages fetched, 42/42 distribution packages generated" in result.err_plain
+    assert "Done: 12/12 packages fetched, 62/62 distribution packages generated" in result.err_plain
     assert "looked up 19 dependencies on repology" in result.err_plain
 
     build = example_project / "pkggen-build"
@@ -63,13 +63,18 @@ def test_repology():
 def test_repology_dependencies_resolve(tmp_path):
     """The real repology data still resolves glfw the way the packaging generators expect."""
     from tests.support.helpers import load_generator, run_generator
-    rp_names = ["arch", "gentoo", "debian_13", "fedora_44", "opensuse_tumbleweed"]
+    rp_names = ["arch", "gentoo", "debian_13", "fedora_44", "opensuse_tumbleweed", "alpine_edge", "void_x86_64"]
     found = run_generator("dependencies", "repology", {"projects": ["glfw"], "repositories": rp_names,
                                                       "user_agent": "pkggen-tests"})
     assert found.code == 0, found.err
     releases = found.json["projects"]["glfw"]
     assert set(rp_names) <= set(releases)
     lib = load_generator("packaging", "lib")
-    assert lib.choose_package("glfw", releases["gentoo"])["srcname"] == "media-libs/glfw"
+    gentoo = load_generator("packaging", "gentoo")
+    assert lib.choose_package("glfw", releases["gentoo"], gentoo.source_name)["srcname"] == "media-libs/glfw"
     assert lib.dev_package(lib.choose_package("glfw", releases["debian_13"]), "glfw", "-dev") == "libglfw3-dev"
     assert lib.dev_package(lib.choose_package("glfw", releases["fedora_44"]), "glfw", "-devel") == "glfw-devel"
+    # Alpine and Void list every subpackage on its own
+    for rp, suffix in (("alpine_edge", "-dev"), ("void_x86_64", "-devel")):
+        package = lib.choose_package("glfw", lib.merge_split_packages(releases[rp]))
+        assert lib.dev_package(package, "glfw", suffix) == f"glfw{suffix}"

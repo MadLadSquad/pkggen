@@ -1,0 +1,53 @@
+{#- The framework and its build tool, UVKBuildTool. Upstream has no plain
+    install step for the framework: it's installed by building an empty
+    project with install-framework: true, whose own files are then removed. -#}
+{% extends "_base/template.tmpl" %}
+{# xbps-src makes /usr/include files 0644, but the applications run the installed export.sh #}
+{% block style %}
+nofixperms=yes
+{% endblock %}
+{% block functions %}
+
+{% include "_base/configure-project.sh" %}
+
+pre_build() {
+	# The framework's pkg-config file, in /usr/lib like the library
+	sed -i 's|^libdir=.*|libdir="${prefix}/lib"|' Framework/cmake/UntitledImGuiFramework.pc.in
+	# The build scripts run make with one job per CPU, which can run out of
+	# memory: let UIMGUI_JOBS set the count (the installed export.sh too, which
+	# builds the applications)
+	sed -i 's/^\([[:space:]]*\)\(cpus\|jobs\)=\$(grep -c processor .*$/&\n\1[ -z "${UIMGUI_JOBS}" ] || \2="${UIMGUI_JOBS}"/' \
+		install.sh export.sh create-project.sh UVKBuildTool/ci.sh
+	grep -q UIMGUI_JOBS export.sh
+}
+
+do_build() {
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	# Builds UVKBuildTool in UVKBuildTool/build
+	./install.sh ci
+	# The empty project that installs the framework
+	./create-project.sh pkg --skip-compilation
+	_configure_project Projects/pkg/uvproj.yaml true
+}
+
+do_install() {
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	(cd UVKBuildTool/build && ./UVKBuildTool --build "$DESTDIR/usr" /usr ../../Projects/pkg)
+	_check_installed Projects/pkg/uvproj.yaml "$DESTDIR/usr/lib"
+	test -e "$DESTDIR/usr/lib/libUntitledImGuiFramework.so"
+	# Only keep the framework, not the project that installed it
+	rm -rf "$DESTDIR"/usr/lib/libpkgLib.so "$DESTDIR"/usr/bin/pkg "$DESTDIR"/usr/share/config/pkg \
+		"$DESTDIR"/usr/include/pkg "$DESTDIR"/usr/{include,share}/utf8cpp
+
+	# UVKBuildTool itself, built again for its system-wide location
+	cmake -B "$wrksrc/uvkbuildtool-system" -S UVKBuildTool \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DUBT_INSTALL=ON \
+		-DUBT_FRAMEWORK_DIR=/usr/include/UntitledImGuiFramework/ \
+		-DUBT_DATA_INSTALL_PREFIX=/usr/share/
+	cmake --build "$wrksrc/uvkbuildtool-system"
+	DESTDIR="$DESTDIR" cmake --install "$wrksrc/uvkbuildtool-system"
+	vlicense LICENSE
+}
+{% endblock %}

@@ -41,11 +41,12 @@ STUB_TESTING = textwrap.dedent("""\
         prepare = "".join("\\nchmod +x /pkggen/repo/" + e["output"] for e in job["packages"] if e["context"].get("chmod"))
         targets.append({
             "name": job["distribution"] + "-" + rp, "rp_name": rp, "image": "example.org/" + rp + ":1",
-            "env": {"TARGET": rp, "MAKEFLAGS": "-j99"}, "repo": "/pkggen/repo",
+            "env": {"TARGET": rp, "MAKEFLAGS": "-j99", "TOOL_JOBS": "-j${PKGGEN_JOBS}"}, "repo": "/pkggen/repo",
             "setup": [step("tools", "install tools on " + job["host_arch"])] + job["test"]["setup"],
             "prepare": [step("prepare", "prepare" + prepare)], "packages": built,
             "finalize": [step("collect", "cp -rL /pkggen/repo /pkggen/out")],
             "post_setup": job["test"]["post-setup"], "collect": "/pkggen/out",
+            "publish": {"indexes": ["^index$"], "content_types": {".pkg": "application/x-pkg"}},
         })
     print(json.dumps({"targets": targets, "skipped": skipped, "warnings": warnings}))
 """)
@@ -187,7 +188,9 @@ def test_success(generators, project, fake_engine, capsys):
     assert run[run.index("--cpus") + 1] == "2.67" and run[run.index("--memory") + 1] == "2730m"
     env = [run[i + 1] for i, arg in enumerate(run) if arg == "-e"]
     assert "TARGET=a1" in env and "PKGGEN_JOBS=2" in env and "MAKEFLAGS=-j99" in env  # targets override the defaults
-    assert "DEB_BUILD_OPTIONS=parallel=2" in env
+    assert "TOOL_JOBS=-j2" in env  # ${PKGGEN_JOBS} is the job count
+    # The build tools' own variables are the testing generators' business
+    assert not [e for e in env if e.startswith(("MAKEOPTS=", "DEB_BUILD_OPTIONS=", "RPM_BUILD_NCPUS="))]
 
     assert container_scripts(fake_engine, "a1") == [
         "install tools on amd64", "user setup", "prepare",
@@ -204,6 +207,8 @@ def test_success(generators, project, fake_engine, capsys):
     assert results["alpha-a1"]["ok"] is True and results["alpha-a1"]["distribution"] == "alpha"
     assert results["alpha-a1"]["output"] == "alpha-a1"
     assert results["alpha-a1"]["packages"] == {"one": {"version": "1.0", "ok": True}, "two": {"version": "1.0", "ok": True}}
+    # How deployment generators upload its repository, from the testing generator
+    assert results["alpha-a1"]["publish"] == {"indexes": ["^index$"], "content_types": {".pkg": "application/x-pkg"}}
     log =(output / "alpha-a1.log").read_text()
     assert "==> setup: tools\n+ install tools on amd64" in log
     assert "==> build: build one\n+ build one from one.json" in log
@@ -318,6 +323,15 @@ def test_target_filter(generators, project, fake_engine, capsys):
     assert "packaging for beta\n" in strip_ansi(capsys.readouterr().err)
     with pytest.raises(utils.GenericError, match=r"Unknown test target\(s\): zz \(available: alpha-a1, alpha-a2, beta-b1\)"):
         testing.test(target_filter=["zz"])
+
+
+def test_release_of_a_chosen_target():
+    """-t asks the testing generator for rp-names, but for target names when an rp-name has several targets."""
+    known = [{"distribution": "void", "name": "void-glibc", "rp_name": "void_x86_64"},
+             {"distribution": "void", "name": "void-musl", "rp_name": "void_x86_64"},
+             {"distribution": "alpine", "name": "alpine-3.24", "rp_name": "alpine_3_24"},
+             {"distribution": "other", "name": "other"}]
+    assert [testing.release_of(t, known) for t in known] == ["void-glibc", "void-musl", "alpine_3_24", "other"]
 
 
 def test_target_filter_with_targets_this_host_cant_run(generators, project, fake_engine, capsys):

@@ -67,12 +67,13 @@ class Failure:
 
 class Target:
     """A distribution to package for."""
-    def __init__(self, name, script, repo_path, repository, rp_names=()):
+    def __init__(self, name, script, repo_path, repository, rp_names=(), aliases=None):
         self.name = name
         self.script = script
         self.repo_path = repo_path
         self.repository = repository
         self.rp_names = list(rp_names)  # its releases in distributions.yaml
+        self.aliases = dict(aliases or {})  # {target name: rp-name} of its `targets`
 
 
 def deep_merge(base, override):
@@ -251,7 +252,7 @@ def load_packages(config, package_filter):
                 merged["dependencies"] = dependencies.merge(defaults["dependencies"], package["dependencies"])
             package = merged
             if ("distributions" in package or "dependencies" in package) and not known_distributions:
-                known_distributions.update({dist["name"]: list(dist.get("rp-names") or [])
+                known_distributions.update({dist["name"]: utils.release_names(dist)
                                             for dist in utils.load_distributions()})
             errors += check_package(package, known_distributions)
             packages.append((package, script))
@@ -272,7 +273,9 @@ def load_targets(config, distribution_filter, failures):
     packaging_dir = os.path.join(utils.get_generators_path(), "packaging")
     repositories = config.get("repositories") or {}
 
-    rp_names = {dist["name"]: list(dist.get("rp-names") or []) for dist in utils.load_distributions()}
+    distributions = utils.load_distributions()
+    rp_names = {dist["name"]: list(dist.get("rp-names") or []) for dist in distributions}
+    aliases = {dist["name"]: utils.target_aliases(dist) for dist in distributions}
     candidates = [name for name in rp_names if os.path.isfile(os.path.join(packaging_dir, f"{name}.py"))]
 
     if distribution_filter:
@@ -294,7 +297,7 @@ def load_targets(config, distribution_filter, failures):
                                                     f"yet. Run `pkggen gen-repo {dist}` first", dist))
             continue
         targets.append(Target(dist, os.path.join(packaging_dir, f"{dist}.py"), repo_path, repositories[dist] or {},
-                              rp_names[dist]))
+                              rp_names[dist], aliases[dist]))
     return targets
 
 
@@ -533,7 +536,7 @@ def run_pipeline(config, package_filter=None, distribution_filter=None):
             if isinstance(test_config.get("distributions"), dict) else None
         releases = dependencies.releases(allowed.get(target.name) if allowed else None, target.rp_names,
                                          test_spec.get("versions") if isinstance(test_spec, dict) else None,
-                                         release_key)
+                                         release_key, target.aliases)
         return run_packaging(target, context, releases,
                              dependencies.for_job(context, target.name, releases, found, local))
 

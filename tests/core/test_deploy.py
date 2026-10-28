@@ -4,6 +4,8 @@ import pytest
 import yaml
 
 import deploy
+import generate
+import testing
 import utils
 from tests.deployment.conftest import git, upstream, write_tree  # noqa: F401
 from tests.support.helpers import run_cli, strip_ansi
@@ -110,12 +112,14 @@ def test_targets_of_another_distribution(project, upstream):
         deploy.deploy()
 
 
-def test_missing_git(project, upstream, monkeypatch):
+def test_targets_carry_their_publish(project, upstream):
+    """The testing generator's description of the repository reaches the deployment generators."""
+    publish = {"indexes": ["(^|/)repodata/"]}
     project({"rpm-based": {"generator": "git", "url": upstream().url, **IDENTITY}},
-            results={"fedora-44": result("rpm-based")})
-    monkeypatch.setattr(deploy.shutil, "which", lambda name: None)
-    with pytest.raises(utils.GenericError, match="pkggen deploy needs git"):
-        deploy.deploy()
+            results={"fedora-44": result("rpm-based", publish=publish), "fedora-43": result("rpm-based")})
+    deployments = deploy.load_deployments(generate.load_config(), None)
+    (dep,) = deploy.select_targets(deployments, testing.load_results(), None, False)
+    assert {t["name"]: t["publish"] for t in dep.targets} == {"fedora-43": {}, "fedora-44": publish}
 
 
 # --- Deploying -----------------------------------------------------------------------------

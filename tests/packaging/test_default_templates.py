@@ -11,14 +11,18 @@ import pytest
 from tests.packaging.conftest import artifact, context
 from tests.support import paths
 
-DISTRIBUTIONS = ["arch", "debian", "gentoo", "rpm-based"]
+DISTRIBUTIONS = ["alpine", "arch", "debian", "gentoo", "rpm-based", "void"]
 
 FULL_DIST_BLOCKS = {
+    "alpine": {"depends": ["a"], "makedepends": ["b"], "pkgrel": 2, "arch": "noarch", "options": "!check !strip",
+               "pkgver": "1.2.0_p1"},
     "arch": {"depends": ["a"], "makedepends": ["b"], "pkgrel": 2, "arch": ["x86_64"]},
     "debian": {"section": "libs", "build-depends": ["b"], "depends": ["a"], "revision": 2, "architecture": "all",
                "long-description": "Long", "copyright": "2020 Me"},
     "gentoo": {"category": "ude-apps", "depend": ["a/b"], "rdepend": ["c/d"], "bdepend": ["e/f"], "keywords": "amd64"},
     "rpm-based": {"build-requires": ["b"], "requires": ["a"], "release": 2, "long-description": "Long"},
+    "void": {"depends": ["a"], "makedepends": ["b-devel"], "hostmakedepends": ["c"], "revision": 2,
+             "archs": "noarch", "version": "1.2.0.1"},
 }
 
 
@@ -58,7 +62,7 @@ def test_default_templates_render(dist, kind, package_with, make_job, tmp_path):
 
 
 # The debian templates don't reference the source folder
-@pytest.mark.parametrize("dist", ["arch", "gentoo", "rpm-based"])
+@pytest.mark.parametrize("dist", ["alpine", "arch", "gentoo", "rpm-based", "void"])
 def test_source_dir_overrides_the_guessed_folder(dist, package_with, make_job, tmp_path):
     assert package_with(dist, make_job(dist, package=full_package(dist))).code == 0
     assert "custom-dir" in "\n".join(rendered_files(tmp_path).values())

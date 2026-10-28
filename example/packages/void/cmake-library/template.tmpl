@@ -1,0 +1,32 @@
+{#- The UntitledDesktop libraries: CMake projects that install with -DUIMGUI_INSTALL=ON,
+    built with xbps-src's cmake build style. Extra CMake options come from the
+    package's `cmake: { args: [...] }` in pkggen.yaml. -#}
+{% extends "_base/template.tmpl" %}
+{% block style %}
+build_style=cmake
+configure_args={{ (["-DUIMGUI_INSTALL=ON"] + (cmake | default({})).args | default([])) | join(" ") | dquote }}
+{% endblock %}
+{% block functions %}
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}
+{% endblock %}

@@ -1,0 +1,6 @@
+{#- An UntitledImGuiFramework application with a Rust handwriting recognition library. -#}
+{% extends "uimgui-app/template.tmpl" %}
+{% block build_parts %}
+	# hanzi_lookup: a Rust library whose crates are vendored in the release tarball
+	(cd hanzi_lookup && cargo build --release --offline --locked)
+{% endblock %}

@@ -13,7 +13,7 @@ from tests.support.example import EVERYWHERE, EXAMPLE_DEPENDENCIES, PACKAGES, ex
 from tests.support.golden import assert_golden, snapshot
 from tests.support.helpers import run_cli
 
-DISTRIBUTIONS = ["arch", "debian", "gentoo", "rpm-based"]
+DISTRIBUTIONS = ["alpine", "arch", "debian", "gentoo", "rpm-based", "void"]
 GENTOO_ONLY = ["abcccid", "btrustbiss"]
 JOBS = len(EVERYWHERE) * len(DISTRIBUTIONS) + len(GENTOO_ONLY)
 DONE_LINE = re.compile(r"✓ \[(?P<dist>[\w-]+)\] (?P<name>[\w-]+) (?P<version>\S+) → (?P<output>\S+) "
@@ -51,7 +51,7 @@ def test_full_pipeline(request, project, http_subprocess):
     result = run_cli("generate")
     assert result.code == 0, result.err
     err = result.err_plain
-    assert "Fetching 12 packages, packaging for rpm-based, debian, arch, gentoo" in err
+    assert "Fetching 12 packages, packaging for rpm-based, debian, arch, gentoo, alpine, void" in err
     for name, (_, _, tag) in PACKAGES.items():
         assert f"✓ fetched {name} {tag.lstrip('v')} (1 artifact)" in err
     assert "✓ fetched btrustbiss 3.46 (1 artifact)" in err
@@ -59,7 +59,7 @@ def test_full_pipeline(request, project, http_subprocess):
     assert "default templates were created" not in err
     assert "Warning" not in err
     assert f"Done: 12/12 packages fetched, {JOBS}/{JOBS} distribution packages generated " \
-           "(rpm-based, debian, arch, gentoo)." in err
+           "(rpm-based, debian, arch, gentoo, alpine, void)." in err
     assert sorted((d["dist"], d["name"]) for d in done_lines(result)) == sorted(
         [(dist, name) for dist in DISTRIBUTIONS for name in EVERYWHERE] + [("gentoo", name) for name in GENTOO_ONLY])
 

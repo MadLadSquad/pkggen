@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Renders packages/arch/<name>/ into <repo>/<name>/ (a PKGBUILD folder, AUR style).
 import os
+import re
+
 import lib
 
 REQUIRED = ["PKGBUILD.tmpl"]
@@ -12,10 +14,17 @@ DEPENDENCY_FIELDS = {
     "runtime": [("depends", "main")],
     "development": [("depends", "main")],
 }
+# pkgver can't contain '-', ':', '/' or whitespace
+pkgver = lib.substitute(r"[-:/\s]", "_")
+FILTERS = {"pkgver": pkgver}
+# Split packages a dependency never means (see lib.drop_unwanted())
+NOISE = ("-doc", "-docs", "-src")
+# Packages for other targets: 32-bit multilib and the MinGW cross toolchain
+OTHER_TARGETS = re.compile(r"^(lib32-|mingw-w64-)")
 
 
 def pick(job, dep, package, kind):
-    return package.get("binname") or lib.basename(package.get("srcname")) or None
+    return package.get("binname") or lib.srcname(package) or None
 
 
 def render(job, dep, names):
@@ -26,11 +35,11 @@ def render(job, dep, names):
 
 def main(job):
     job.context["arches"] = lib.architectures(job, ARCHITECTURES, ["any"])
-    lib.dependencies(job, DEPENDENCY_FIELDS, pick, render)
+    lib.dependencies(job, DEPENDENCY_FIELDS, pick, render, noise=NOISE, other_targets=OTHER_TARGETS)
     lib.ensure_templates(job, REQUIRED)
     out = os.path.join(job.repository_path, job.name)
     job.output = out
-    lib.render_tree(job, lambda rel: os.path.join(out, rel))
+    lib.render_tree(job, lambda rel: os.path.join(out, rel), filters=FILTERS)
 
 
 if __name__ == "__main__":

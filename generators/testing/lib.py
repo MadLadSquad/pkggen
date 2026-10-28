@@ -22,15 +22,23 @@
 #     "name": "debian-13", "rp_name": "debian_13", "image": "docker.io/library/debian:trixie",
 #     "platform": null,                          // e.g. "linux/amd64" to force one
 #     "data_images": [ { "image": "...", "path": "/var/db/repos/gentoo" } ],  // mounted with --volumes-from
-#     "env": { "DEBIAN_FRONTEND": "noninteractive" },
+#     "env": { "DEBIAN_FRONTEND": "noninteractive",   // ${PKGGEN_JOBS} becomes the job count pkggen picked
+#              "DEB_BUILD_OPTIONS": "parallel=${PKGGEN_JOBS}" },   // (also set as PKGGEN_JOBS and MAKEFLAGS)
 #     "repo": "/pkggen/repo",                    // where pkggen copies the repository in
 #     "setup":    [steps],                       // before the repository is copied in
 #     "prepare":  [steps],                       // after it's copied in
 #     "packages": [ { "name": "foo", "build": [steps], "install": [steps] } ],
 #     "finalize": [steps],                       // index the finished repository into `collect`
 #     "post_setup": [steps],
-#     "collect": "/pkggen/out"                   // copied out to pkggen-build/test/<name>/
+#     "collect": "/pkggen/out",                  // copied out to pkggen-build/test/<name>/
+#     "publish": {                               // how deployment generators upload what's collected:
+#       "indexes": [regex],                      //   files that list the packages (uploaded after them)
+#       "metadata": [regex],                     //   files clients read first, e.g. signed ones (uploaded last)
+#       "content_types": { ".deb": "..." }       //   media types by file name suffix
+#     }
 #   }
+# The `publish` regexes are searched in paths relative to `collect`; pkggen
+# records them in results.json for `pkggen deploy`.
 # A step is { "name": "...", "run": "<sh script>", "user": null, "workdir": null }.
 # Each step runs in its own `sh -exc`, so `cd` and variables don't carry over.
 import json
@@ -42,6 +50,8 @@ import traceback
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
 
 # Paths inside the containers
+# In a target's `env`, replaced by the job count pkggen picked for each container
+JOBS = "${PKGGEN_JOBS}"
 REPO = "/pkggen/repo"
 OUT = "/pkggen/out"
 WORK = "/pkggen/work"
@@ -154,36 +164,47 @@ def collect_step():
 
 # --- Targets -----------------------------------------------------------------
 
+def table_specs(table):
+    """[(rp-name, spec)] of a {rp-name: spec or [specs]} table, in its order.
+
+    A list gives one rp-name several targets (Void's glibc and musl builds are
+    both repology's void_x86_64; distributions.yaml's `targets` names them).
+    """
+    return [(rp, spec) for rp, value in table.items() for spec in (value if isinstance(value, list) else [value])]
+
+
 def select_targets(job, table):
-    """The (rp-name, spec) pairs to test, from a {rp-name: spec} table.
+    """The (rp-name, spec) pairs to test, from a {rp-name: spec or [specs]} table.
 
     Every spec has a `name` (the target name), an `image` and the host
     architectures it runs on (`arches`). Without `versions`, every rp-name
-    of the distribution is tested.
+    of the distribution is tested. An rp-name in `versions` selects all of
+    its targets, a target name only that one.
     """
-    by_name = {spec["name"]: rp for rp, spec in table.items()}
+    specs = table_specs(table)
     if job.versions is None:
         wanted = []
         for rp in job.rp_names:
             if rp in table:
-                wanted.append(rp)
+                wanted += [entry for entry in specs if entry[0] == rp]
             else:
                 job.warn(f"{job.distribution} has no container image for {rp}, so it's not tested")
     else:
         wanted, unknown = [], []
         for version in job.versions:
-            rp = version if version in table else by_name.get(version)
-            if rp is None:
+            found = [entry for entry in specs if version in (entry[0], entry[1]["name"])]
+            if not found:
                 unknown.append(str(version))
-            elif rp not in wanted:
-                wanted.append(rp)
+            wanted += [entry for entry in found if entry not in wanted]
         if unknown:
+            # The rp-names, and the target names of those with several targets
+            available = ", ".join(list(table) + [spec["name"] for rp, value in table.items()
+                                                 if isinstance(value, list) for spec in value])
             raise TestingError(f"unknown {job.distribution} version(s) in 'test.distributions.{job.distribution}"
-                               f".versions': {', '.join(unknown)}. Available: {', '.join(table)}")
+                               f".versions': {', '.join(unknown)}. Available: {available}")
 
     result = []
-    for rp in wanted:
-        spec = table[rp]
+    for rp, spec in wanted:
         if job.host_arch not in spec.get("arches", ["amd64", "arm64"]):
             job.warn(f"{spec['name']} has no {job.host_arch} container image, so it's skipped")
             job.skipped.append({"name": spec["name"], "rp_name": rp})
@@ -192,7 +213,7 @@ def select_targets(job, table):
     return result
 
 
-def target(job, rp_name, spec, *, setup, prepare, packages, finalize, env=None, data_images=None):
+def target(job, rp_name, spec, *, setup, prepare, packages, finalize, env=None, data_images=None, publish=None):
     return {
         "name": spec["name"],
         "rp_name": rp_name,
@@ -207,6 +228,7 @@ def target(job, rp_name, spec, *, setup, prepare, packages, finalize, env=None, 
         "finalize": finalize,
         "post_setup": user_steps(job, "post-setup"),
         "collect": OUT,
+        "publish": publish or {},
     }
 
 

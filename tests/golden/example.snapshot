@@ -1,3 +1,785 @@
+==> alpine/.gitignore (30 bytes)
+src/
+pkg/
+*.apk
+*.tar.*
+*.log
+
+==> alpine/favicon.png (4179 bytes)
+<binary, 4179 bytes>
+
+==> alpine/index.html (4703 bytes)
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="The official Alpine Linux repository for the UntitledDesktopEnvironment and related projects.">
+		<meta name="author" content="MadLadSquad">
+		<link rel="icon" type="image/png" href="./favicon.png">
+		<title>UntitledDesktop APK Repository</title>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet" type="text/css">
+
+		<style>
+			body {
+				background-color: #E8EEF2;
+				color: #37293A;
+				max-width: 1360px;
+			}
+			h1, h2, h3, h4, h5, h6, p, a, li {
+				font-family: Ubuntu, sans-serif;
+			}
+
+			a {
+				text-decoration: none;
+				color: #1d84b5;
+			}
+
+			.inline-code {
+				display: inline;
+				border: 1px solid #37293A;
+				border-radius: 0.25rem;
+				background-color: #37293A;
+				color: #e8eef2;
+				padding-left: 0.25rem;
+				padding-right: 0.25rem;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Welcome to the UntitledDesktopEnvironment Alpine Linux repository</h1>
+		<p>This repository is used for hosting all UntitledDesktopEnvironment packages, as well as all <a href="https://madladsquad.com">MadLadSquad</a> applications, for Alpine Linux.</p>
+
+		<p>Packages are built for Alpine Linux edge, 3.24 and 3.23, for x86_64 and aarch64. The packages and the indexes are signed with our RSA key: download it into <code class="inline-code">/etc/apk/keys/</code>, so apk trusts the repository:</p>
+		<pre class="sourceCode language-bash"><code class="sourceCode language-bash">wget -O /etc/apk/keys/madladsquad.rsa.pub https://apks.madladsquad.com/madladsquad.rsa.pub</code></pre>
+
+		<p>Then add the repository of your release to <code class="inline-code">/etc/apk/repositories</code> (<code class="inline-code">alpine-edge</code>, <code class="inline-code">alpine-3.24</code> or <code class="inline-code">alpine-3.23</code>) and install the packages:</p>
+		<pre class="sourceCode language-bash"><code class="sourceCode language-bash">echo "https://apks.madladsquad.com/alpine-3.24" >> /etc/apk/repositories
+apk update
+apk add untitled-imgui-framework</code></pre>
+
+		<h2>Available packages:</h2>
+		<ul>
+			<li>untitled-game-system-manager - Provides <a href="https://github.com/MadLadSquad/UntitledGameSystemManager">UntitledGameSystemManager</a>, a manager for containerised Linux game systems</li>
+			<li>untitled-ibus-handwriting - Provides <a href="https://github.com/MadLadSquad/UntitledIBusHandwriting">UntitledIBusHandwriting</a>, an IBus handwriting input method for IBus</li>
+			<li>ude-session-logout - Provides <a href="https://github.com/MadLadSquad/UntitledDESessionLogout">UntitledDESessionLogout</a>, a session logout utility for the UntitledDesktopEnvironment</li>
+			<li>untitled-imgui-framework - Provides <a href="https://github.com/MadLadSquad/UntitledImGuiFramework">UntitledImGuiFramework</a>, an independent cross-platform desktop application development toolkit</li>
+			<li>untitled-dbus-utils - Provides <a href="https://github.com/MadLadSquad/UntitledDBusUtils">UntitledDBusUtils</a>, a C++ wrapper on top of the low level D-Bus C API</li>
+			<li>untitled-exec - Provides <a href="https://github.com/MadLadSquad/UntitledExec">UntitledExec</a>, a cross-platform fork and exec/CreateProcess wrapper library</li>
+			<li>untitled-cli-parser - Provides <a href="https://github.com/MadLadSquad/UntitledCLIParser">UntitledCLIParser</a>, a parser for CLI arguments</li>
+			<li>untitled-i18n - Provides <a href="https://github.com/MadLadSquad/UntitledI18N">UntitledI18N</a>, a i18n library</li>
+			<li>untitled-open - Provides <a href="https://github.com/MadLadSquad/UntitledOpen">UntitledOpen</a>, a file dialog, URL and file opener library</li>
+			<li>untitled-xdg-basedir - Provides <a href="https://github.com/MadLadSquad/UntitledXDGBasedir">UntitledXDGBasedir</a>, a better implementation of the XDG base directory specification</li>
+		</ul>
+		<footer>
+			<p>A <a href="https://madladsquad.com">MadLadSquad</a> / <a href="https://heapforge.com">Heapforge</a> project. Copyright &#169; <a href="https://heapforge.com">Heapforge Ltd.</a> 2025 - 2026 &bull; <a href="https://madladsquad.com/privacy-policy">Privacy Policy</a>.</p>
+		</footer>
+	</body>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark-reasonable.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+	<script>hljs.highlightAll();</script>
+</html>
+
+
+==> alpine/ude-session-logout/APKBUILD (3152 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/uimgui-app/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=ude-session-logout
+pkgver=2.3.0.0
+pkgrel=0
+pkgdesc="A log out prompt for the UntitledDesktopEnvironment"
+url="https://github.com/MadLadSquad/UntitledDESessionLogout"
+arch="x86_64 aarch64"
+license="MIT"
+depends="untitled-imgui-framework"
+makedepends="sed cmake pkgconf untitled-imgui-framework"
+# Upstream has no tests
+options="!check"
+source="
+	ude-session-logout-2.3.0.0.tar.xz::https://github.com/MadLadSquad/UntitledDESessionLogout/releases/download/v2.3.0.0/ude-session-logout-2.3.0.0.tar.xz
+	"
+builddir="$srcdir"/"ude-session-logout-2.3.0.0"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, which
+# abuild rejects, so everything goes to lib/ instead. The directories are
+# compiled into the application. abuild runs this with busybox sh: no bashisms.
+_configure_project() {
+	local file="$1" framework="${2:-false}"
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# The job count abuild's MAKEFLAGS asks for (JOBS in abuild.conf), for
+# UIMGUI_JOBS (the framework's scripts otherwise use every CPU). Empty without one.
+_make_jobs() {
+	printf '%s\n' "$MAKEFLAGS" | sed -n 's/.*-j *\([0-9][0-9]*\).*/\1/p'
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		echo "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)" >&2
+		return 1
+	fi
+}
+
+build() {
+	# abuild makes CMake use Ninja, but UVKBuildTool runs make
+	export CMAKE_GENERATOR="Unix Makefiles"
+	UVKBuildTool --generate "$builddir"
+	_configure_project uvproj.yaml
+}
+
+package() {
+	# UVKBuildTool compiles and installs in one step
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	UVKBuildTool --build "$pkgdir/usr" /usr "$builddir"
+	_check_installed uvproj.yaml "$pkgdir/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$pkgdir"/usr/include/utf8cpp "$pkgdir"/usr/share/utf8cpp
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+1c853c10de2d2d3d7d87617eb796f445e7b322a8d1075b82f404cf638e0e3709145c00916a4e28729e95855265abf585ffcce91d2f8b321a8c1af365ad4e2410  ude-session-logout-2.3.0.0.tar.xz
+"
+
+==> alpine/untitled-cli-parser/APKBUILD (2078 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/cmake-library/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-cli-parser
+pkgver=6.1.0.0
+pkgrel=0
+pkgdesc="C and C++ parser for CLI arguments"
+url="https://github.com/MadLadSquad/UntitledCLIParser"
+arch="x86_64 aarch64"
+license="MIT"
+depends=""
+makedepends="sed samurai cmake pkgconf"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-cli-parser-6.1.0.0.tar.xz::https://github.com/MadLadSquad/UntitledCLIParser/releases/download/v6.1.0.0/untitled-cli-parser-6.1.0.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-cli-parser-6.1.0.0"
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+276f3603bf80f1d9b621a16c88d23e2346921c2fd956046bf9a35fa8d0eae6faab11c89e4cb52be9bcd86e70fd3951e484c3da64059304b0636330bac1101a3f  untitled-cli-parser-6.1.0.0.tar.xz
+"
+
+==> alpine/untitled-dbus-utils/APKBUILD (2126 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/cmake-library/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-dbus-utils
+pkgver=2.2.0.0
+pkgrel=0
+pkgdesc="Type and memory safe C++ wrapper around the low level D-Bus C API"
+url="https://github.com/MadLadSquad/UntitledDBusUtils"
+arch="x86_64 aarch64"
+license="MIT"
+depends="dbus-dev"
+makedepends="sed samurai cmake pkgconf dbus-dev"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-dbus-utils-2.2.0.0.tar.xz::https://github.com/MadLadSquad/UntitledDBusUtils/releases/download/v2.2.0.0/untitled-dbus-utils-2.2.0.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-dbus-utils-2.2.0.0"
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+fa4a61099cc0f7af1b91869cc659f1e11ec5ec3b071567ff1bccdb1fb8dc855db3332805b7a0646da18f281c87236a2314f6cc9eaad291dbe9469a2888662413  untitled-dbus-utils-2.2.0.0.tar.xz
+"
+
+==> alpine/untitled-exec/APKBUILD (2083 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/cmake-library/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-exec
+pkgver=5.0.0.1
+pkgrel=0
+pkgdesc="Cross-platform C and C++ library for running applications as separate processes"
+url="https://github.com/MadLadSquad/UntitledExec"
+arch="x86_64 aarch64"
+license="MIT"
+depends=""
+makedepends="sed samurai cmake pkgconf"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-exec-5.0.0.1.tar.xz::https://github.com/MadLadSquad/UntitledExec/releases/download/v5.0.0.1/untitled-exec-5.0.0.1.tar.xz
+	"
+builddir="$srcdir"/"untitled-exec-5.0.0.1"
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+2b8598d47715ca2a5b289c2eb03a446d2e608b3e45400e1222ed6a941561b431deeb8f2b4e389f3328b732993b28b2f83c57b8d33f4636482fb9ff3a159a6e0d  untitled-exec-5.0.0.1.tar.xz
+"
+
+==> alpine/untitled-game-system-manager/APKBUILD (3618 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/untitled-game-system-manager/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-game-system-manager
+pkgver=2.9.1.0
+pkgrel=0
+pkgdesc="A manager for containerised Linux gaming systems based on Incus"
+url="https://github.com/MadLadSquad/UntitledGameSystemManager"
+arch="x86_64 aarch64"
+license="MIT"
+depends="incus xhost untitled-imgui-framework"
+makedepends="sed cmake pkgconf go>=1.25 untitled-imgui-framework"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-game-system-manager-2.9.1.0.tar.xz::https://github.com/MadLadSquad/UntitledGameSystemManager/releases/download/v2.9.1.0/untitled-game-system-manager-2.9.1.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-game-system-manager-2.9.1.0"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, which
+# abuild rejects, so everything goes to lib/ instead. The directories are
+# compiled into the application. abuild runs this with busybox sh: no bashisms.
+_configure_project() {
+	local file="$1" framework="${2:-false}"
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# The job count abuild's MAKEFLAGS asks for (JOBS in abuild.conf), for
+# UIMGUI_JOBS (the framework's scripts otherwise use every CPU). Empty without one.
+_make_jobs() {
+	printf '%s\n' "$MAKEFLAGS" | sed -n 's/.*-j *\([0-9][0-9]*\).*/\1/p'
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		echo "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)" >&2
+		return 1
+	fi
+}
+
+build() {
+	# abuild makes CMake use Ninja, but UVKBuildTool runs make
+	export CMAKE_GENERATOR="Unix Makefiles"
+	# The Incus bindings: a C shared library written in Go, with vendored modules
+	export GOCACHE="$srcdir/go-cache" GOPATH="$srcdir/go"
+	export CGO_CPPFLAGS="$CPPFLAGS" CGO_CFLAGS="$CFLAGS" CGO_CXXFLAGS="$CXXFLAGS" CGO_LDFLAGS="$LDFLAGS"
+	(cd IncusBindings && go build -mod=vendor -trimpath -modcacherw -buildmode=c-shared \
+		-o libUGM_Incus_InternalFuncs.so .)
+	UVKBuildTool --generate "$builddir"
+	_configure_project uvproj.yaml
+}
+
+package() {
+	# UVKBuildTool compiles and installs in one step
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	UVKBuildTool --build "$pkgdir/usr" /usr "$builddir"
+	_check_installed uvproj.yaml "$pkgdir/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$pkgdir"/usr/include/utf8cpp "$pkgdir"/usr/share/utf8cpp
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+29f7eb2680b7825b1ee93a725ef904a2ba880d141dc89c0effde22e950f76238bfd46c47809d734a8cbf20b6820d2b726268b8ae969955258ad60633d825e540  untitled-game-system-manager-2.9.1.0.tar.xz
+"
+
+==> alpine/untitled-i18n/APKBUILD (2088 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/cmake-library/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-i18n
+pkgver=1.6.2.0
+pkgrel=0
+pkgdesc="Next generation C and C++ internationalisation library"
+url="https://github.com/MadLadSquad/UntitledI18N"
+arch="x86_64 aarch64"
+license="MIT"
+depends=""
+makedepends="sed samurai cmake pkgconf"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-i18n-1.6.2.0.tar.xz::https://github.com/MadLadSquad/UntitledI18N/releases/download/v1.6.2.0/untitled-i18n-1.6.2.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-i18n-1.6.2.0"
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON \
+		'-DBUILD_SHARED_LIBS=OFF'
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+b2d9b437476daa7e3b637fcf24504afa93f4ce86cf4d3322415381b326383729c144af899e3a5a2158656e19523923f6ae020501f2303a587830db2e46eb3826  untitled-i18n-1.6.2.0.tar.xz
+"
+
+==> alpine/untitled-ibus-handwriting/APKBUILD (3362 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/untitled-ibus-handwriting/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-ibus-handwriting
+pkgver=1.5.1.0
+pkgrel=0
+pkgdesc="A handwriting recognition input method for IBus"
+url="https://github.com/MadLadSquad/UntitledIBusHandwriting"
+arch="x86_64 aarch64"
+license="MIT"
+depends="ibus untitled-imgui-framework"
+makedepends="sed cmake pkgconf cargo ibus-dev untitled-imgui-framework"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-ibus-handwriting-1.5.1.0.tar.xz::https://github.com/MadLadSquad/UntitledIBusHandwriting/releases/download/v1.5.1.0/untitled-ibus-handwriting-1.5.1.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-ibus-handwriting-1.5.1.0"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, which
+# abuild rejects, so everything goes to lib/ instead. The directories are
+# compiled into the application. abuild runs this with busybox sh: no bashisms.
+_configure_project() {
+	local file="$1" framework="${2:-false}"
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# The job count abuild's MAKEFLAGS asks for (JOBS in abuild.conf), for
+# UIMGUI_JOBS (the framework's scripts otherwise use every CPU). Empty without one.
+_make_jobs() {
+	printf '%s\n' "$MAKEFLAGS" | sed -n 's/.*-j *\([0-9][0-9]*\).*/\1/p'
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		echo "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)" >&2
+		return 1
+	fi
+}
+
+build() {
+	# abuild makes CMake use Ninja, but UVKBuildTool runs make
+	export CMAKE_GENERATOR="Unix Makefiles"
+	# hanzi_lookup: a Rust library whose crates are vendored in the release tarball
+	(cd hanzi_lookup && cargo build --release --offline --locked)
+	UVKBuildTool --generate "$builddir"
+	_configure_project uvproj.yaml
+}
+
+package() {
+	# UVKBuildTool compiles and installs in one step
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	UVKBuildTool --build "$pkgdir/usr" /usr "$builddir"
+	_check_installed uvproj.yaml "$pkgdir/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$pkgdir"/usr/include/utf8cpp "$pkgdir"/usr/share/utf8cpp
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+470f8f03205005290b1986bb825e4fcfbd5ea0887caaae85e5ad6d73e74beeb54a43ab16197b4e40ff7558359274453ab0e69880922000f81bb3ec8ad6612910  untitled-ibus-handwriting-1.5.1.0.tar.xz
+"
+
+==> alpine/untitled-imgui-framework/APKBUILD (4975 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/untitled-imgui-framework/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-imgui-framework
+pkgver=2.5.0.1
+pkgrel=0
+pkgdesc="Cross-platform desktop application framework based on dear imgui"
+url="https://github.com/MadLadSquad/UntitledImGuiFramework"
+arch="x86_64 aarch64"
+license="MIT"
+depends="bash utfcpp vulkan-headers vulkan-loader-dev glfw-dev>=3.4 freetype-dev fontconfig-dev mesa-dev wayland-dev libx11-dev libxrandr-dev untitled-dbus-utils untitled-cli-parser untitled-exec untitled-i18n untitled-open untitled-xdg-basedir"
+makedepends="sed bash cmake pkgconf utfcpp vulkan-headers vulkan-loader-dev glfw-dev>=3.4 freetype-dev fontconfig-dev mesa-dev wayland-dev libx11-dev libxrandr-dev untitled-dbus-utils untitled-cli-parser untitled-exec untitled-i18n untitled-open untitled-xdg-basedir"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-imgui-framework-2.5.0.1.tar.xz::https://github.com/MadLadSquad/UntitledImGuiFramework/releases/download/v2.5.0.1/untitled-imgui-framework-2.5.0.1.tar.xz
+	"
+builddir="$srcdir"/"untitled-imgui-framework-2.5.0.1"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, which
+# abuild rejects, so everything goes to lib/ instead. The directories are
+# compiled into the application. abuild runs this with busybox sh: no bashisms.
+_configure_project() {
+	local file="$1" framework="${2:-false}"
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# The job count abuild's MAKEFLAGS asks for (JOBS in abuild.conf), for
+# UIMGUI_JOBS (the framework's scripts otherwise use every CPU). Empty without one.
+_make_jobs() {
+	printf '%s\n' "$MAKEFLAGS" | sed -n 's/.*-j *\([0-9][0-9]*\).*/\1/p'
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		echo "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)" >&2
+		return 1
+	fi
+}
+
+prepare() {
+	default_prepare
+	# The framework's pkg-config file, in /usr/lib like the library
+	sed -i 's|^libdir=.*|libdir="${prefix}/lib"|' Framework/cmake/UntitledImGuiFramework.pc.in
+	# The build scripts run make with one job per CPU, which can run out of
+	# memory: let UIMGUI_JOBS set the count (the installed export.sh too, which
+	# builds the applications)
+	sed -i 's/^\([[:space:]]*\)\(cpus\|jobs\)=\$(grep -c processor .*$/&\n\1[ -z "${UIMGUI_JOBS}" ] || \2="${UIMGUI_JOBS}"/' \
+		install.sh export.sh create-project.sh UVKBuildTool/ci.sh
+	grep -q UIMGUI_JOBS export.sh
+}
+
+build() {
+	# abuild makes CMake use Ninja, but the framework's scripts and UVKBuildTool run make
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	# Builds UVKBuildTool in UVKBuildTool/build
+	./install.sh ci
+	# The empty project that installs the framework
+	./create-project.sh pkg --skip-compilation
+	_configure_project Projects/pkg/uvproj.yaml true
+}
+
+package() {
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	(cd UVKBuildTool/build && ./UVKBuildTool --build "$pkgdir/usr" /usr ../../Projects/pkg)
+	_check_installed Projects/pkg/uvproj.yaml "$pkgdir/usr/lib"
+	test -e "$pkgdir/usr/lib/libUntitledImGuiFramework.so"
+	# Only keep the framework, not the project that installed it
+	rm -rf "$pkgdir"/usr/lib/libpkgLib.so "$pkgdir"/usr/bin/pkg "$pkgdir"/usr/share/config/pkg \
+		"$pkgdir"/usr/include/pkg "$pkgdir"/usr/include/utf8cpp "$pkgdir"/usr/share/utf8cpp
+
+	# UVKBuildTool itself, built again for its system-wide location
+	cmake -B "$srcdir/uvkbuildtool" -S UVKBuildTool \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DUBT_INSTALL=ON \
+		-DUBT_FRAMEWORK_DIR=/usr/include/UntitledImGuiFramework/ \
+		-DUBT_DATA_INSTALL_PREFIX=/usr/share/
+	cmake --build "$srcdir/uvkbuildtool"
+	DESTDIR="$pkgdir" cmake --install "$srcdir/uvkbuildtool"
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+3a222fa700da0b5a81570a520a7b14c4cbbaf5b2de6492f5caa05df20603b319cd0311bb8ef6f080e7a6ee3f6a5765913072b9a607c02e6269364c1149054dcb  untitled-imgui-framework-2.5.0.1.tar.xz
+"
+
+==> alpine/untitled-open/APKBUILD (2147 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/cmake-library/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-open
+pkgver=3.0.1.0
+pkgrel=0
+pkgdesc="Cross-platform C and C++ library for opening links and native file pickers"
+url="https://github.com/MadLadSquad/UntitledOpen"
+arch="x86_64 aarch64"
+license="MIT"
+depends="xdg-desktop-portal"
+makedepends="sed samurai cmake pkgconf dbus-dev wayland-dev"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-open-3.0.1.0.tar.xz::https://github.com/MadLadSquad/UntitledOpen/releases/download/v3.0.1.0/untitled-open-3.0.1.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-open-3.0.1.0"
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON \
+		'-DBUILD_SHARED_LIBS=OFF'
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+bc57ffd4f73c1831a78b32fceccb234ef1ac62c283352e7c1cb9a580f4ee5516273d8c14ed4bf2e6cdbde44a0951978df41fcf8ab632df49c600a70abf8ccffd  untitled-open-3.0.1.0.tar.xz
+"
+
+==> alpine/untitled-xdg-basedir/APKBUILD (2175 bytes)
+# Maintainer: MadLadSquad <contact@madladsquad.com>
+# Generated by pkggen, edit packages/alpine/cmake-library/APKBUILD.tmpl instead
+maintainer="MadLadSquad <contact@madladsquad.com>"
+pkgname=untitled-xdg-basedir
+pkgver=6.0.0.0
+pkgrel=0
+pkgdesc="C and C++ implementation of the XDG base directory specification"
+url="https://github.com/MadLadSquad/UntitledXDGBasedir"
+arch="x86_64 aarch64"
+license="MIT"
+depends=""
+makedepends="sed samurai cmake pkgconf"
+# Upstream has no tests
+options="!check"
+source="
+	untitled-xdg-basedir-6.0.0.0.tar.xz::https://github.com/MadLadSquad/UntitledXDGBasedir/releases/download/v6.0.0.0/untitled-xdg-basedir-6.0.0.0.tar.xz
+	"
+builddir="$srcdir"/"untitled-xdg-basedir-6.0.0.0"
+
+prepare() {
+	default_prepare
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+build() {
+	cmake -B build \
+		-DCMAKE_BUILD_TYPE=None \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DUIMGUI_INSTALL=ON \
+		'-DCREATE_DIRS=OFF' \
+		'-DNO_IGNORE_RELATIVE_DIRS=OFF'
+	cmake --build build
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="
+aa2488e34c962138c594e9a8a7cf0f050fcfd2d7f4079fbb0aafd59ea48a1c1a2cc62fb82bf28b369e2fde57235bc152898c8564f9a75fb1bfc6ac78971b0a88  untitled-xdg-basedir-6.0.0.0.tar.xz
+"
+
 ==> arch/.gitignore (36 bytes)
 src/
 pkg/
@@ -3820,3 +4602,623 @@ sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
 - Update to 6.0.0.0
 
 ==> rpm-based/SRPMS/.gitkeep (0 bytes)
+
+==> void/.gitignore (36 bytes)
+hostdir/
+masterdir*/
+*.xbps
+*.tar.*
+
+==> void/favicon.png (4179 bytes)
+<binary, 4179 bytes>
+
+==> void/index.html (4520 bytes)
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="The official Void Linux repository for the UntitledDesktopEnvironment and related projects.">
+		<meta name="author" content="MadLadSquad">
+		<link rel="icon" type="image/png" href="./favicon.png">
+		<title>UntitledDesktop XBPS Repository</title>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Ubuntu&display=swap" rel="stylesheet" type="text/css">
+
+		<style>
+			body {
+				background-color: #E8EEF2;
+				color: #37293A;
+				max-width: 1360px;
+			}
+			h1, h2, h3, h4, h5, h6, p, a, li {
+				font-family: Ubuntu, sans-serif;
+			}
+
+			a {
+				text-decoration: none;
+				color: #1d84b5;
+			}
+
+			.inline-code {
+				display: inline;
+				border: 1px solid #37293A;
+				border-radius: 0.25rem;
+				background-color: #37293A;
+				color: #e8eef2;
+				padding-left: 0.25rem;
+				padding-right: 0.25rem;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Welcome to the UntitledDesktopEnvironment Void Linux repository</h1>
+		<p>This repository is used for hosting all UntitledDesktopEnvironment packages, as well as all <a href="https://madladsquad.com">MadLadSquad</a> applications, for Void Linux.</p>
+
+		<p>Packages are built for Void Linux, both glibc and musl, for x86_64 and aarch64. To use this repository add the following configuration to <code class="inline-code">/etc/xbps.d/untitled-desktop.conf</code>:</p>
+		<pre class="sourceCode language-plaintext"><code class="sourceCode language-plaintext"># Void Linux packages for the UntitledDesktop project
+repository=https://xbps.madladsquad.com/binpkgs</code></pre>
+
+		<p>The same file works on glibc and musl systems: xbps picks the packages of your architecture. The packages are signed with our RSA key, which <code class="inline-code">xbps-install -S</code> asks you to import the first time it uses the repository (signed by MadLadSquad &lt;contact@madladsquad.com&gt;).</p>
+
+		<h2>Available packages:</h2>
+		<ul>
+			<li>untitled-game-system-manager - Provides <a href="https://github.com/MadLadSquad/UntitledGameSystemManager">UntitledGameSystemManager</a>, a manager for containerised Linux game systems</li>
+			<li>untitled-ibus-handwriting - Provides <a href="https://github.com/MadLadSquad/UntitledIBusHandwriting">UntitledIBusHandwriting</a>, an IBus handwriting input method for IBus</li>
+			<li>ude-session-logout - Provides <a href="https://github.com/MadLadSquad/UntitledDESessionLogout">UntitledDESessionLogout</a>, a session logout utility for the UntitledDesktopEnvironment</li>
+			<li>untitled-imgui-framework - Provides <a href="https://github.com/MadLadSquad/UntitledImGuiFramework">UntitledImGuiFramework</a>, an independent cross-platform desktop application development toolkit</li>
+			<li>untitled-dbus-utils - Provides <a href="https://github.com/MadLadSquad/UntitledDBusUtils">UntitledDBusUtils</a>, a C++ wrapper on top of the low level D-Bus C API</li>
+			<li>untitled-exec - Provides <a href="https://github.com/MadLadSquad/UntitledExec">UntitledExec</a>, a cross-platform fork and exec/CreateProcess wrapper library</li>
+			<li>untitled-cli-parser - Provides <a href="https://github.com/MadLadSquad/UntitledCLIParser">UntitledCLIParser</a>, a parser for CLI arguments</li>
+			<li>untitled-i18n - Provides <a href="https://github.com/MadLadSquad/UntitledI18N">UntitledI18N</a>, a i18n library</li>
+			<li>untitled-open - Provides <a href="https://github.com/MadLadSquad/UntitledOpen">UntitledOpen</a>, a file dialog, URL and file opener library</li>
+			<li>untitled-xdg-basedir - Provides <a href="https://github.com/MadLadSquad/UntitledXDGBasedir">UntitledXDGBasedir</a>, a better implementation of the XDG base directory specification</li>
+		</ul>
+		<footer>
+			<p>A <a href="https://madladsquad.com">MadLadSquad</a> / <a href="https://heapforge.com">Heapforge</a> project. Copyright &#169; <a href="https://heapforge.com">Heapforge Ltd.</a> 2025 - 2026 &bull; <a href="https://madladsquad.com/privacy-policy">Privacy Policy</a>.</p>
+		</footer>
+	</body>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark-reasonable.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+	<script>hljs.highlightAll();</script>
+</html>
+
+
+==> void/untitled-desktop.conf (102 bytes)
+# Void Linux packages for the UntitledDesktop project
+repository=https://xbps.madladsquad.com/binpkgs
+
+==> void/srcpkgs/.gitkeep (0 bytes)
+
+==> void/srcpkgs/ude-session-logout/template (2519 bytes)
+# Template file for 'ude-session-logout'
+# Generated by pkggen, edit packages/void/uimgui-app/template.tmpl instead
+pkgname=ude-session-logout
+version=2.3.0.0
+revision=1
+archs="x86_64* aarch64*"
+hostmakedepends="cmake pkgconf"
+makedepends="untitled-imgui-framework"
+depends="untitled-imgui-framework"
+short_desc="A log out prompt for the UntitledDesktopEnvironment"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledDESessionLogout"
+distfiles="https://github.com/MadLadSquad/UntitledDESessionLogout/releases/download/v2.3.0.0/ude-session-logout-2.3.0.0.tar.xz>ude-session-logout-2.3.0.0.tar.xz"
+checksum="251887de2f3e9dc54b8e17755669608a508edf6a16ac582bb224070b2660c8a7"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, a
+# symlink to lib/ on Void, so everything goes to lib/ instead. The directories
+# are compiled into the application.
+_configure_project() {
+	local file=$1 framework=${2:-false}
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		msg_error "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)\n"
+	fi
+}
+
+do_build() {
+	UVKBuildTool --generate "$wrksrc"
+	_configure_project uvproj.yaml
+}
+
+do_install() {
+	# UVKBuildTool compiles and installs in one step; the framework's scripts
+	# otherwise use every CPU
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	UVKBuildTool --build "$DESTDIR/usr" /usr "$wrksrc"
+	_check_installed uvproj.yaml "$DESTDIR/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$DESTDIR"/usr/{include,share}/utf8cpp
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-cli-parser/template (1681 bytes)
+# Template file for 'untitled-cli-parser'
+# Generated by pkggen, edit packages/void/cmake-library/template.tmpl instead
+pkgname=untitled-cli-parser
+version=6.1.0.0
+revision=1
+archs="x86_64* aarch64*"
+build_style=cmake
+configure_args="-DUIMGUI_INSTALL=ON"
+hostmakedepends="cmake pkgconf"
+makedepends=""
+depends=""
+short_desc="C and C++ parser for CLI arguments"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledCLIParser"
+distfiles="https://github.com/MadLadSquad/UntitledCLIParser/releases/download/v6.1.0.0/untitled-cli-parser-6.1.0.0.tar.xz>untitled-cli-parser-6.1.0.0.tar.xz"
+checksum="de06d834216aeabd1f193f134b632e35a5fb32edb8ef3572348d47495c29b2d9"
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-dbus-utils/template (1732 bytes)
+# Template file for 'untitled-dbus-utils'
+# Generated by pkggen, edit packages/void/cmake-library/template.tmpl instead
+pkgname=untitled-dbus-utils
+version=2.2.0.0
+revision=1
+archs="x86_64* aarch64*"
+build_style=cmake
+configure_args="-DUIMGUI_INSTALL=ON"
+hostmakedepends="cmake pkgconf"
+makedepends="dbus-devel"
+depends="dbus-devel"
+short_desc="Type and memory safe C++ wrapper around the low level D-Bus C API"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledDBusUtils"
+distfiles="https://github.com/MadLadSquad/UntitledDBusUtils/releases/download/v2.2.0.0/untitled-dbus-utils-2.2.0.0.tar.xz>untitled-dbus-utils-2.2.0.0.tar.xz"
+checksum="d9265e6f92e9ac423ef4e8168cc564a6da3f72d8685bf56bd064a09863d1c3ed"
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-exec/template (1692 bytes)
+# Template file for 'untitled-exec'
+# Generated by pkggen, edit packages/void/cmake-library/template.tmpl instead
+pkgname=untitled-exec
+version=5.0.0.1
+revision=1
+archs="x86_64* aarch64*"
+build_style=cmake
+configure_args="-DUIMGUI_INSTALL=ON"
+hostmakedepends="cmake pkgconf"
+makedepends=""
+depends=""
+short_desc="Cross-platform C and C++ library for running applications as separate processes"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledExec"
+distfiles="https://github.com/MadLadSquad/UntitledExec/releases/download/v5.0.0.1/untitled-exec-5.0.0.1.tar.xz>untitled-exec-5.0.0.1.tar.xz"
+checksum="f39beb57deb4f488ed1337470a00d587c4ccea8744799a363814c4de0cd2354e"
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-game-system-manager/template (2971 bytes)
+# Template file for 'untitled-game-system-manager'
+# Generated by pkggen, edit packages/void/untitled-game-system-manager/template.tmpl instead
+pkgname=untitled-game-system-manager
+version=2.9.1.0
+revision=1
+archs="x86_64* aarch64*"
+hostmakedepends="cmake pkgconf go"
+makedepends="untitled-imgui-framework"
+depends="incus xhost untitled-imgui-framework"
+short_desc="A manager for containerised Linux gaming systems based on Incus"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledGameSystemManager"
+distfiles="https://github.com/MadLadSquad/UntitledGameSystemManager/releases/download/v2.9.1.0/untitled-game-system-manager-2.9.1.0.tar.xz>untitled-game-system-manager-2.9.1.0.tar.xz"
+checksum="7958afcc9c67a47e0f74ce70eb16e6ee8265589c2c669d57f255431558c91f99"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, a
+# symlink to lib/ on Void, so everything goes to lib/ instead. The directories
+# are compiled into the application.
+_configure_project() {
+	local file=$1 framework=${2:-false}
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		msg_error "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)\n"
+	fi
+}
+
+do_build() {
+	# The Incus bindings: a C shared library written in Go, with vendored modules
+	export GOCACHE="$wrksrc/.go-cache" GOPATH="$wrksrc/.go"
+	export CGO_CPPFLAGS="$CPPFLAGS" CGO_CFLAGS="$CFLAGS" CGO_CXXFLAGS="$CXXFLAGS" CGO_LDFLAGS="$LDFLAGS"
+	(cd IncusBindings && go build -mod=vendor -trimpath -modcacherw -buildmode=c-shared \
+		-o libUGM_Incus_InternalFuncs.so .)
+	UVKBuildTool --generate "$wrksrc"
+	_configure_project uvproj.yaml
+}
+
+do_install() {
+	# UVKBuildTool compiles and installs in one step; the framework's scripts
+	# otherwise use every CPU
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	UVKBuildTool --build "$DESTDIR/usr" /usr "$wrksrc"
+	_check_installed uvproj.yaml "$DESTDIR/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$DESTDIR"/usr/{include,share}/utf8cpp
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-i18n/template (1691 bytes)
+# Template file for 'untitled-i18n'
+# Generated by pkggen, edit packages/void/cmake-library/template.tmpl instead
+pkgname=untitled-i18n
+version=1.6.2.0
+revision=1
+archs="x86_64* aarch64*"
+build_style=cmake
+configure_args="-DUIMGUI_INSTALL=ON -DBUILD_SHARED_LIBS=OFF"
+hostmakedepends="cmake pkgconf"
+makedepends=""
+depends=""
+short_desc="Next generation C and C++ internationalisation library"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledI18N"
+distfiles="https://github.com/MadLadSquad/UntitledI18N/releases/download/v1.6.2.0/untitled-i18n-1.6.2.0.tar.xz>untitled-i18n-1.6.2.0.tar.xz"
+checksum="d5f182414aaa55c6b20058f644a47172d75a8208ea5af0475f121689e55c36de"
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-ibus-handwriting/template (2724 bytes)
+# Template file for 'untitled-ibus-handwriting'
+# Generated by pkggen, edit packages/void/untitled-ibus-handwriting/template.tmpl instead
+pkgname=untitled-ibus-handwriting
+version=1.5.1.0
+revision=1
+archs="x86_64* aarch64*"
+hostmakedepends="cmake pkgconf cargo"
+makedepends="ibus-devel untitled-imgui-framework"
+depends="ibus untitled-imgui-framework"
+short_desc="A handwriting recognition input method for IBus"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledIBusHandwriting"
+distfiles="https://github.com/MadLadSquad/UntitledIBusHandwriting/releases/download/v1.5.1.0/untitled-ibus-handwriting-1.5.1.0.tar.xz>untitled-ibus-handwriting-1.5.1.0.tar.xz"
+checksum="87755dbfb7844ab4883e17320c1bff2ed573b17588d093a685812321f27735d3"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, a
+# symlink to lib/ on Void, so everything goes to lib/ instead. The directories
+# are compiled into the application.
+_configure_project() {
+	local file=$1 framework=${2:-false}
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		msg_error "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)\n"
+	fi
+}
+
+do_build() {
+	# hanzi_lookup: a Rust library whose crates are vendored in the release tarball
+	(cd hanzi_lookup && cargo build --release --offline --locked)
+	UVKBuildTool --generate "$wrksrc"
+	_configure_project uvproj.yaml
+}
+
+do_install() {
+	# UVKBuildTool compiles and installs in one step; the framework's scripts
+	# otherwise use every CPU
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	UVKBuildTool --build "$DESTDIR/usr" /usr "$wrksrc"
+	_check_installed uvproj.yaml "$DESTDIR/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$DESTDIR"/usr/{include,share}/utf8cpp
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-imgui-framework/template (4314 bytes)
+# Template file for 'untitled-imgui-framework'
+# Generated by pkggen, edit packages/void/untitled-imgui-framework/template.tmpl instead
+pkgname=untitled-imgui-framework
+version=2.5.0.1
+revision=1
+archs="x86_64* aarch64*"
+nofixperms=yes
+hostmakedepends="cmake pkgconf"
+makedepends="utfcpp Vulkan-Headers vulkan-loader-devel glfw-devel freetype-devel fontconfig-devel libglvnd-devel wayland-devel libX11-devel libXrandr-devel untitled-dbus-utils untitled-cli-parser untitled-exec untitled-i18n untitled-open untitled-xdg-basedir"
+depends="utfcpp Vulkan-Headers vulkan-loader-devel glfw-devel>=3.4 freetype-devel fontconfig-devel libglvnd-devel wayland-devel libX11-devel libXrandr-devel untitled-dbus-utils untitled-cli-parser untitled-exec untitled-i18n untitled-open untitled-xdg-basedir"
+short_desc="Cross-platform desktop application framework based on dear imgui"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledImGuiFramework"
+distfiles="https://github.com/MadLadSquad/UntitledImGuiFramework/releases/download/v2.5.0.1/untitled-imgui-framework-2.5.0.1.tar.xz>untitled-imgui-framework-2.5.0.1.tar.xz"
+checksum="05552aebbc6ce8c14e1e134eeb6c19fd241cb02db2103ef2fc5a5564c22bbcf1"
+
+# Configures a UVKBuildTool project (its uvproj.yaml) for a system-wide build
+# against the system's framework. Upstream installs libraries to lib64/, a
+# symlink to lib/ on Void, so everything goes to lib/ instead. The directories
+# are compiled into the application.
+_configure_project() {
+	local file=$1 framework=${2:-false}
+	sed -i \
+		-e 's|lib64/|lib/|g' \
+		-e '/^build-mode-vendor:/d' \
+		-e '/^system-wide:/d' \
+		-e '/^install-framework:/d' \
+		"$file"
+	if grep -q '^install-override:' "$file"; then
+		sed -i '/^install-override:/,/^[^ ]/ s|^  unix:$|  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"|' "$file"
+	else
+		printf 'install-override:\n  unix:\n    framework-library-dir: "lib/"\n    framework-application-library-dir: "lib/"\n' >> "$file"
+	fi
+	printf 'build-mode-vendor: false\nsystem-wide: true\ninstall-framework: %s\n' "$framework" >> "$file"
+}
+
+# UVKBuildTool exits with 0 even when the build fails: fail when the project's
+# library (lib<name>Lib.so, <name> from uvproj.yaml) wasn't installed
+_check_installed() {
+	local name
+	name=$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$1" | head -n 1)
+	if [ ! -e "$2/lib${name}Lib.so" ]; then
+		msg_error "UVKBuildTool didn't install lib${name}Lib.so, so the build failed (see above)\n"
+	fi
+}
+
+pre_build() {
+	# The framework's pkg-config file, in /usr/lib like the library
+	sed -i 's|^libdir=.*|libdir="${prefix}/lib"|' Framework/cmake/UntitledImGuiFramework.pc.in
+	# The build scripts run make with one job per CPU, which can run out of
+	# memory: let UIMGUI_JOBS set the count (the installed export.sh too, which
+	# builds the applications)
+	sed -i 's/^\([[:space:]]*\)\(cpus\|jobs\)=\$(grep -c processor .*$/&\n\1[ -z "${UIMGUI_JOBS}" ] || \2="${UIMGUI_JOBS}"/' \
+		install.sh export.sh create-project.sh UVKBuildTool/ci.sh
+	grep -q UIMGUI_JOBS export.sh
+}
+
+do_build() {
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	# Builds UVKBuildTool in UVKBuildTool/build
+	./install.sh ci
+	# The empty project that installs the framework
+	./create-project.sh pkg --skip-compilation
+	_configure_project Projects/pkg/uvproj.yaml true
+}
+
+do_install() {
+	export UIMGUI_JOBS="$XBPS_MAKEJOBS"
+	(cd UVKBuildTool/build && ./UVKBuildTool --build "$DESTDIR/usr" /usr ../../Projects/pkg)
+	_check_installed Projects/pkg/uvproj.yaml "$DESTDIR/usr/lib"
+	test -e "$DESTDIR/usr/lib/libUntitledImGuiFramework.so"
+	# Only keep the framework, not the project that installed it
+	rm -rf "$DESTDIR"/usr/lib/libpkgLib.so "$DESTDIR"/usr/bin/pkg "$DESTDIR"/usr/share/config/pkg \
+		"$DESTDIR"/usr/include/pkg "$DESTDIR"/usr/{include,share}/utf8cpp
+
+	# UVKBuildTool itself, built again for its system-wide location
+	cmake -B "$wrksrc/uvkbuildtool-system" -S UVKBuildTool \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DUBT_INSTALL=ON \
+		-DUBT_FRAMEWORK_DIR=/usr/include/UntitledImGuiFramework/ \
+		-DUBT_DATA_INSTALL_PREFIX=/usr/share/
+	cmake --build "$wrksrc/uvkbuildtool-system"
+	DESTDIR="$DESTDIR" cmake --install "$wrksrc/uvkbuildtool-system"
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-open/template (1753 bytes)
+# Template file for 'untitled-open'
+# Generated by pkggen, edit packages/void/cmake-library/template.tmpl instead
+pkgname=untitled-open
+version=3.0.1.0
+revision=1
+archs="x86_64* aarch64*"
+build_style=cmake
+configure_args="-DUIMGUI_INSTALL=ON -DBUILD_SHARED_LIBS=OFF"
+hostmakedepends="cmake pkgconf"
+makedepends="dbus-devel wayland-devel"
+depends="xdg-desktop-portal"
+short_desc="Cross-platform C and C++ library for opening links and native file pickers"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledOpen"
+distfiles="https://github.com/MadLadSquad/UntitledOpen/releases/download/v3.0.1.0/untitled-open-3.0.1.0.tar.xz>untitled-open-3.0.1.0.tar.xz"
+checksum="2c631ec09e14d7424d489e76215bdbd139025e776eca7e30a037098da543f74f"
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}
+
+==> void/srcpkgs/untitled-xdg-basedir/template (1765 bytes)
+# Template file for 'untitled-xdg-basedir'
+# Generated by pkggen, edit packages/void/cmake-library/template.tmpl instead
+pkgname=untitled-xdg-basedir
+version=6.0.0.0
+revision=1
+archs="x86_64* aarch64*"
+build_style=cmake
+configure_args="-DUIMGUI_INSTALL=ON -DCREATE_DIRS=OFF -DNO_IGNORE_RELATIVE_DIRS=OFF"
+hostmakedepends="cmake pkgconf"
+makedepends=""
+depends=""
+short_desc="C and C++ implementation of the XDG base directory specification"
+maintainer="MadLadSquad <contact@madladsquad.com>"
+license="MIT"
+homepage="https://github.com/MadLadSquad/UntitledXDGBasedir"
+distfiles="https://github.com/MadLadSquad/UntitledXDGBasedir/releases/download/v6.0.0.0/untitled-xdg-basedir-6.0.0.0.tar.xz>untitled-xdg-basedir-6.0.0.0.tar.xz"
+checksum="39075ed00cc3239c5275c380319c9420d76ef05afecb52ade8ac29da2ab6cc29"
+
+pre_configure() {
+	# Older releases install the library to lib64/ and their pkg-config file
+	# to lib/: use CMake's standard library directory for both, like newer ones do
+	grep -q 'include(GNUInstallDirs)' CMakeLists.txt ||
+		sed -i '0,/^project(/s|^\(project(.*\)$|\1\ninclude(GNUInstallDirs)|' CMakeLists.txt
+	sed -i \
+		-e 's|DESTINATION lib64/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/|g' \
+		-e 's|DESTINATION lib/pkgconfig/|DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/|g' \
+		CMakeLists.txt
+	sed -i 's|^libdir=.*|libdir="@CMAKE_INSTALL_FULL_LIBDIR@"|' ./*.pc.in
+	# UntitledExec's uexecdata.h uses pid_t and size_t without their headers, which
+	# glibc pulls in through others but musl doesn't
+	if [ -f uexecdata.h ] && ! grep -q 'sys/types.h' uexecdata.h; then
+		sed -i 's|^\([[:space:]]*\)#include <stdbool.h>|&\n\1#include <stddef.h>\n\1#include <sys/types.h>|' uexecdata.h
+		grep -q 'sys/types.h' uexecdata.h
+	fi
+}
+
+post_install() {
+	vlicense LICENSE
+}

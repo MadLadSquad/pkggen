@@ -16,7 +16,8 @@
 #       "build" | "libraries" | "runtime" | "development": [
 #         { "name": "glfw", "op": ">=", "version": "3.4",
 #           "override": "<literal>" | false,          // only when pkggen.yaml sets one for this distribution
-#           "local": { "name", "category", "packaged" } | null,   // one of pkggen.yaml's own packages
+#           // one of pkggen.yaml's own packages, with its pkggen.yaml settings
+#           "local": { "name", "packaged", "package": { ... } } | null,
 #           "releases": { "<rp-name>": [ <repology package> ] } } ] }
 #   }
 # It renders the templates into the repository and prints
@@ -29,7 +30,6 @@ import shutil
 import sys
 import traceback
 from datetime import datetime, timezone
-from email.utils import format_datetime
 
 import jinja2
 
@@ -121,19 +121,12 @@ def parse_date(value):
     return date if date.tzinfo else date.replace(tzinfo=timezone.utc)
 
 
-DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+def date_of(value):
+    """A template value as a datetime: a date, an ISO 8601 string, else now (source_date()).
 
-
-def filter_rfc2822(value):
-    """Debian changelog date: 'Mon, 19 Oct 2026 12:00:00 +0000'."""
-    return format_datetime(parse_date(value) or source_date())
-
-
-def filter_rpmdate(value):
-    """RPM %changelog date: 'Mon Oct 19 2026' (always English, unlike strftime)."""
-    date = parse_date(value) or source_date()
-    return f"{DAYS[date.weekday()]} {MONTHS[date.month - 1]} {date.day:02d} {date.year}"
+    For the generators' own date filters (Debian's rfc2822, RPM's rpmdate).
+    """
+    return parse_date(value) or source_date()
 
 
 # --- People and architectures --------------------------------------------
@@ -197,21 +190,24 @@ def architectures(job, names, any_value, other=None):
 #   - maps each role to the template fields it fills and the kind of package
 #     it needs there: "main" (the program or library) or "dev" (its
 #     development files), e.g. Debian's {"libraries": [("build_depends", "dev")]}
+#   - prepares each release's repology packages with the generator's own
+#     function, if any (`prepare`, e.g. merge_split_packages())
+#   - leaves out the packages a dependency never means, by the generator's
+#     rules (drop_unwanted(): `noise`, `other_targets`)
 #   - picks one repology package per release (choose_package()), and the name
 #     to use from it with pick(job, dep, package, kind) -> name or None
 #   - renders the names of every release with render(job, dep, names) ->
 #     a value (or a list of them) for the field, e.g. "libglfw3-dev (>= 3.4)"
 # and sets job.context["deps"] = {field: [values]}. Overrides are used as they
 # are, `false` drops the dependency, local packages use local_name(job, local).
+# Repology's `srcname` is compared with the project's name as it is, unless
+# the generator passes `source_name` (Gentoo's srcname is category/name).
 
 ROLES = ("build", "libraries", "runtime", "development")
 # Repology statuses of a release's current package (not an old branch, a live ebuild, ...)
 CURRENT_STATUSES = {"newest", "devel", "unique", "outdated"}
-# Packages for other targets: cross compilers, 32-bit multilib
-OTHER_TARGET_RE = re.compile(r"^(mingw(32|64)?-|ucrt64-|lib32-|cross-)|-cross-")
-# Binary packages that are never what a dependency means
-NOISE_RE = re.compile(r"-(doc|docs|dbg|dbgsym|debuginfo|debugsource|static|tests?|src|devel-static|devel-doc)$")
-DEV_SUFFIXES = ("-dev", "-devel")
+# Library packages are often named lib<name>; generators add their own prefixes
+LIBRARY_PREFIXES = ("lib",)
 VERSION_PREFIX_RE = re.compile(r"\d+(\.\d+)*")
 
 
@@ -232,71 +228,131 @@ def satisfies(version, op, wanted):
     return {">=": have >= want, "<=": have <= want, "=": have == want, ">": have > want, "<": have < want}[op]
 
 
-def basename(srcname):
-    """Gentoo's srcname is category/name."""
-    return str(srcname or "").rsplit("/", 1)[-1]
+def srcname(package):
+    """A repology package's source name, as repology lists it (the default `source_name`)."""
+    return str(package.get("srcname") or "")
 
 
-def choose_package(project, packages):
-    """The package a release means by a project: its own name, current, newest; None for none."""
-    candidates = [p for p in packages
-                  if not OTHER_TARGET_RE.search(basename(p.get("srcname")))
-                  and not OTHER_TARGET_RE.search(p.get("binname") or "")
-                  and not NOISE_RE.search(p.get("binname") or "")]
-    if not candidates:
+def choose_package(project, packages, source_name=srcname):
+    """The package a release means by a project: its own name, current, newest; None for none.
+
+    The packages should have been through drop_unwanted() first. source_name(package)
+    is the name compared with the project's.
+    """
+    if not packages:
         return None
 
     def rank(p):
-        source = basename(p.get("srcname")).lower()
+        source = source_name(p).lower()
         binary = (p.get("binname") or "").lower()
         return (source == project.lower(),
-                not binary or binary == source,           # Arch lists each split package
+                not binary or binary == source,           # an entry per binary package: the source's own
                 p.get("status") in CURRENT_STATUSES,
                 version_key(p.get("version")),
                 -len(source))                             # glfw rather than glfw-wayland
-    return max(candidates, key=rank)
+    return max(packages, key=rank)
 
 
 def binary_names(package):
-    names = package.get("binnames") or ([package["binname"]] if package.get("binname") else [])
-    return [n for n in names if not NOISE_RE.search(n) and not OTHER_TARGET_RE.search(n)]
+    return package.get("binnames") or ([package["binname"]] if package.get("binname") else [])
+
+
+def drop_unwanted(packages, noise=(), other_targets=None, source_name=srcname):
+    """The packages without the ones a dependency never means, by the generator's rules.
+
+    `noise` is a tuple of binary package name suffixes (-doc, -dbgsym, ...).
+    `other_targets` is a regex (searched) or a function name -> bool for the
+    packages of other targets (cross compilers, 32-bit multilib, ...); it's
+    checked against the source name (source_name(package)) too. A package whose source or binname is
+    unwanted, or whose binnames all are, is dropped; the others lose the
+    unwanted binnames.
+    """
+    if other_targets is not None and not callable(other_targets):
+        other_targets = other_targets.search
+
+    def unwanted(name, source=False):
+        if not name:
+            return False
+        return bool((not source and noise and name.endswith(tuple(noise)))
+                    or (other_targets and other_targets(name)))
+
+    result = []
+    for package in packages:
+        if unwanted(source_name(package), source=True) or unwanted(package.get("binname")):
+            continue
+        if package.get("binnames"):
+            kept = [n for n in package["binnames"] if not unwanted(n)]
+            if not kept:
+                continue
+            package = {**package, "binnames": kept}
+        result.append(package)
+    return result
 
 
 def lists_binaries(package):
-    """Whether repology knows the binary packages (openSUSE Leap lists each one as its own srcname)."""
+    """Whether repology lists the package's binary packages (some repositories only have source names)."""
     return bool(package.get("binnames") or package.get("binname"))
 
 
-def main_package(package, project):
-    """The program or library itself among a source package's binary packages."""
-    source = basename(package.get("srcname"))
+def main_package(package, project, dev_suffix, prefixes=LIBRARY_PREFIXES):
+    """The program or library itself among a source package's binary packages.
+
+    `dev_suffix` is the format's suffix of development packages (-dev, -devel),
+    which are never the main package; `prefixes` the prefixes of its library
+    packages (lib<name>). Without binary packages, the source name.
+    """
+    source = srcname(package)
     if not lists_binaries(package):
         return source or None
-    names = [n for n in binary_names(package) if not n.endswith(DEV_SUFFIXES)]
+    names = [n for n in binary_names(package) if not n.endswith(dev_suffix)]
     if not names:
         return None
-    for wanted in (source, project, f"lib{source}", f"lib{project}"):
-        if wanted in names:
-            return wanted
+    for prefix in ("",) + tuple(prefixes):
+        for stem in (source, project):
+            if f"{prefix}{stem}" in names:
+                return f"{prefix}{stem}"
     return min(names, key=lambda n: (len(n), n))
 
 
-def dev_package(package, project, suffix):
-    """The development files' package (…-dev, …-devel, lib64…-devel), else the main package.
+def dev_package(package, project, dev_suffix, prefixes=LIBRARY_PREFIXES):
+    """The development files' package (<name><dev_suffix>, <prefix><name><dev_suffix>), else the main package.
 
-    None when repology doesn't list the binary packages (see guess_dev_package()).
+    None when repology doesn't list the binary packages: the generator decides
+    then (rpm-based.py guesses from the source name).
     """
     if not lists_binaries(package):
         return None
-    names = [n for n in binary_names(package) if n.endswith(suffix)]
-    source = basename(package.get("srcname"))
+    names = [n for n in binary_names(package) if n.endswith(dev_suffix)]
+    source = srcname(package)
     for stem in (source, project):
-        for wanted in (f"{stem}{suffix}", f"lib{stem}{suffix}", f"lib64{stem}{suffix}"):
-            if wanted in names:
-                return wanted
+        for prefix in ("",) + tuple(prefixes):
+            if f"{prefix}{stem}{dev_suffix}" in names:
+                return f"{prefix}{stem}{dev_suffix}"
     if names:
-        return min(names, key=lambda n: (not n.startswith("lib"), len(n), n))
-    return main_package(package, project)
+        return min(names, key=lambda n: (not n.startswith(tuple(prefixes)), len(n), n))
+    return main_package(package, project, dev_suffix, prefixes)
+
+
+def merge_split_packages(packages):
+    """One entry per source package, with every binary package's name in `binnames`.
+
+    For repositories that repology lists one binary package per entry, each
+    with only a `binname` (glfw, glfw-dev, ...): the entries of one source
+    package and version are merged into the first one, keeping their order.
+    Generators pass it to dependencies() as `prepare`.
+    """
+    merged = {}
+    for package in packages:
+        key = (package.get("srcname"), package.get("version"), package.get("subrepo"))
+        entry = merged.get(key)
+        if entry is None:
+            entry = merged[key] = dict(package)
+            entry["binnames"] = list(package.get("binnames") or [])
+            entry["binname"] = srcname(package) or package.get("binname")
+        for name in [package.get("binname")] + list(package.get("binnames") or []):
+            if name and name not in entry["binnames"]:
+                entry["binnames"].append(name)
+    return list(merged.values())
 
 
 def describe(dep):
@@ -304,17 +360,31 @@ def describe(dep):
 
 
 def local_name(job, local):
-    """The name of one of pkggen.yaml's own packages here (Gentoo overrides it with the category)."""
+    """The name of one of pkggen.yaml's own packages here: its name.
+
+    `local` is {name, packaged, package (its pkggen.yaml settings)}; generators
+    that name packages differently pass their own function.
+    """
     return local["name"]
 
 
-def dependencies(job, fields, pick, render, local=local_name):
-    """Fill job.context["deps"]: {field: [rendered dependencies]} (see the comment above)."""
+def dependencies(job, fields, pick, render, local=local_name, prepare=None, noise=(), other_targets=None,
+                 source_name=srcname):
+    """Fill job.context["deps"]: {field: [rendered dependencies]} (see the comment above).
+
+    `render` is one function, or {field: function} when fields are written
+    differently. prepare(packages) -> packages runs first on each release's
+    repology packages (e.g. merge_split_packages()). `noise` and
+    `other_targets` are the distribution's packages that are never what a
+    dependency means (see drop_unwanted()); source_name(package) is the name
+    compared with the project's (default: repology's srcname).
+    """
     deps = {field: [] for kinds in fields.values() for field, _ in kinds}
     missing = []
     for role in ROLES:
         for dep in job.dependencies.get(role) or []:
             for field, kind in fields.get(role, ()):
+                render_field = render[field] if isinstance(render, dict) else render
                 if "override" in dep:
                     values = [dep["override"]] if dep["override"] is not False else []
                 elif dep.get("local"):
@@ -322,11 +392,15 @@ def dependencies(job, fields, pick, render, local=local_name):
                         job.warn(f"the dependency '{dep['name']}' is one of pkggen.yaml's packages, but it "
                                  f"isn't packaged for {job.distribution}")
                     name = local(job, dep["local"])
-                    values = render(job, dep, {rp: name for rp in job.releases} or {job.distribution: name})
+                    values = render_field(job, dep, {rp: name for rp in job.releases} or {job.distribution: name})
                 else:
                     names = {}
                     for rp in job.releases:
-                        package = choose_package(dep["name"], (dep.get("releases") or {}).get(rp) or [])
+                        packages = (dep.get("releases") or {}).get(rp) or []
+                        if prepare:
+                            packages = prepare(packages)
+                        packages = drop_unwanted(packages, noise, other_targets, source_name)
+                        package = choose_package(dep["name"], packages, source_name)
                         name = pick(job, dep, package, kind) if package else None
                         if name:
                             names[rp] = name
@@ -340,7 +414,7 @@ def dependencies(job, fields, pick, render, local=local_name):
                     absent = [rp for rp in job.releases if rp not in names]
                     if absent:
                         job.warn(f"{dep['name']} isn't packaged in {', '.join(absent)} (repology)")
-                    values = render(job, dep, names)
+                    values = render_field(job, dep, names)
                 for value in values if isinstance(values, list) else [values]:
                     if value not in deps[field]:
                         deps[field].append(value)
@@ -362,43 +436,11 @@ def releases_in_order(job, names):
 
 # --- Licenses and versions -------------------------------------------------
 
-# SPDX id (including the deprecated ids GitHub still returns) -> Debian DEP-5 short name
-DEBIAN_LICENSES = {
-    "MIT": "Expat",
-    "GPL-2.0": "GPL-2", "GPL-2.0-only": "GPL-2", "GPL-2.0-or-later": "GPL-2+",
-    "GPL-3.0": "GPL-3", "GPL-3.0-only": "GPL-3", "GPL-3.0-or-later": "GPL-3+",
-    "LGPL-2.0": "LGPL-2", "LGPL-2.0-only": "LGPL-2", "LGPL-2.0-or-later": "LGPL-2+",
-    "LGPL-2.1": "LGPL-2.1", "LGPL-2.1-only": "LGPL-2.1", "LGPL-2.1-or-later": "LGPL-2.1+",
-    "LGPL-3.0": "LGPL-3", "LGPL-3.0-only": "LGPL-3", "LGPL-3.0-or-later": "LGPL-3+",
-    "AGPL-3.0": "AGPL-3", "AGPL-3.0-only": "AGPL-3", "AGPL-3.0-or-later": "AGPL-3+",
-    "BSD-2-Clause": "BSD-2-clause", "BSD-3-Clause": "BSD-3-clause",
-}
-
-# SPDX id -> Gentoo license file name
-GENTOO_LICENSES = {
-    "GPL-2.0": "GPL-2", "GPL-2.0-only": "GPL-2", "GPL-2.0-or-later": "GPL-2+",
-    "GPL-3.0": "GPL-3", "GPL-3.0-only": "GPL-3", "GPL-3.0-or-later": "GPL-3+",
-    "LGPL-2.0": "LGPL-2", "LGPL-2.0-only": "LGPL-2", "LGPL-2.0-or-later": "LGPL-2+",
-    "LGPL-2.1": "LGPL-2.1", "LGPL-2.1-only": "LGPL-2.1", "LGPL-2.1-or-later": "LGPL-2.1+",
-    "LGPL-3.0": "LGPL-3", "LGPL-3.0-only": "LGPL-3", "LGPL-3.0-or-later": "LGPL-3+",
-    "AGPL-3.0": "AGPL-3", "AGPL-3.0-only": "AGPL-3", "AGPL-3.0-or-later": "AGPL-3+",
-    "BSD-2-Clause": "BSD-2", "BSD-3-Clause": "BSD",
-    "Zlib": "ZLIB", "BSL-1.0": "Boost-1.0",
-}
-
 # GitHub reports deprecated SPDX ids; RPM and Arch want the current ones
 SPDX_UPDATES = {
     "GPL-2.0": "GPL-2.0-only", "GPL-3.0": "GPL-3.0-only",
     "LGPL-2.1": "LGPL-2.1-only", "LGPL-3.0": "LGPL-3.0-only", "AGPL-3.0": "AGPL-3.0-only",
 }
-
-
-def filter_debian_license(value):
-    return DEBIAN_LICENSES.get(str(value), str(value))
-
-
-def filter_gentoo_license(value):
-    return GENTOO_LICENSES.get(str(value), str(value))
 
 
 def filter_spdx(value):
@@ -415,18 +457,39 @@ def filter_dquote(value):
     return '"' + re.sub(r'([\\"$`])', r"\\\1", str(value)) + '"'
 
 
-def filter_pkgver(value):
-    """Arch/RPM versions can't contain '-', ':', '/' or whitespace."""
-    return re.sub(r"[-:/\s]", "_", str(value))
+def substitute(pattern, replacement):
+    """A template filter that rewrites its value: every match of `pattern` becomes `replacement`.
+
+    `pattern` is a regex (text or compiled), `replacement` a string or a
+    function of the match, as re.sub() takes them. The value is stripped first.
+    Generators build their formats' version filters with it, e.g. Void's
+    substitute(r"[-_:/\\s]", ".") or Alpine's with a function for _rc1 suffixes.
+    """
+    compiled = re.compile(pattern) if isinstance(pattern, str) else pattern
+
+    def apply(value):
+        return compiled.sub(replacement, str(value).strip())
+    return apply
+
+
+def package_version(job, key, translate, valid, example):
+    """The version a format writes: the package's `<distribution>.<key>`, else translate(version).
+
+    `valid` is the format's version syntax: a regex (matched) or a function
+    version -> bool. Fails when the version isn't valid, with a hint to fix it.
+    """
+    value = job.context["dist"].get(key)
+    version = str(value) if value is not None else translate(job.version)
+    if not (valid(version) if callable(valid) else valid.match(version)):
+        raise PackagingError(
+            f"version '{job.version}' of {job.name} gives '{version}', which isn't a valid {job.distribution} "
+            f"version (e.g. {example}). Adjust the fetch generator's 'transforms', or set "
+            f"'{job.distribution}: {{ {key}: ... }}' for the package")
+    return version
 
 
 FILTERS = {
-    "rfc2822": filter_rfc2822,
-    "rpmdate": filter_rpmdate,
-    "debian_license": filter_debian_license,
-    "gentoo_license": filter_gentoo_license,
     "spdx": filter_spdx,
-    "pkgver": filter_pkgver,
     "shquote": filter_shquote,
     "dquote": filter_dquote,
     "person_name": filter_person_name,
@@ -521,7 +584,7 @@ def ensure_templates(job, required):
                  "Edit them to customise the package")
 
 
-def make_environment(job):
+def make_environment(job, filters=None):
     env = jinja2.Environment(
         # The package's folder first, then the root, so `{% extends "shared/PKGBUILD.tmpl" %}` works
         loader=jinja2.FileSystemLoader([job.templates_path, job.templates_root]),
@@ -532,6 +595,7 @@ def make_environment(job):
         autoescape=False,
     )
     env.filters.update(FILTERS)
+    env.filters.update(filters or {})  # the generator's own, e.g. Alpine's apkver
     return env
 
 
@@ -598,15 +662,16 @@ def write_output(job, path, content, executable=False):
         os.chmod(path, mode | 0o111)
 
 
-def render_tree(job, place, executable=()):
+def render_tree(job, place, executable=(), filters=None):
     """Render every template in the package's folder into the repository.
 
     *.tmpl files are rendered with Jinja2 and lose the suffix. Other files are
     copied unchanged. place(rel) maps a relative output name to its absolute
     destination. Outputs named in `executable` (or whose template is
-    executable) get the executable bit.
+    executable) get the executable bit. `filters` ({name: function}) adds the
+    generator's own template filters to the shared ones (FILTERS).
     """
-    env = make_environment(job)
+    env = make_environment(job, filters)
     for rel in iter_files(job.templates_path):
         src = os.path.join(job.templates_path, rel)
         if rel.endswith(TEMPLATE_SUFFIX):

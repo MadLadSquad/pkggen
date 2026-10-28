@@ -1,0 +1,27 @@
+{#- UntitledImGuiFramework applications, built and installed by UVKBuildTool.
+    Applications with extra parts extend this file and fill `build_parts`. -#}
+{% extends "_base/APKBUILD.tmpl" %}
+{% block functions %}
+
+{% include "_base/configure-project.sh" %}
+
+build() {
+	# abuild makes CMake use Ninja, but UVKBuildTool runs make
+	export CMAKE_GENERATOR="Unix Makefiles"
+{% block build_parts %}
+{% endblock %}
+	UVKBuildTool --generate "$builddir"
+	_configure_project uvproj.yaml
+}
+
+package() {
+	# UVKBuildTool compiles and installs in one step
+	export CMAKE_GENERATOR="Unix Makefiles"
+	export UIMGUI_JOBS="$(_make_jobs)"
+	UVKBuildTool --build "$pkgdir/usr" /usr "$builddir"
+	_check_installed uvproj.yaml "$pkgdir/usr/lib"
+	# The framework's copy of utfcpp comes from the utfcpp package
+	rm -rf "$pkgdir"/usr/include/utf8cpp "$pkgdir"/usr/share/utf8cpp
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+{% endblock %}
