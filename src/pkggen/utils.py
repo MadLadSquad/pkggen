@@ -1,25 +1,46 @@
 #!/usr/bin/env python3
+import importlib.util
 import os
 import yaml
 import sys
-
-def create_secrets_file():
-    if os.name == 'nt':
-        base_dir = os.getenv('APPDATA', os.path.expanduser('~\\AppData\\Roaming'))
-    else:
-        base_dir = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
-    config_dir = os.path.join(base_dir, 'pkggen')
-    os.makedirs(config_dir, exist_ok=True)
-    secrets_file = os.path.join(config_dir, 'secrets.yaml')
-    if not os.path.exists(secrets_file):
-        with open(secrets_file, 'w') as f:
-            f.write('')
-    return secrets_file
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Where the generators are when PKGGEN_GENERATORS_PATH isn't set: the copy an
 # installed pkggen ships with, else the checkout's generators/ (editable installs)
 BUNDLED_GENERATORS = (os.path.join(HERE, "generators"), os.path.join(HERE, os.pardir, os.pardir, "generators"))
+COMMON_MODULE = "pkggen_common"
+
+
+def load_common():
+    """generators/common.py, the helpers pkggen shares with the generators' lib.py files.
+
+    Always the copy pkggen ships with, not PKGGEN_GENERATORS_PATH's: pkggen's
+    own behaviour doesn't change with the generators it runs. It's registered
+    as `pkggen_common`, the name the generators' lib.py files load it under.
+    """
+    if COMMON_MODULE in sys.modules:
+        return sys.modules[COMMON_MODULE]
+    for folder in BUNDLED_GENERATORS:
+        path = os.path.join(folder, "common.py")
+        if os.path.isfile(path):
+            spec = importlib.util.spec_from_file_location(COMMON_MODULE, path)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[COMMON_MODULE] = module
+            spec.loader.exec_module(module)
+            return module
+    raise ImportError(f"pkggen's generators/common.py is missing (looked in {', '.join(BUNDLED_GENERATORS)}): "
+                      "reinstall pkggen")
+
+
+common = load_common()
+ANSI_RE = common.ANSI_RE
+ERROR_PREFIX_RE = common.ERROR_PREFIX_RE
+
+
+def create_secrets_file():
+    """Create secrets.yaml (readable only by its owner) if it doesn't exist. Returns its path."""
+    return common.ensure_secrets_file()[0]
+
 
 def get_generators_path():
     # Absolute, so generators still resolve when run from another working directory
@@ -34,11 +55,11 @@ def get_generators_path():
 def load_distributions():
     dist_file = os.path.join(get_generators_path(), "distributions", "distributions.yaml")
     try:
-        with open(dist_file, "r") as stream:
+        with open(dist_file, "r", encoding="utf-8") as stream:
             data = yaml.safe_load(stream) or {}
     except FileNotFoundError:
         raise GenericError(f"Couldn't find the distributions list at {dist_file}! Is PKGGEN_GENERATORS_PATH set?")
-    except yaml.YAMLError as e:
+    except (yaml.YAMLError, UnicodeDecodeError) as e:
         raise GenericError(f"Couldn't parse {dist_file}: {e}")
 
     distributions = data.get("distributions") or []
@@ -73,10 +94,13 @@ def get_run_path():
 def get_pkggen_config():
     pkggen_config = os.path.join(get_run_path(), "pkggen.yaml")
     try:
-        with open(pkggen_config, "r") as stream:
+        # YAML files are UTF-8, whatever the locale's code page is (often cp1252 on Windows)
+        with open(pkggen_config, "r", encoding="utf-8") as stream:
             return yaml.safe_load(stream)
     except FileNotFoundError:
         raise GenericError(f"Couldn't find {pkggen_config}! Run pkggen from its directory or set PKGGEN_RUN_PATH.")
+    except UnicodeDecodeError as e:
+        raise GenericError(f"Couldn't parse {pkggen_config}: it isn't UTF-8 ({e})")
     except yaml.YAMLError as e:
         raise GenericError(f"Couldn't parse {pkggen_config}: {e}")
 

@@ -19,38 +19,84 @@ needs_gpg = pytest.mark.skipif(shutil.which("gpg") is None, reason="needs GnuPG"
 
 
 class FakeS3:
-    """Path-style S3 with ListObjectsV2, GetObject, PutObject and DeleteObject."""
+    """Path-style S3 with ListObjectsV2, GetObject, PutObject, DeleteObject and multipart uploads."""
 
     def __init__(self, mock, endpoint=ENDPOINT, bucket=BUCKET):
         self.objects = {}
+        self.etags = {}
         self.headers = {}
+        self.multipart = {}
+        self.next_upload_id = 0
+        self.fail_part = None
+        self.fail_complete = False
         self.log = []
         self.prefix = f"{endpoint}/{bucket}"
         pattern = re.compile(re.escape(self.prefix) + r"(/[^?]*)?(\?.*)?$")
-        for method in ("GET", "PUT", "DELETE"):
+        for method in ("GET", "PUT", "POST", "DELETE"):
             mock.add_callback(method, pattern, callback=self.handle)
 
     def handle(self, request):
         assert request.headers["Authorization"].startswith("AWS4-HMAC-SHA256 Credential=KEYID/")
         parts = urlsplit(request.url)
+        query = parse_qs(parts.query, keep_blank_values=True)
         key = unquote(parts.path[len(urlsplit(self.prefix).path) + 1:])
         if request.method == "GET" and not key:
-            return self.list(parse_qs(parts.query).get("prefix", [""])[0])
+            return self.list(query.get("prefix", [""])[0])
+        body = request.body if isinstance(request.body, bytes) else (
+            request.body.encode("utf-8") if isinstance(request.body, str) else b"")
+        assert request.headers["x-amz-content-sha256"] == hashlib.sha256(body).hexdigest()
+        if request.method == "POST" and "uploads" in query:
+            self.next_upload_id += 1
+            upload_id = f"up-{self.next_upload_id}"
+            self.multipart[upload_id] = {"key": key, "headers": dict(request.headers), "parts": {}}
+            self.log.append(("INIT_MP", key))
+            return 200, {}, (f'<?xml version="1.0" encoding="UTF-8"?><InitiateMultipartUploadResult '
+                             f'xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><UploadId>{upload_id}</UploadId>'
+                             f'</InitiateMultipartUploadResult>')
+        if "uploadId" in query:
+            upload_id = query["uploadId"][0]
+            if request.method == "PUT":
+                number = int(query["partNumber"][0])
+                self.log.append(("PUT_PART", key))
+                if self.fail_part == number:
+                    return 500, {}, "<Error><Code>InternalError</Code><Message>part failed</Message></Error>"
+                assert request.headers["Content-MD5"] == base64.b64encode(hashlib.md5(body).digest()).decode()
+                etag = f'"{hashlib.md5(body).hexdigest()}"'
+                self.multipart[upload_id]["parts"][number] = (body, etag)
+                return 200, {"ETag": etag}, ""
+            if request.method == "POST":
+                self.log.append(("COMPLETE_MP", key))
+                if self.fail_complete:
+                    return 200, {}, "<Error><Code>InternalError</Code><Message>complete failed</Message></Error>"
+                entry = self.multipart.pop(upload_id)
+                ordered = [entry["parts"][n] for n in sorted(entry["parts"])]
+                self.objects[key] = b"".join(chunk for chunk, _ in ordered)
+                digests = b"".join(bytes.fromhex(etag.strip('"')) for _, etag in ordered)
+                self.etags[key] = f"{hashlib.md5(digests).hexdigest()}-{len(ordered)}"
+                self.headers[key] = entry["headers"]
+                return 200, {}, (f'<CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                                 f'<Key>{escape(key)}</Key><ETag>"{self.etags[key]}"</ETag>'
+                                 f'</CompleteMultipartUploadResult>')
+            if request.method == "DELETE":
+                self.multipart.pop(upload_id, None)
+                self.log.append(("ABORT_MP", key))
+                return 204, {}, ""
         self.log.append((request.method, key))
         if request.method == "GET":
             return (200, {}, self.objects[key]) if key in self.objects else (404, {}, "<Error><Code>NoSuchKey</Code></Error>")
         if request.method == "PUT":
-            body = request.body if isinstance(request.body, bytes) else (request.body or b"")
             assert request.headers["Content-MD5"] == base64.b64encode(hashlib.md5(body).digest()).decode()
-            assert request.headers["x-amz-content-sha256"] == hashlib.sha256(body).hexdigest()
             self.objects[key] = body
+            self.etags[key] = hashlib.md5(body).hexdigest()
             self.headers[key] = dict(request.headers)
-            return 200, {"ETag": f'"{hashlib.md5(body).hexdigest()}"'}, ""
+            return 200, {"ETag": f'"{self.etags[key]}"'}, ""
         self.objects.pop(key, None)
+        self.etags.pop(key, None)
         return 204, {}, ""
 
     def list(self, prefix):
-        items = "".join(f"<Contents><Key>{escape(k)}</Key><ETag>&quot;{hashlib.md5(v).hexdigest()}&quot;</ETag>"
+        items = "".join(f"<Contents><Key>{escape(k)}</Key>"
+                        f"<ETag>&quot;{self.etags.get(k) or hashlib.md5(v).hexdigest()}&quot;</ETag>"
                         f"<Size>{len(v)}</Size></Contents>"
                         for k, v in sorted(self.objects.items()) if k.startswith(prefix))
         return 200, {}, ('<?xml version="1.0" encoding="UTF-8"?><ListBucketResult '
@@ -58,7 +104,7 @@ class FakeS3:
                          f"{items}<IsTruncated>false</IsTruncated></ListBucketResult>")
 
     def uploads(self):
-        return [key for method, key in self.log if method == "PUT"]
+        return [key for method, key in self.log if method in ("PUT", "COMPLETE_MP")]
 
     def deletes(self):
         return [key for method, key in self.log if method == "DELETE"]
@@ -335,3 +381,44 @@ def test_signed_rpm_repositories(s3_generator, make_job, s3, tmp_path, gpg_key):
     job = deploy(s3_generator, make_job, config(**{"gpg-key": "test", "public-key": "rpmkey.pub"}),
                  [target(output, "fedora-44")], distribution="rpm-based")
     assert job.unchanged == ["dist-gen"] and s3.uploads() == []
+
+
+def test_multipart_upload_and_unchanged(s3_generator, make_job, s3, tmp_path, monkeypatch):
+    monkeypatch.setattr(s3_generator, "MULTIPART_THRESHOLD", 16)
+    monkeypatch.setattr(s3_generator, "PART_SIZE", 16)
+    payload = "0123456789abcdef" * 3 + "tail"  # 52 bytes -> 4 parts, > 16 threshold
+    small = "tiny"
+    out = write_tree(tmp_path / "test" / "debian-13", {
+        "pool/main/f/foo/foo_1.0_amd64.deb": payload,
+        "dists/trixie/Release": small,
+    })
+    job = deploy(s3_generator, make_job, DEBIAN, [target(out, "debian-13")])
+    assert job.pushed == ["dist-gen"]
+    key = "pool/main/f/foo/foo_1.0_amd64.deb"
+    assert s3.objects[key] == payload.encode("utf-8")
+    assert s3.etags[key].endswith("-4")
+    assert s3.headers[key]["Content-Type"] == "application/vnd.debian.binary-package"
+    assert [m for m, k in s3.log if k == key] == ["INIT_MP", "PUT_PART", "PUT_PART", "PUT_PART", "PUT_PART", "COMPLETE_MP"]
+    assert s3.multipart == {}
+
+    # A second deploy matches the `<md5>-<parts>` ETag and skips re-uploading
+    s3.log.clear()
+    job = deploy(s3_generator, make_job, DEBIAN, [target(out, "debian-13")])
+    assert job.unchanged == ["dist-gen"] and s3.uploads() == []
+
+
+@pytest.mark.parametrize("fail_part, fail_complete, match", [
+    (2, False, "part failed"),
+    (None, True, "complete failed"),
+])
+def test_multipart_upload_aborts_on_failure(s3_generator, make_job, s3, tmp_path, monkeypatch,
+                                            fail_part, fail_complete, match):
+    monkeypatch.setattr(s3_generator, "MULTIPART_THRESHOLD", 16)
+    monkeypatch.setattr(s3_generator, "PART_SIZE", 16)
+    s3.fail_part = fail_part
+    s3.fail_complete = fail_complete
+    out = write_tree(tmp_path / "test" / "debian-13", {"pool/main/f/foo/foo_1.0_amd64.deb": "x" * 40})
+    with pytest.raises(s3_generator.lib.DeployError, match=match):
+        deploy(s3_generator, make_job, DEBIAN, [target(out, "debian-13")])
+    assert ("ABORT_MP", "pool/main/f/foo/foo_1.0_amd64.deb") in s3.log
+    assert s3.multipart == {}

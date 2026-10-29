@@ -3,10 +3,7 @@ import json
 import pytest
 import yaml
 
-import deploy
-import generate
-import testing
-import utils
+from pkggen import deploy, generate, testing, utils
 from tests.deployment.conftest import git, upstream, write_tree  # noqa: F401
 from tests.support.helpers import run_cli, strip_ansi
 
@@ -118,7 +115,7 @@ def test_targets_carry_their_publish(project, upstream):
     project({"rpm-based": {"generator": "git", "url": upstream().url, **IDENTITY}},
             results={"fedora-44": result("rpm-based", publish=publish), "fedora-43": result("rpm-based")})
     deployments = deploy.load_deployments(generate.load_config(), None)
-    (dep,) = deploy.select_targets(deployments, testing.load_results(), None, False)
+    (dep,) = deploy.select_targets(deployments, testing.load_results(), None)
     assert {t["name"]: t["publish"] for t in dep.targets} == {"fedora-43": {}, "fedora-44": publish}
 
 
@@ -230,3 +227,26 @@ def test_cli(project, upstream):
     result_ = run_cli("deploy")
     assert result_.code == 0, result_.err
     assert up.files() == {"fedora-44/RPMS/fedora-44.rpm": "fedora-44"}
+
+
+def test_skip_tests_does_not_deploy_stale_folder_when_output_is_null(project, upstream, capsys):
+    up = upstream()
+    root = project({"rpm-based": {"generator": "git", "url": up.url, **IDENTITY}},
+                   results={"fedora-44": result("rpm-based", ok=False, output=False,
+                                                failed=["setup failed: pull timed out"])})
+    # A leftover folder from an earlier run must not be published when this run collected nothing
+    write_tree(root / "pkggen-build" / "test" / "fedora-44", {"RPMS/stale.rpm": "last week"})
+    assert deploy.deploy(skip_tests=True) == 1
+    assert up.files() is None
+    assert "- [rpm-based-git] fedora-44: skipped: its last test failed (setup failed: pull timed out)" in \
+        strip_ansi(capsys.readouterr().err)
+
+
+def test_check_validates_deployments_without_tested_targets(project, upstream):
+    up = upstream()
+    project({"rpm-based": {"generator": "git", "url": up.url, **IDENTITY},
+             "arch": {"generator": "git", "unknown-key": True}},
+            results={"fedora-44": result("rpm-based")})
+    with pytest.raises(utils.GenericError, match="deployment.arch"):
+        deploy.deploy()
+    assert up.files() is None

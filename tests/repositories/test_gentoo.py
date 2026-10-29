@@ -88,11 +88,23 @@ def test_warnings(gen_repo):
 @pytest.mark.parametrize("block, message", [
     ({}, "'repositories.gentoo' is missing: name"),
     ({"name": "o", "copyright": {"years": "2026"}}, "'repositories.gentoo.copyright' is missing: owner, license"),
+    ({"name": "o", "copyright": "2026"}, "'repositories.gentoo.copyright' must be a mapping"),
+    ({"name": "o", "owners": ["Jane"]}, "'repositories.gentoo.owners[0]' must be a mapping"),
+    ({"name": "o", "source": ["https://example.org"]}, "'repositories.gentoo.source[0]' must be a mapping"),
 ])
 def test_errors(gen_repo, block, message):
     result = gen_repo("gentoo", block)
     assert result.code == 1
+    assert "Traceback" not in result.err
     assert message in result.err_plain
+
+
+def test_non_ascii_utf8(gen_repo):
+    block = {"name": "o", "description": "Ümlauts — 日本語", "owners": [{"name": "Jürgen", "email": "j@example.org"}]}
+    result = gen_repo("gentoo", block)
+    assert result.code == 0, result.err
+    xml = (gen_repo.out / "repositories.xml").read_bytes().decode("utf-8")
+    assert "Ümlauts — 日本語" in xml and "Jürgen" in xml
 
 
 def test_rerun_skips_existing(gen_repo, example_config):

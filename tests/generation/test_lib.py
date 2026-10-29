@@ -101,6 +101,22 @@ def test_secrets_path_on_windows(lib, monkeypatch, tmp_path):
     assert lib.secrets_path() == str(tmp_path / "pkggen" / "secrets.yaml")
 
 
+def test_load_secrets_utf8_and_permissions(lib, isolated_env, secrets):
+    import os
+    lib.load_secrets()
+    path = isolated_env / "pkggen" / "secrets.yaml"
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o777 == 0o600
+        path.chmod(0o644)
+        lib.load_secrets()
+        assert path.stat().st_mode & 0o777 == 0o600
+    path.write_bytes("github_key: \"Jürgen-🔑\"\n".encode("utf-8"))
+    assert lib.load_secrets() == {"github_key": "Jürgen-🔑"}
+    path.write_bytes(b"github_key: \xff\n")
+    with pytest.raises(lib.TinyError, match="isn't UTF-8"):
+        lib.load_secrets()
+
+
 # --- http_error ------------------------------------------------------------------------
 
 def fake_response(http, status, json_body=None, headers=None, body=""):

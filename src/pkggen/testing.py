@@ -16,10 +16,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-import containers
-import generate
-import utils
-from generate import GREEN, RED, RESET, YELLOW, plural, say
+from . import containers, generate, utils
+from .generate import GREEN, RED, RESET, YELLOW, plural, say
 
 TEST_KEYS = {"engine", "connection", "cpus", "memory", "jobs", "vm", "pull", "setup", "post-setup", "distributions"}
 DISTRIBUTION_KEYS = {"versions", "setup", "post-setup"}
@@ -150,6 +148,8 @@ def load_test_config(config, distributions):
         errors.append(f"'test.distributions.{dist}' isn't a distribution pkggen can test "
                       f"(available: {', '.join(distributions) or 'none'})")
 
+    # The release names of every distribution, to check `versions` against
+    known = {dist["name"]: utils.release_names(dist) for dist in utils.load_distributions()}
     for dist in distributions:
         entry = per_dist.get(dist) or {}
         if not isinstance(entry, dict):
@@ -160,10 +160,9 @@ def load_test_config(config, distributions):
             errors.append(f"'test.distributions.{dist}' has unknown keys: {', '.join(unknown)} "
                           f"(allowed: {', '.join(sorted(DISTRIBUTION_KEYS))})")
         versions = entry.get("versions")
-        if versions is not None and not (isinstance(versions, list) and versions
-                                         and all(isinstance(v, str) and v for v in versions)):
-            errors.append(f"'test.distributions.{dist}.versions' must be a list of release names like "
-                          "debian_13 (the rp-names in distributions.yaml)")
+        problem = generate.release_list_problem(dist, versions, known.get(dist))
+        if problem:
+            errors.append(problem)
             versions = None
         settings["distributions"][dist] = {
             "versions": versions,
@@ -226,7 +225,7 @@ def describe(dist, payload):
                              capture_output=True, encoding="utf-8", errors="replace",
                              env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     if process.returncode != 0:
-        raise RuntimeError(generate.ANSI_RE.sub("", process.stderr).strip()
+        raise RuntimeError(utils.ANSI_RE.sub("", process.stderr).strip()
                            or f"the testing generator exited with code {process.returncode}")
     try:
         result = json.loads(process.stdout)
@@ -308,8 +307,8 @@ def limit_packages(target, contexts):
 
 def package_entries(dist, pipeline):
     """The packages that were fetched and packaged for dist, in pkggen.yaml order."""
-    target = next((t for t in pipeline.targets if t.name == dist), None)
-    if target is None:
+    distribution = next((d for d in pipeline.distributions if d.name == dist), None)
+    if distribution is None:
         return None
     entries = []
     for package, _ in pipeline.packages:
@@ -320,7 +319,7 @@ def package_entries(dist, pipeline):
         output = result.get("output") or ""
         if output:
             absolute = os.path.join(utils.get_run_path(), output)
-            output = os.path.relpath(absolute, target.repo_path).replace(os.sep, "/")
+            output = os.path.relpath(absolute, distribution.repo_path).replace(os.sep, "/")
         entries.append({"context": pipeline.contexts[name], "output": output})
     return entries
 
@@ -505,9 +504,9 @@ def print_summary(results, pipeline_failures):
         return
     problems = len(failures) + len(skipped) + len(pipeline_failures)
     say(f"{RED}Finished with {plural(problems, 'problem')}:{RESET} {line}.")
-    for failure in pipeline_failures:
-        lines = failure.message.splitlines() or ["unknown error"]
-        say(f"  {RED}✗{RESET} {failure.label()}: {lines[0]}")
+    if pipeline_failures:
+        # generate.print_summary() listed them already, before the targets finished
+        say(f"  {RED}✗{RESET} {plural(len(pipeline_failures), 'fetch or packaging problem')}, listed above")
     for r in results:
         if r.skipped:
             say(f"  {YELLOW}-{RESET} [{r.name}] skipped: {r.skipped}")
@@ -672,7 +671,7 @@ def test(package_filter=None, distribution_filter=None, target_filter=None, jobs
 
         # Fetch and package on the host while the containers start
         pipeline = generate.run_pipeline(config, package_filter, tested)
-        generate.print_summary(pipeline.stats, len(pipeline.packages), pipeline.targets, pipeline.failures)
+        generate.print_summary(pipeline.stats, len(pipeline.packages), pipeline.distributions, pipeline.failures)
         for dist in tested:
             entries = package_entries(dist, pipeline)
             if entries is None:

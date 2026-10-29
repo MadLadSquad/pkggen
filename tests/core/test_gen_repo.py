@@ -4,8 +4,7 @@ import shutil
 
 import pytest
 
-import gen_repo
-import utils
+from pkggen import gen_repo, utils
 from tests.support import paths
 
 

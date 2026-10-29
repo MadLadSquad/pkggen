@@ -13,16 +13,11 @@ import subprocess
 import sys
 import threading
 
-import generate
-import testing
-import utils
-from generate import GREEN, RED, RESET, YELLOW, plural, say
+from . import generate, testing, utils
+from .generate import GREEN, RED, RESET, YELLOW, plural, say
 
 DEPLOY_DIR = "deploy"
 SCRIPT_ENV = {"PYTHONIOENCODING": "utf-8"}
-
-
-# Deployment generators that push with git
 
 
 class Deployment:
@@ -33,7 +28,7 @@ class Deployment:
         self.config = config
         self.id = ident
         self.targets = []           # payloads of the targets with test output
-        self.skipped_targets = []   # names of the selected targets without
+        self.skipped_targets = []   # names of the selected targets without test output to deploy
         self.skipped = []           # [(name, reason)]
         self.result = None
         self.error = None
@@ -121,7 +116,7 @@ def not_passed_reason(entry):
     return f"its last test failed ({failed[0]})" if failed else "its last test failed"
 
 
-def select_targets(deployments, results, target_filter, skip_tests):
+def select_targets(deployments, results, target_filter):
     """Attach the test output of every deployment's targets. Returns the deployments that have something to deploy."""
     targets = (results or {}).get("targets") or {}
     errors = []
@@ -153,8 +148,11 @@ def select_targets(deployments, results, target_filter, skip_tests):
                 dep.skipped_targets.append(name)
                 dep.skipped.append((name, f"it hasn't been tested yet: run `pkggen test -t {name}`"))
                 continue
-            path = os.path.join(output_root, entry.get("output") or testing.NAME_RE.sub("-", name))
-            if not os.path.isdir(path):
+            # Only this run's output: pkggen-build/test/<target>/ can be left over from an earlier run when
+            # this one didn't get as far as collecting the repository (its `output` is null then)
+            output = entry.get("output")
+            path = os.path.join(output_root, output) if isinstance(output, str) and output else None
+            if path is None or not os.path.isdir(path):
                 dep.skipped_targets.append(name)
                 reason = not_passed_reason(entry) if not entry.get("ok") else "its test output is missing"
                 dep.skipped.append((name, f"{reason}: run `pkggen test -t {name}`" if entry.get("ok") else reason))
@@ -218,7 +216,7 @@ def check_all(deployments, config, package_filter, skip_tests, dry_run):
             job(dep, config, package_filter, skip_tests, dry_run, check=True)), text=True, capture_output=True,
             encoding="utf-8", errors="replace", env={**os.environ, **SCRIPT_ENV})
         if process.returncode != 0:
-            message = generate.ANSI_RE.sub("", process.stderr).strip() or f"exit code {process.returncode}"
+            message = utils.ANSI_RE.sub("", process.stderr).strip() or f"exit code {process.returncode}"
             errors.append(f"'{dep.where}': the {dep.generator} deployment generator failed: {message}")
             continue
         try:
@@ -305,10 +303,12 @@ def deploy(package_filter=None, distribution_filter=None, target_filter=None, sk
     if results is None:
         raise utils.GenericError(f"There's nothing tested to deploy yet ({utils.display_path(testing.results_path())} "
                                  "doesn't exist): run `pkggen test` first")
-    deployments = select_targets(deployments, results, target_filter, skip_tests)
+    deployments = select_targets(deployments, results, target_filter)
+
+    # Every deployment's configuration is checked, also those with nothing to deploy this time
+    check_all(deployments, config, package_filter, skip_tests, dry_run)
 
     runnable = [d for d in deployments if d.targets]
-    check_all(runnable, config, package_filter, skip_tests, dry_run)
 
     for dep in runnable:
         say(f"Deploying {dep.id} ({', '.join(t['name'] for t in dep.targets)})"
@@ -316,6 +316,6 @@ def deploy(package_filter=None, distribution_filter=None, target_filter=None, sk
         try:
             dep.result = run_deployment(dep, job(dep, config, package_filter, skip_tests, dry_run, check=False))
         except RuntimeError as e:
-            dep.error = generate.ERROR_PREFIX_RE.sub("", generate.ANSI_RE.sub("", str(e))).strip()
+            dep.error = utils.ERROR_PREFIX_RE.sub("", utils.ANSI_RE.sub("", str(e))).strip()
             say(f"{RED}✗{RESET} [{dep.id}] failed")
     return print_summary(deployments, dry_run)

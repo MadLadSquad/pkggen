@@ -67,13 +67,9 @@ def url_user(url):
     return None
 
 
-def shquote(value):
-    return "'" + str(value).replace("'", "'\\''") + "'"
-
-
 def ssh_command(key, interactive):
     """GIT_SSH_COMMAND that uses only `key`. git runs it with its own sh, also on Windows."""
-    command = (f"ssh -i {shquote(key.replace(os.sep, '/'))} -o IdentitiesOnly=yes "
+    command = (f"ssh -i {lib.shquote(key.replace(os.sep, '/'))} -o IdentitiesOnly=yes "
                "-o StrictHostKeyChecking=accept-new")
     if not interactive:
         command += " -o BatchMode=yes"

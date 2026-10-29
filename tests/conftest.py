@@ -11,8 +11,8 @@ import yaml
 from tests.support import paths
 from tests.support.http_shim.pkggen_test_http import Routes
 
-# The core modules import each other by bare name (`import utils`)
-sys.path.insert(0, str(paths.SRC))
+# Put src/ on sys.path so tests import `pkggen` without an editable install
+sys.path.insert(0, str(paths.REPO / "src"))
 
 # A fixed date for reproducible output: 2026-10-19 12:00:00 UTC
 SOURCE_DATE_EPOCH = "1792411200"

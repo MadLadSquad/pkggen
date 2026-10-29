@@ -12,6 +12,8 @@ def build_copyright(gentoo):
     copyright_obj = gentoo.get("copyright")
     if not copyright_obj:
         return
+    if not isinstance(copyright_obj, dict):
+        lib.fail("'repositories.gentoo.copyright' must be a mapping with 'years', 'owner' and 'license'")
 
     missing = [key for key in ("years", "owner", "license") if not copyright_obj.get(key)]
     if missing:
@@ -24,7 +26,7 @@ Distributed under the terms of the {copyright_obj['license']}.
 
 
 def build_profiles(gentoo, name):
-    categories = lib.as_list(gentoo.get("categories"))
+    categories = lib.words(gentoo.get("categories"))
     if categories:
         lib.write_file("profiles/categories", lib.lines(*categories))
 
@@ -39,8 +41,8 @@ def build_metadata(gentoo, name):
         return str(lib.to_bool(gentoo.get(key), default)).lower()
 
     def joined(key, default=None):
-        values = lib.as_list(gentoo.get(key))
-        return " ".join(str(v) for v in values) if values else default
+        values = lib.words(gentoo.get(key))
+        return " ".join(values) if values else default
 
     entries = [
         f"repo-name = {name}",
@@ -86,7 +88,10 @@ def build_repositories_xml(gentoo, name):
         if value:
             xml.append(f"    <{key}>{escape(str(value))}</{key}>")
 
-    for owner in lib.as_list(gentoo.get("owners")):
+    for i, owner in enumerate(lib.as_list(gentoo.get("owners"))):
+        if not isinstance(owner, dict):
+            lib.fail(f"'repositories.gentoo.owners[{i}]' must be a mapping with 'email', and optionally 'name' "
+                     f"and 'type', got {owner!r}")
         o_name = owner.get("name")
         o_email = owner.get("email")
         o_type = owner.get("type")
@@ -104,7 +109,9 @@ def build_repositories_xml(gentoo, name):
             xml.append(f"      <name>{escape(str(o_name))}</name>")
         xml.append("    </owner>")
 
-    for source in lib.as_list(gentoo.get("source")):
+    for i, source in enumerate(lib.as_list(gentoo.get("source"))):
+        if not isinstance(source, dict):
+            lib.fail(f"'repositories.gentoo.source[{i}]' must be a mapping with 'type' and 'url', got {source!r}")
         s_type = source.get("type")
         s_url = source.get("url")
         if s_type and s_url:

@@ -48,7 +48,7 @@ def test_target_names_match_their_rp_names():
 
     An rp-name with several targets names them in distributions.yaml's `targets` instead.
     """
-    import generate
+    from pkggen import generate
     for dist in TESTING:
         for rp, value in load_generator("testing", dist).TARGETS.items():
             if isinstance(value, list):
@@ -69,7 +69,7 @@ def test_only_rp_names_with_several_targets_are_in_targets():
 @pytest.mark.parametrize("dist", TESTING)
 def test_every_testing_generator_describes_its_repository(dist):
     """`publish` tells deployment generators which files are indexes and metadata; pkggen checks it."""
-    import testing  # src/pkggen/testing.py
+    from pkggen import testing
     publish = load_generator("testing", dist).PUBLISH
     assert testing.publish_problem(publish) is None
     assert publish.get("indexes") or publish.get("metadata")
@@ -99,7 +99,7 @@ def test_publish_patterns(dist, path, kind):
     ({"content_types": {".x": 1}}, "'content_types' isn't a mapping"),
 ])
 def test_publish_problems(publish, problem):
-    import testing
+    from pkggen import testing
     found = testing.publish_problem(publish)
     assert (found is None) if problem is None else (problem in found)
 

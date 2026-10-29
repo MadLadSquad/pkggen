@@ -4,8 +4,7 @@ import textwrap
 
 import pytest
 
-import generate
-import utils
+from pkggen import dependencies, generate, utils
 from tests.support.helpers import strip_ansi
 
 # --- Stub generators ---------------------------------------------------------
@@ -233,48 +232,48 @@ def test_load_packages_without_generation_dir(monkeypatch, tmp_path):
         generate.load_packages({"g": packages({"name": "p"}, generator="url")}, None)
 
 
-# --- load_targets ----------------------------------------------------------------
+# --- load_distributions --------------------------------------------------------
 
 
-def test_load_targets(stub_generators, project):
+def test_load_distributions(stub_generators, project):
     root = project({}, repos=("alpha",))
     failures = []
-    targets = generate.load_targets({"repositories": REPOSITORIES}, None, failures)
-    assert [(t.name, t.repo_path, t.repository) for t in targets] == [
+    distributions = generate.load_distributions({"repositories": REPOSITORIES}, None, failures)
+    assert [(d.name, d.repo_path, d.repository) for d in distributions] == [
         ("alpha", str(root / "pkggen-build" / "alpha"), {"key": "value"})]
-    assert targets[0].script == str(stub_generators / "packaging" / "alpha.py")
+    assert distributions[0].script == str(stub_generators / "packaging" / "alpha.py")
     # beta has a block but no repository yet; nopackaging has no packaging generator
     assert [(f.distribution, f.package) for f in failures] == [("beta", "*")]
     assert "Run `pkggen gen-repo beta` first" in failures[0].message
 
 
-def test_load_targets_skips_dists_without_block(stub_generators, project):
+def test_load_distributions_skips_dists_without_block(stub_generators, project):
     project({})
     failures = []
-    assert generate.load_targets({"repositories": {"beta": {}}}, None, failures)[0].name == "beta"
+    assert generate.load_distributions({"repositories": {"beta": {}}}, None, failures)[0].name == "beta"
     assert failures == []
 
 
-def test_load_targets_filter(stub_generators, project):
+def test_load_distributions_filter(stub_generators, project):
     project({})
     failures = []
-    targets = generate.load_targets({"repositories": {"alpha": {}}}, ["alpha", "beta"], failures)
-    assert [t.name for t in targets] == ["alpha"]
+    distributions = generate.load_distributions({"repositories": {"alpha": {}}}, ["alpha", "beta"], failures)
+    assert [d.name for d in distributions] == ["alpha"]
     # A requested distribution without a block is reported
     assert "no 'repositories.beta' block" in failures[0].message
 
 
-def test_load_targets_unknown_filter(stub_generators, project):
+def test_load_distributions_unknown_filter(stub_generators, project):
     project({})
     with pytest.raises(utils.GenericError, match=r"No packaging generator for: nopackaging, zzz \(available: alpha, beta\)"):
-        generate.load_targets({"repositories": REPOSITORIES}, ["zzz", "nopackaging"], [])
+        generate.load_distributions({"repositories": REPOSITORIES}, ["zzz", "nopackaging"], [])
 
 
-def test_load_targets_real_generators(example_project, example_config):
+def test_load_distributions_real_generators(example_project, example_config):
     (example_project / "pkggen-build" / "arch").mkdir(parents=True)
     failures = []
-    targets = generate.load_targets(example_config, None, failures)
-    assert [t.name for t in targets] == ["arch"]
+    distributions = generate.load_distributions(example_config, None, failures)
+    assert [d.name for d in distributions] == ["arch"]
     assert sorted(f.distribution for f in failures) == ["alpine", "debian", "gentoo", "rpm-based", "void"]
 
 
@@ -348,9 +347,9 @@ def test_run_fetch_errors(stub_generators, stub, message):
 
 def test_run_packaging(stub_generators, project):
     root = project({})
-    target = generate.Target("alpha", str(stub_generators / "packaging" / "alpha.py"),
-                             str(root / "pkggen-build" / "alpha"), {"key": "value"})
-    result = generate.run_packaging(target, {"name": "p", "version": "1"})
+    dist = generate.Distribution("alpha", str(stub_generators / "packaging" / "alpha.py"),
+                                 str(root / "pkggen-build" / "alpha"), {"key": "value"})
+    result = generate.run_packaging(dist, {"name": "p", "version": "1"})
     job = json.loads((root / "pkggen-build" / "alpha" / "p.json").read_text())
     assert result["warnings"] == ["stub warning"]
     assert job == {
@@ -370,10 +369,10 @@ def test_run_packaging(stub_generators, project):
 @pytest.mark.parametrize("key, message", [("pack_fail", "packaging broke"), ("pack_invalid", "printed invalid JSON")])
 def test_run_packaging_errors(stub_generators, project, key, message):
     root = project({})
-    target = generate.Target("alpha", str(stub_generators / "packaging" / "alpha.py"),
-                             str(root / "pkggen-build" / "alpha"), {})
+    dist = generate.Distribution("alpha", str(stub_generators / "packaging" / "alpha.py"),
+                                 str(root / "pkggen-build" / "alpha"), {})
     with pytest.raises(RuntimeError, match=message):
-        generate.run_packaging(target, {"name": "p", "version": "1", key: "alpha"})
+        generate.run_packaging(dist, {"name": "p", "version": "1", key: "alpha"})
 
 
 # --- generate() ------------------------------------------------------------------------
@@ -725,3 +724,22 @@ def test_packages_that_need_nothing_from_repology_dont_wait_for_it(stub_generato
     assert generate.generate() == 1
     assert (root / "pkggen-build" / "alpha" / "local-only.json").exists()
     assert not (root / "pkggen-build" / "alpha" / "needy.json").exists()
+
+
+@pytest.mark.parametrize("test_block, fragment", [
+    ({"distributions": {"alpha": {"versions": ["typo"]}}},
+     "'test.distributions.alpha.versions' names unknown release(s): typo (known: a)"),
+    ({"distributions": {"gamma": {"versions": ["g"]}}},
+     "'test.distributions' names unknown distribution(s): gamma"),
+    ({"distributions": {"alpha": {"versions": []}}},
+     "'test.distributions.alpha.versions' must be a list of release names"),
+])
+def test_generate_validates_test_distribution_versions(stub_generators, project, test_block, fragment):
+    project({"repositories": REPOSITORIES, "test": test_block, "group": packages({"name": "one"})})
+    with pytest.raises(utils.GenericError) as info:
+        generate.generate()
+    assert fragment in info.value.args[0]
+
+
+def test_dependencies_releases_does_not_fall_back_on_unknown_version():
+    assert dependencies.releases(["typo"], ["a_1", "a_2"], None, generate.release_key) == []

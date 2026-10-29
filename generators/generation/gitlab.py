@@ -127,6 +127,11 @@ class GitLab:
             raise lib.TinyError(f"invalid GitLab query {data['query']!r}, expected one of: release, tag, commit")
 
         self.version = data.get("version")
+        # YAML reads `version: 1.10` as the number 1.1: converting it back could pick the wrong tag
+        if self.version is not None and not isinstance(self.version, str):
+            raise lib.TinyError(f"'version' must be the exact tag name or commit hash in quotes, like "
+                                f"version: \"{self.version}\" (YAML reads unquoted numbers as numbers: "
+                                "1.10 becomes 1.1)")
         self.transforms = data.get("transforms")
         self.artifacts = data.get("artifacts")
         if self.artifacts is not None and not isinstance(self.artifacts, list):

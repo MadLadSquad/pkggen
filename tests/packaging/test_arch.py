@@ -83,3 +83,26 @@ def test_homepage_falls_back_to_source_url(package_with, tmp_path, make_job):
     assert package_with("arch", job).code == 0
     assert 'url="https://downloads.example.com/untitled-cli-parser-1.2.0.tar.xz"' in \
         (output(tmp_path) / "PKGBUILD").read_text()
+
+
+def test_default_templates_include_repology_dependencies(package_with, make_job, tmp_path):
+    job = make_job("arch", arch={"depends": ["glibc"], "makedepends": ["ninja"]})
+    job["releases"] = ["arch"]
+    job["dependencies"] = {
+        "build": [{"name": "cmake", "op": None, "version": None, "local": None,
+                   "releases": {"arch": [{"binname": "cmake", "version": "3.30"}]}}],
+        "libraries": [{"name": "glfw", "op": ">=", "version": "3.4", "local": None,
+                       "releases": {"arch": [{"binname": "glfw", "version": "3.4"}]}}],
+        "runtime": [],
+        "development": [],
+    }
+    result = package_with("arch", job)
+    assert result.code == 0, result.err
+    pkgbuild = (output(tmp_path) / "PKGBUILD").read_text().splitlines()
+    assert "makedepends=('cmake' 'ninja')" in pkgbuild
+    assert "depends=('glfw>=3.4' 'glibc')" in pkgbuild
+    srcinfo = (output(tmp_path) / ".SRCINFO").read_text().splitlines()
+    assert [line for line in srcinfo if line.startswith("\tmakedepends = ")] == [
+        "\tmakedepends = cmake", "\tmakedepends = ninja"]
+    assert [line for line in srcinfo if line.startswith("\tdepends = ")] == [
+        "\tdepends = glfw>=3.4", "\tdepends = glibc"]

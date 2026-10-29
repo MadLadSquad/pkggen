@@ -44,6 +44,15 @@ from datetime import datetime, timedelta, timezone
 
 import yaml
 
+# generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
+# Loaded by path once per process, under a name no other module has
+if "pkggen_common" not in sys.modules:
+    _spec = importlib.util.spec_from_file_location(
+        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(sys.modules["pkggen_common"])
+from pkggen_common import *  # noqa: E402,F401,F403
+
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
 
 # pkggen-managed SSH keys are replaced after this long
@@ -146,22 +155,10 @@ def log(message):
 
 
 # --- Secrets -----------------------------------------------------------------
-
-def config_dir():
-    """pkggen's configuration folder: $XDG_CONFIG_HOME/pkggen, or %APPDATA%\\pkggen on Windows."""
-    if os.name == "nt":
-        base_dir = os.getenv("APPDATA", os.path.expanduser("~\\AppData\\Roaming"))
-    else:
-        base_dir = os.getenv("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return os.path.join(base_dir, "pkggen")
-
-
-def secrets_path():
-    return os.path.join(config_dir(), "secrets.yaml")
-
+# config_dir() and secrets_path() come from generators/common.py
 
 def load_secrets():
-    path = secrets_path()
+    path = secrets_path()  # noqa: F405 (from pkggen_common)
     try:
         with open(path, "r", encoding="utf-8") as stream:
             result = yaml.safe_load(stream)
@@ -169,6 +166,8 @@ def load_secrets():
         return {}
     except yaml.YAMLError as e:
         raise DeployError(f"couldn't parse {path}: {e}")
+    except UnicodeDecodeError as e:
+        raise DeployError(f"{path} isn't UTF-8: {e}")
     if result is not None and not isinstance(result, dict):
         raise DeployError(f"{path} must contain a mapping of secret names to values")
     return result or {}
@@ -594,7 +593,11 @@ class Signer:
         if FINGERPRINT_RE.match(value):
             self.key = value[2:] if value.lower().startswith("0x") else value
         else:
-            armored = value if ARMORED_KEY in value else open(os.path.expanduser(value), encoding="utf-8").read()
+            if ARMORED_KEY in value:
+                armored = value
+            else:
+                with open(os.path.expanduser(value), encoding="utf-8") as f:
+                    armored = f.read()
             os.makedirs(job.work_path, exist_ok=True)
             self.home = tempfile.mkdtemp(prefix="gnupg-", dir=job.work_path)
             os.chmod(self.home, 0o700)

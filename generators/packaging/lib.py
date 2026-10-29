@@ -23,6 +23,7 @@
 # It renders the templates into the repository and prints
 #   { "output": "...", "files_written": [...], "files_unchanged": [...], "warnings": [...] }
 # as JSON on stdout. Errors go to stderr, with exit code 1.
+import importlib.util
 import json
 import os
 import re
@@ -32,6 +33,15 @@ import traceback
 from datetime import datetime, timezone
 
 import jinja2
+
+# generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
+# Loaded by path once per process, under a name no other module has
+if "pkggen_common" not in sys.modules:
+    _spec = importlib.util.spec_from_file_location(
+        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(sys.modules["pkggen_common"])
+from pkggen_common import *  # noqa: E402,F401,F403
 
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
 TEMPLATE_SUFFIX = ".tmpl"
@@ -89,14 +99,6 @@ class Job:
         except ValueError:  # different drive on Windows
             return path
         return path if rel.startswith("..") else rel
-
-
-def to_bool(value, default=False):
-    if value is None:
-        return default
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "on")
-    return bool(value)
 
 
 # --- Dates ---------------------------------------------------------------
@@ -449,7 +451,7 @@ def filter_spdx(value):
 
 def filter_shquote(value):
     """Quote for bash with single quotes: it's -> 'it'\\''s'."""
-    return "'" + str(value).replace("'", "'\\''") + "'"
+    return shquote(value)  # noqa: F405 (from pkggen_common)
 
 
 def filter_dquote(value):
@@ -657,9 +659,11 @@ def write_output(job, path, content, executable=False):
             f.write(data)
         job.written.append(job.display(path))
 
-    if executable:
-        mode = os.stat(path).st_mode
-        os.chmod(path, mode | 0o111)
+    # Set or clear the executable bit, so a file that stopped being executable loses it
+    mode = os.stat(path).st_mode
+    wanted = mode | 0o111 if executable else mode & ~0o111
+    if wanted != mode:
+        os.chmod(path, wanted)
 
 
 def render_tree(job, place, executable=(), filters=None):

@@ -17,8 +17,7 @@ from dataclasses import dataclass
 
 from tqdm import tqdm
 
-import dependencies
-import utils
+from . import dependencies, utils
 
 # Top-level pkggen.yaml keys that aren't package groups
 RESERVED_KEYS = {"repositories", "test", "deployment"}
@@ -44,9 +43,6 @@ RESET = "\x1b[0m"
 
 _print_lock = threading.Lock()
 
-ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-ERROR_PREFIX_RE = re.compile(r"^Error( \[[^\]]*\])?: ", re.MULTILINE)
-
 
 def say(message):
     with _print_lock:
@@ -58,14 +54,14 @@ class Failure:
         self.stage = stage
         self.package = package
         # Generators print "Error [pkg]: ..." in color; the summary adds its own label
-        self.message = ERROR_PREFIX_RE.sub("", ANSI_RE.sub("", message)).strip()
+        self.message = utils.ERROR_PREFIX_RE.sub("", utils.ANSI_RE.sub("", message)).strip()
         self.distribution = distribution
 
     def label(self):
         return f"[{self.distribution}] {self.package}" if self.distribution else f"{self.stage} {self.package}"
 
 
-class Target:
+class Distribution:
     """A distribution to package for."""
     def __init__(self, name, script, repo_path, repository, rp_names=(), aliases=None):
         self.name = name
@@ -170,6 +166,49 @@ def check_distributions(package, known):
     return []
 
 
+def release_list_problem(distribution, versions, known=None):
+    """Why `test.distributions.<distribution>.versions` is wrong, or None.
+
+    It's a non-empty list of releases: rp-names or test target names (debian_13,
+    debian-13), which are checked against `known` (the distribution's release
+    names in distributions.yaml) when given.
+    """
+    where = f"'test.distributions.{distribution}.versions'"
+    if versions is None:
+        return None
+    if not (isinstance(versions, list) and versions and all(isinstance(v, str) and v for v in versions)):
+        return f"{where} must be a list of release names like debian_13 (the rp-names in distributions.yaml)"
+    if known is not None:
+        releases = {release_key(name) for name in known}
+        unknown = [v for v in versions if release_key(v) not in releases]
+        if unknown:
+            return f"{where} names unknown release(s): {', '.join(unknown)} (known: {', '.join(known)})"
+    return None
+
+
+def check_test_versions(config, known):
+    """Problems with every `test.distributions.<dist>.versions`. known: {distribution: its release names}.
+
+    `pkggen generate` builds dependencies for these releases too, so a typo
+    there is reported by every command, not only by `pkggen test`.
+    """
+    test = config.get("test")
+    per_dist = test.get("distributions") if isinstance(test, dict) else None
+    if not isinstance(per_dist, dict):
+        return []  # `pkggen test` reports a malformed `test` block
+    errors = []
+    unknown = [d for d in per_dist if d not in known]
+    if unknown:
+        errors.append(f"'test.distributions' names unknown distribution(s): {', '.join(unknown)} "
+                      f"(known: {', '.join(sorted(known))})")
+    for dist, entry in per_dist.items():
+        if dist in known and isinstance(entry, dict):
+            problem = release_list_problem(dist, entry.get("versions"), known[dist])
+            if problem:
+                errors.append(problem)
+    return errors
+
+
 def check_package(package, known_distributions=None):
     """Problems with the optional fields every packaging generator reads."""
     name = package["name"]
@@ -268,14 +307,14 @@ def load_packages(config, package_filter):
     return packages
 
 
-def load_targets(config, distribution_filter, failures):
+def load_distributions(config, distribution_filter, failures):
     """Distributions with a packaging generator and a `repositories.<dist>` block."""
     packaging_dir = os.path.join(utils.get_generators_path(), "packaging")
     repositories = config.get("repositories") or {}
 
-    distributions = utils.load_distributions()
-    rp_names = {dist["name"]: list(dist.get("rp-names") or []) for dist in distributions}
-    aliases = {dist["name"]: utils.target_aliases(dist) for dist in distributions}
+    known = utils.load_distributions()
+    rp_names = {dist["name"]: list(dist.get("rp-names") or []) for dist in known}
+    aliases = {dist["name"]: utils.target_aliases(dist) for dist in known}
     candidates = [name for name in rp_names if os.path.isfile(os.path.join(packaging_dir, f"{name}.py"))]
 
     if distribution_filter:
@@ -285,7 +324,7 @@ def load_targets(config, distribution_filter, failures):
                                      f"(available: {', '.join(candidates) or 'none'})")
         candidates = [dist for dist in candidates if dist in distribution_filter]
 
-    targets = []
+    distributions = []
     for dist in candidates:
         if dist not in repositories:
             if distribution_filter:
@@ -296,9 +335,9 @@ def load_targets(config, distribution_filter, failures):
             failures.append(Failure("package", "*", f"the repository {utils.display_path(repo_path)} doesn't exist "
                                                     f"yet. Run `pkggen gen-repo {dist}` first", dist))
             continue
-        targets.append(Target(dist, os.path.join(packaging_dir, f"{dist}.py"), repo_path, repositories[dist] or {},
-                              rp_names[dist], aliases[dist]))
-    return targets
+        distributions.append(Distribution(dist, os.path.join(packaging_dir, f"{dist}.py"), repo_path,
+                                          repositories[dist] or {}, rp_names[dist], aliases[dist]))
+    return distributions
 
 
 def error_lines(stderr_text):
@@ -310,6 +349,8 @@ def error_lines(stderr_text):
 def fetch_environment():
     """The fetch generators' environment: PKGGEN_CACHE_DIR defaults to pkggen-build/cache. Empty turns it off."""
     env = dict(os.environ)
+    # Their output is read as UTF-8, also where the locale's code page isn't (Windows)
+    env["PYTHONIOENCODING"] = "utf-8"
     if CACHE_ENV not in env:
         env[CACHE_ENV] = os.path.join(utils.get_run_path(), utils.DEFAULT_BUILD_DIR, CACHE_DIR)
     return env
@@ -375,52 +416,55 @@ def build_context(package, result):
     return context
 
 
-def run_packaging(target, context, releases=None, package_dependencies=None):
+def run_packaging(distribution, context, releases=None, package_dependencies=None):
     run_path = utils.get_run_path()
-    templates_root = os.path.join(run_path, "packages", target.name)
+    templates_root = os.path.join(run_path, "packages", distribution.name)
     job = {
-        "distribution": target.name,
+        "distribution": distribution.name,
         "package": context,
-        "repository": target.repository,
-        "repository_path": target.repo_path,
+        "repository": distribution.repository,
+        "repository_path": distribution.repo_path,
         # Packages with the same `templates` share one folder
         "templates_path": os.path.join(templates_root, context.get("templates") or context["name"]),
         "templates_root": templates_root,
-        "default_templates_path": os.path.join(utils.get_generators_path(), "templates", target.name),
+        "default_templates_path": os.path.join(utils.get_generators_path(), "templates", distribution.name),
         "run_path": run_path,
         # The releases the package is built for, and its dependencies with repology's packages in them
-        "releases": releases if releases is not None else list(target.rp_names),
+        "releases": releases if releases is not None else list(distribution.rp_names),
         "dependencies": package_dependencies or {role: [] for role in dependencies.ROLES},
     }
-    process = subprocess.run([sys.executable, target.script], input=json.dumps(job),
-                             text=True, capture_output=True)
+    # The child writes UTF-8 even where the locale's code page isn't (Windows)
+    process = subprocess.run([sys.executable, distribution.script], input=json.dumps(job), text=True,
+                             capture_output=True, encoding="utf-8", errors="replace",
+                             env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     if process.returncode != 0:
         raise RuntimeError(process.stderr.strip() or f"the packaging generator exited with code {process.returncode}")
     try:
         return json.loads(process.stdout)
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"{os.path.basename(target.script)} printed invalid JSON ({e}): {process.stdout.strip()[:200]!r}")
+        raise RuntimeError(
+            f"{os.path.basename(distribution.script)} printed invalid JSON ({e}): {process.stdout.strip()[:200]!r}")
 
 
 def plural(count, word):
     return f"{count} {word}{'' if count == 1 else 's'}"
 
 
-def report_packaging(target, context, result):
+def report_packaging(distribution, context, result):
     name = context["name"]
     for warning in result.get("warnings") or []:
-        say(f"{YELLOW}Warning [{target.name}/{name}]: {warning}{RESET}")
+        say(f"{YELLOW}Warning [{distribution.name}/{name}]: {warning}{RESET}")
     written = result.get("files_written") or []
     unchanged = result.get("files_unchanged") or []
     where = f" → {result['output']}" if result.get("output") else ""
-    say(f"{GREEN}✓{RESET} [{target.name}] {name} {context['version']}{where} "
+    say(f"{GREEN}✓{RESET} [{distribution.name}] {name} {context['version']}{where} "
         f"({len(written)} written, {len(unchanged)} unchanged)")
 
 
-def print_summary(stats, total_packages, targets, failures):
-    distributions = f" ({', '.join(t.name for t in targets)})" if targets else ""
+def print_summary(stats, total_packages, distributions, failures):
+    names = f" ({', '.join(d.name for d in distributions)})" if distributions else ""
     line = (f"{stats['fetched']}/{total_packages} packages fetched, "
-            f"{stats['packaged']}/{stats['jobs']} distribution packages generated{distributions}")
+            f"{stats['packaged']}/{stats['jobs']} distribution packages generated{names}")
     say("")
     if not failures:
         say(f"{GREEN}Done:{RESET} {line}.")
@@ -437,11 +481,11 @@ def print_summary(stats, total_packages, targets, failures):
 @dataclass
 class PipelineResult:
     """What run_pipeline() did, for callers that continue with the packages (`pkggen test`)."""
-    packages: list   # (package, fetch generator path), in pkggen.yaml order
-    targets: list    # [Target]
-    contexts: dict   # package name -> template context, for every fetched package
-    packaged: dict   # (distribution, package name) -> packaging generator result
-    failures: list   # [Failure]
+    packages: list       # (package, fetch generator path), in pkggen.yaml order
+    distributions: list  # [Distribution]
+    contexts: dict       # package name -> template context, for every fetched package
+    packaged: dict       # (distribution, package name) -> packaging generator result
+    failures: list       # [Failure]
     stats: dict
 
 
@@ -457,24 +501,29 @@ def load_config():
 def generate(package_filter=None, distribution_filter=None):
     """Run stages 3 and 4. Returns the process exit code."""
     result = run_pipeline(load_config(), package_filter, distribution_filter)
-    print_summary(result.stats, len(result.packages), result.targets, result.failures)
+    print_summary(result.stats, len(result.packages), result.distributions, result.failures)
     return 1 if result.failures else 0
 
 
 def run_pipeline(config, package_filter=None, distribution_filter=None):
-    """Fetch every package and package it for every target distribution."""
+    """Fetch every package and package it for every selected distribution."""
     packages = load_packages(config, package_filter)
     if not packages:
         raise utils.GenericError("pkggen.yaml defines no packages!")
+    # Dependencies are rendered for the releases in `test.distributions.<dist>.versions`
+    errors = check_test_versions(config, {dist["name"]: utils.release_names(dist)
+                                          for dist in utils.load_distributions()})
+    if errors:
+        raise utils.GenericError("Problems found in pkggen.yaml:\n  - " + "\n  - ".join(errors))
 
     failures = []
-    targets = load_targets(config, distribution_filter, failures)
-    if not targets:
+    distributions = load_distributions(config, distribution_filter, failures)
+    if not distributions:
         say(f"{YELLOW}Warning: no distribution to package for, so packages are only fetched. Add a "
             f"'repositories.<dist>' block and run `pkggen gen-repo <dist>` to package them.{RESET}")
 
-    if targets:
-        names = [t.name for t in targets]
+    if distributions:
+        names = [d.name for d in distributions]
         for package, _ in packages:
             if not any(builds_for(package, name) for name in names):
                 say(f"{YELLOW}Warning: {package['name']} is only packaged for "
@@ -482,13 +531,13 @@ def run_pipeline(config, package_filter=None, distribution_filter=None):
                     f"this time{RESET}")
 
     say(f"Fetching {plural(len(packages), 'package')}"
-        + (f", packaging for {', '.join(t.name for t in targets)}" if targets else ""))
+        + (f", packaging for {', '.join(d.name for d in distributions)}" if distributions else ""))
 
     # Dependencies are looked up once for every package, while the packages are fetched
-    target_names = [t.name for t in targets]
+    distribution_names = [d.name for d in distributions]
     everything = load_packages(config, None) if package_filter else packages
-    local = dependencies.local_packages([p for p, _ in everything], target_names, builds_for)
-    projects = dependencies.projects([p for p, _ in packages], target_names, local, builds_for)
+    local = dependencies.local_packages([p for p, _ in everything], distribution_names, builds_for)
+    projects = dependencies.projects([p for p, _ in packages], distribution_names, local, builds_for)
     test_config = config.get("test") if isinstance(config.get("test"), dict) else {}
 
     fetch_workers = min(len(packages), MAX_FETCH_WORKERS)
@@ -501,49 +550,49 @@ def run_pipeline(config, package_filter=None, distribution_filter=None):
     contexts = {}
     packaged = {}
 
-    def on_packaged(future, target, context):
+    def on_packaged(future, distribution, context):
         try:
             result = future.result()
         except Exception as e:
             with stats_lock:
-                failures.append(Failure("package", context["name"], str(e), target.name))
-            say(f"{RED}✗{RESET} [{target.name}] {context['name']} failed")
+                failures.append(Failure("package", context["name"], str(e), distribution.name))
+            say(f"{RED}✗{RESET} [{distribution.name}] {context['name']} failed")
             return
         with stats_lock:
             stats["packaged"] += 1
-            packaged[(target.name, context["name"])] = result
-        report_packaging(target, context, result)
+            packaged[(distribution.name, context["name"])] = result
+        report_packaging(distribution, context, result)
 
     def look_up():
-        rp_names = list(dict.fromkeys(rp for t in targets for rp in t.rp_names))
+        rp_names = list(dict.fromkeys(rp for d in distributions for rp in d.rp_names))
         found, warnings = dependencies.run_generator(projects, rp_names, env=fetch_environment())
         for line in dict.fromkeys(warnings):
-            say(f"{YELLOW}{ANSI_RE.sub('', line).strip()}{RESET}")
+            say(f"{YELLOW}{utils.ANSI_RE.sub('', line).strip()}{RESET}")
         count = len(projects)
         say(f"{GREEN}✓{RESET} looked up {count} {'dependency' if count == 1 else 'dependencies'} on repology")
         return found
 
-    def package_one(target, context):
+    def package_one(distribution, context):
         found = {}
         # Only packages that need something from repology wait for it
-        if projects and dependencies.projects([context], [target.name], local, builds_for):
+        if projects and dependencies.projects([context], [distribution.name], local, builds_for):
             try:
                 found = looked_up.result()
             except Exception as e:
                 raise RuntimeError(f"couldn't look its dependencies up: {e}")
         allowed = package_distributions(context)
-        test_spec = (test_config.get("distributions") or {}).get(target.name) \
+        test_spec = (test_config.get("distributions") or {}).get(distribution.name) \
             if isinstance(test_config.get("distributions"), dict) else None
-        releases = dependencies.releases(allowed.get(target.name) if allowed else None, target.rp_names,
+        releases = dependencies.releases(allowed.get(distribution.name) if allowed else None, distribution.rp_names,
                                          test_spec.get("versions") if isinstance(test_spec, dict) else None,
-                                         release_key, target.aliases)
-        return run_packaging(target, context, releases,
-                             dependencies.for_job(context, target.name, releases, found, local))
+                                         release_key, distribution.aliases)
+        return run_packaging(distribution, context, releases,
+                             dependencies.for_job(context, distribution.name, releases, found, local))
 
     with ThreadPoolExecutor(max_workers=fetch_workers) as fetch_pool, \
             ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as package_pool, \
             ThreadPoolExecutor(max_workers=1) as dependency_pool:
-        looked_up = dependency_pool.submit(look_up) if projects and targets else None
+        looked_up = dependency_pool.submit(look_up) if projects and distributions else None
         fetches = {fetch_pool.submit(run_fetch, package, script, positions): package
                    for package, script in packages}
 
@@ -563,12 +612,12 @@ def run_pipeline(config, package_filter=None, distribution_filter=None):
             say(f"{GREEN}✓{RESET} fetched {package['name']} {context['version']} "
                 f"({plural(len(context['artifacts']), 'artifact')})")
             # Start packaging right away, while other packages are still downloading
-            for target in targets:
-                if not builds_for(package, target.name):
+            for distribution in distributions:
+                if not builds_for(package, distribution.name):
                     continue
                 stats["jobs"] += 1
-                job = package_pool.submit(package_one, target, context)
-                job.add_done_callback(lambda f, t=target, c=context: on_packaged(f, t, c))
+                job = package_pool.submit(package_one, distribution, context)
+                job.add_done_callback(lambda f, d=distribution, c=context: on_packaged(f, d, c))
         # Leaving the `with` block waits for the remaining packaging jobs
 
-    return PipelineResult(packages, targets, contexts, packaged, failures, stats)
+    return PipelineResult(packages, distributions, contexts, packaged, failures, stats)

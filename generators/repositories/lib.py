@@ -4,9 +4,19 @@
 # Every repository generator receives the full pkggen.yaml as JSON on stdin
 # and reads its own block from `repositories.<distribution>`. Files are written
 # relative to the current working directory (the gen-repo output directory).
+import importlib.util
 import json
 import os
 import sys
+
+# generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
+# Loaded by path once per process, under a name no other module has
+if "pkggen_common" not in sys.modules:
+    _spec = importlib.util.spec_from_file_location(
+        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(sys.modules["pkggen_common"])
+from pkggen_common import *  # noqa: E402,F401,F403
 
 # Set by `pkggen gen-repo --force`. Without it, existing files are left alone.
 FORCE = os.getenv("PKGGEN_FORCE") == "1"
@@ -62,7 +72,8 @@ def write_file(path, content):
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    with open(path, "w", newline="\n") as f:
+    # UTF-8 whatever the locale (Windows' is often cp1252), and LF line endings
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"{'overwrote' if exists else 'created'} {path}", file=sys.stderr)
 
@@ -74,23 +85,6 @@ def make_dirs(dirs, gitkeep=True):
         keep = os.path.join(directory, ".gitkeep")
         if gitkeep and not os.path.exists(keep):
             open(keep, "w").close()
-
-
-def as_list(value):
-    """Turn None, a single value or a list into a list."""
-    if value is None:
-        return []
-    if isinstance(value, (list, tuple)):
-        return list(value)
-    return [value]
-
-
-def to_bool(value, default):
-    if value is None:
-        return default
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "on")
-    return bool(value)
 
 
 def lines(*entries):

@@ -18,15 +18,13 @@ import re
 import subprocess
 import sys
 
-import utils
-from version import PKGGEN_VERSION
+from . import utils
+from .version import PKGGEN_VERSION
 
 ROLES = ("build", "libraries", "runtime", "development")
 GENERATOR = "repology"
 USER_AGENT = f"pkggen/{PKGGEN_VERSION} (+https://github.com/MadLadSquad/pkggen)"
 # Repology project names: lowercase words, also with ':' (e.g. "python:requests")
-ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-ERROR_PREFIX_RE = re.compile(r"^Error( \[[^\]]*\])?: ")
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.+:-]*$")
 CONSTRAINT_RE = re.compile(r"^\s*(>=|<=|=|>|<)\s*([A-Za-z0-9][A-Za-z0-9_.+:~-]*)\s*$")
 ENTRY_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9_.+:-]*)\s*(?:(>=|<=|=|>|<)\s*([A-Za-z0-9][A-Za-z0-9_.+:~-]*))?\s*$")
@@ -162,7 +160,7 @@ def releases(versions, rp_names, test_versions, release_key, aliases=None):
         return list(rp_names)
     by_key = {release_key(name): rp for name, rp in (aliases or {}).items()}
     keys = {release_key(by_key.get(release_key(v), v)) for v in versions}
-    return [rp for rp in rp_names if release_key(rp) in keys] or list(rp_names)
+    return [rp for rp in rp_names if release_key(rp) in keys]
 
 
 def for_job(package, distribution, chosen, resolved, local):
@@ -194,10 +192,10 @@ def run_generator(names, rp_names, wildcards=(), env=None):
            "user_agent": USER_AGENT}
     process = subprocess.run([sys.executable, script], input=json.dumps(job), text=True, encoding="utf-8",
                              capture_output=True, env=env)
-    lines = [ANSI_RE.sub("", line).strip() for line in process.stderr.splitlines()]
+    lines = [utils.ANSI_RE.sub("", line).strip() for line in process.stderr.splitlines()]
     warnings = [line for line in lines if "Warning" in line]
     if process.returncode != 0:
-        errors = [ERROR_PREFIX_RE.sub("", line) for line in lines if "Error" in line]
+        errors = [utils.ERROR_PREFIX_RE.sub("", line) for line in lines if "Error" in line]
         raise RuntimeError("\n".join(errors[-5:]) or f"the dependency generator exited with code {process.returncode}")
     try:
         result = json.loads(process.stdout)

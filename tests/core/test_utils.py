@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-import utils
+from pkggen import utils
 from tests.support import paths
 
 
@@ -176,3 +176,34 @@ def test_generic_error_keeps_plain_message():
 
 def test_default_paths_are_this_repository():
     assert utils.get_generators_path() == str(paths.GENERATORS)
+
+
+def test_get_pkggen_config_utf8_and_invalid_bytes(monkeypatch, tmp_path):
+    monkeypatch.setenv("PKGGEN_RUN_PATH", str(tmp_path))
+    (tmp_path / "pkggen.yaml").write_bytes("maintainer: \"Jürgen <j@example.org>\"\ndescription: \"Ümlauts — 日本語\"\n".encode("utf-8"))
+    assert utils.get_pkggen_config() == {"maintainer": "Jürgen <j@example.org>", "description": "Ümlauts — 日本語"}
+
+    (tmp_path / "pkggen.yaml").write_bytes(b"name: \xff\n")
+    with pytest.raises(utils.GenericError, match="isn't UTF-8"):
+        utils.get_pkggen_config()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file permissions")
+def test_create_secrets_file_permissions(isolated_env, secrets):
+    path = utils.create_secrets_file()
+    assert os.stat(path).st_mode & 0o777 == 0o600
+    os.chmod(path, 0o644)
+    utils.create_secrets_file()
+    assert os.stat(path).st_mode & 0o777 == 0o600
+
+
+def test_shared_common_imported_in_every_layer_and_no_bare_shadowing():
+    from tests.support.helpers import load_generator
+    shared = ("ANSI_RE", "ERROR_PREFIX_RE", "config_dir", "secrets_path",
+              "ensure_secrets_file", "shquote", "to_bool", "as_list", "words")
+    for layer in ("dependencies", "deployment", "generation", "packaging", "repositories", "testing"):
+        lib = load_generator(layer, "lib")
+        for attr in shared:
+            assert hasattr(lib, attr), (layer, attr)
+    with pytest.raises(ModuleNotFoundError):
+        __import__("utils")

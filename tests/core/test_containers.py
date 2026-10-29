@@ -3,8 +3,7 @@ import json
 
 import pytest
 
-import containers
-import utils
+from pkggen import containers, utils
 
 
 def settings(**values):

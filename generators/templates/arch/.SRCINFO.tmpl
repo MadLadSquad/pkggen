@@ -8,10 +8,10 @@ pkgbase = {{ name }}
 	arch = {{ a }}
 {% endfor %}
 	license = {{ license | default("LicenseRef-unknown") | spdx }}
-{% for d in dist.makedepends | default([]) %}
+{% for d in deps.makedepends + dist.makedepends | default([]) %}
 	makedepends = {{ d }}
 {% endfor %}
-{% for d in dist.depends | default([]) %}
+{% for d in deps.depends + dist.depends | default([]) %}
 	depends = {{ d }}
 {% endfor %}
 {% for a in artifacts %}

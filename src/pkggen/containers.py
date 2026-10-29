@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 
-import utils
+from . import utils
 
 MACHINE_NAME = "pkggen"
 # The session label every container gets, so a run can clean up after itself

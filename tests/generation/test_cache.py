@@ -95,7 +95,7 @@ def test_a_broken_cache_entry_is_ignored(glib, http, cache):
 
 
 def test_generate_points_fetch_generators_at_pkggen_build(monkeypatch, tmp_path):
-    import generate
+    from pkggen import generate
     monkeypatch.setenv("PKGGEN_RUN_PATH", str(tmp_path))
     monkeypatch.delenv("PKGGEN_CACHE_DIR", raising=False)
     assert generate.fetch_environment()["PKGGEN_CACHE_DIR"] == str(tmp_path / "pkggen-build" / "cache")

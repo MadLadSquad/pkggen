@@ -4,6 +4,7 @@
 # Contract: a fetch generator reads one package (JSON) on stdin and prints one
 # JSON result on stdout. Everything else (progress bars, messages, errors) goes
 # to stderr, so stdout always stays parseable.
+import importlib.util
 import hashlib
 import json
 import os
@@ -19,6 +20,15 @@ import yaml
 from requests.adapters import HTTPAdapter
 from requests.structures import CaseInsensitiveDict
 from tqdm import tqdm
+
+# generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
+# Loaded by path once per process, under a name no other module has
+if "pkggen_common" not in sys.modules:
+    _spec = importlib.util.spec_from_file_location(
+        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(sys.modules["pkggen_common"])
+from pkggen_common import *  # noqa: E402,F401,F403
 
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
 TIMEOUT = 30
@@ -205,36 +215,20 @@ def warn(message):
     log(f"\x1b[33mWarning: {message}\x1b[0m")
 
 
-def secrets_path():
-    if os.name == "nt":
-        base_dir = os.getenv("APPDATA", os.path.expanduser("~\\AppData\\Roaming"))
-    else:
-        base_dir = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
-    return os.path.join(base_dir, "pkggen", "secrets.yaml")
-
-
 def load_secrets():
-    path = secrets_path()
-    if not os.path.exists(path):
-        warn(f"{path} was requested but not found. Creating it automatically.")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        open(path, "w").close()
+    path, created = ensure_secrets_file()  # noqa: F405 (from pkggen_common)
+    if created:
+        warn(f"{path} was requested but not found, so it was created (readable only by you)")
     try:
-        with open(path, "r") as stream:
+        with open(path, "r", encoding="utf-8") as stream:
             result = yaml.safe_load(stream)
     except yaml.YAMLError as e:
         raise TinyError(f"couldn't parse {path}: {e}")
+    except UnicodeDecodeError as e:
+        raise TinyError(f"{path} isn't UTF-8: {e}")
     if result is not None and not isinstance(result, dict):
         raise TinyError(f"{path} must contain a mapping of secret names to values")
     return result or {}
-
-
-def to_bool(value, default=False):
-    if value is None:
-        return default
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "on")
-    return bool(value)
 
 
 def apply_transforms(transforms, value):

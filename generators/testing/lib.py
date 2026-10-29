@@ -41,11 +41,21 @@
 # records them in results.json for `pkggen deploy`.
 # A step is { "name": "...", "run": "<sh script>", "user": null, "workdir": null }.
 # Each step runs in its own `sh -exc`, so `cd` and variables don't carry over.
+import importlib.util
 import json
 import os
 import re
 import sys
 import traceback
+
+# generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
+# Loaded by path once per process, under a name no other module has
+if "pkggen_common" not in sys.modules:
+    _spec = importlib.util.spec_from_file_location(
+        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(sys.modules["pkggen_common"])
+from pkggen_common import *  # noqa: E402,F401,F403
 
 DEBUG = os.getenv("PKGGEN_DEBUG") == "1"
 
@@ -119,11 +129,6 @@ def user_steps(job, key):
     """The user's `setup` or `post-setup` steps, already normalised by pkggen."""
     return [step(s.get("name") or "user step", s["run"], s.get("user"), s.get("workdir"))
             for s in job.test.get(key) or []]
-
-
-def shquote(value):
-    """Quote for sh with single quotes: it's -> 'it'\\''s'."""
-    return "'" + str(value).replace("'", "'\\''") + "'"
 
 
 def heredoc(path, content):

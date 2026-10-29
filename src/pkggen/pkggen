@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 # Runs pkggen from a checkout: `python3 src/pkggen/pkggen <command>`.
 # An installed pkggen runs the same code as the `pkggen` command (pkggen.cli:main).
-from cli import main
+import os
+import sys
+
+here = os.path.dirname(os.path.abspath(__file__))
+sys.path[:] = [p for p in sys.path if os.path.abspath(p or os.getcwd()) != here]
+sys.path.insert(0, os.path.dirname(here))
+
+from pkggen.cli import main  # noqa: E402
 
 if __name__ == "__main__":
     main()

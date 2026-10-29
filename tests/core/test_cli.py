@@ -68,3 +68,19 @@ def test_gen_repo_end_to_end(example_project):
     assert result.code == 0, result.err
     assert (example_project / "pkggen-build" / "gentoo" / "profiles" / "repo_name").is_file()
 
+
+@pytest.mark.parametrize("args", [["version"], ["-v"], ["--version"], ["--help"]])
+def test_version_and_help_do_not_require_distributions_yaml(tmp_path, args):
+    result = run_cli(*args, env={"PKGGEN_GENERATORS_PATH": tmp_path})
+    assert result.code == 0, result.err
+    if args != ["--help"]:
+        assert result.out.strip() == f"pkggen version {VERSION}"
+
+
+@pytest.mark.parametrize("args", [["arch"], ["--help"], ["-o", "out", "arch"], []])
+def test_gen_repo_reports_missing_distributions_yaml_cleanly(tmp_path, args):
+    result = run_cli("gen-repo", *args, env={"PKGGEN_GENERATORS_PATH": tmp_path})
+    assert result.code == 1
+    assert "Traceback" not in result.err
+    assert "Error: Couldn't find " in result.err_plain
+

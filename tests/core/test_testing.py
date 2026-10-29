@@ -4,10 +4,7 @@ import textwrap
 
 import pytest
 
-import containers
-import generate
-import testing
-import utils
+from pkggen import containers, generate, testing, utils
 from tests.core.test_generate import STUB_FETCH, STUB_PACKAGING, packages  # noqa: F401
 from tests.support.helpers import run_cli, strip_ansi
 
@@ -23,6 +20,9 @@ STUB_TESTING = textwrap.dedent("""\
     def step(name, run):
         return {"name": name, "run": run, "user": None, "workdir": None}
     targets, skipped, warnings = [], [], ["packages: %d" % len(job["packages"])]
+    if job["repository"].get("fail_generator"):
+        print("\\x1b[31mError: bad repository\\x1b[0m", file=sys.stderr)
+        sys.exit(1)
     for rp in job["versions"] or job["rp_names"]:
         if rp == "bad":
             print("\\x1b[31mError: bad version\\x1b[0m", file=sys.stderr)
@@ -374,8 +374,8 @@ def test_nothing_to_test(generators, project):
 
 
 def test_testing_generator_errors(generators, project):
-    project(test={"distributions": {"beta": {"versions": ["bad"]}}})
-    with pytest.raises(utils.GenericError, match="The beta testing generator failed: Error: bad version"):
+    project(extra={"repositories": {"alpha": {}, "beta": {"fail_generator": True}}})
+    with pytest.raises(utils.GenericError, match="The beta testing generator failed: Error: bad repository"):
         testing.test()
 
 
@@ -436,7 +436,7 @@ def test_package_entries_paths_are_relative_to_the_repository(tmp_path, monkeypa
     repo = tmp_path / "custom" / "gentoo"
     pipeline = generate.PipelineResult(
         packages=[({"name": "a"}, "x"), ({"name": "b"}, "x"), ({"name": "c"}, "x")],
-        targets=[generate.Target("gentoo", "x", str(repo), {})],
+        distributions=[generate.Distribution("gentoo", "x", str(repo), {})],
         contexts={"a": {"name": "a"}, "b": {"name": "b"}, "c": {"name": "c"}},
         packaged={("gentoo", "a"): {"output": "custom/gentoo/dev-libs/a"},
                   ("gentoo", "c"): {"output": str(repo / "app-misc" / "c")}},
@@ -493,3 +493,19 @@ def test_package_distributions_limit_the_releases_it_is_tested_on(generators, pr
     assert targets["alpha-a1"]["packages"]["two"] == {"version": "1.0", "ok": False,
                                                       "skipped": "its 'distributions' leave out alpha-a1"}
     assert targets["alpha-a2"]["packages"]["two"] == {"version": "1.0", "ok": True}
+
+
+def test_unknown_version_in_test_distributions_is_rejected_up_front(generators, project, fake_engine):
+    project(test={"distributions": {"beta": {"versions": ["bad"]}}})
+    with pytest.raises(utils.GenericError, match=r"'test\.distributions\.beta\.versions' names unknown release\(s\): "
+                                                 r"bad \(known: b1\)"):
+        testing.test()
+    assert fake_engine.raw_calls() == []
+
+
+def test_pipeline_failures_are_not_reprinted_in_test_summary(generators, project, fake_engine, capsys):
+    project(group=packages({"name": "good"}, {"name": "broken", "stub": "fail"}))
+    assert testing.test() == 1
+    err = strip_ansi(capsys.readouterr().err)
+    assert err.count("✗ fetch broken: boom") == 1
+    assert "✗ 1 fetch or packaging problem, listed above" in err

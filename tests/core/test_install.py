@@ -58,8 +58,8 @@ def environment():
 
 
 def generators_path(python, cwd):
-    return sh(python, "-c", "import sys; sys.argv = ['pkggen']; import pkggen.cli, utils; "
-                            "print(utils.get_generators_path())", cwd=cwd, env=environment()).strip()
+    return sh(python, "-c", "from pkggen import utils; print(utils.get_generators_path())",
+              cwd=cwd, env=environment()).strip()
 
 
 def source_files(root):

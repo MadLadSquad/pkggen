@@ -4,7 +4,7 @@
 import os
 import json
 import shutil
-import utils
+from . import utils
 import subprocess
 import sys
 

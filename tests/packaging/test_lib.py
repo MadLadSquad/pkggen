@@ -333,6 +333,13 @@ def test_executable_bits(plib, make_job, tmp_path):
     assert os.access(tmp_path / "out" / "named", os.X_OK)
     assert not os.access(tmp_path / "out" / "plain", os.X_OK)
 
+    # Clearing the template's executable bit (and removing `named` from executable) clears stale +x on output
+    os.chmod(tmp_path / "packages" / "arch" / "p" / "script.tmpl", 0o644)
+    (tmp_path / "packages" / "arch" / "p" / "named.tmpl").write_text("updated")
+    plib.render_tree(job, lambda rel: str(tmp_path / "out" / rel))
+    assert not os.access(tmp_path / "out" / "script", os.X_OK)
+    assert not os.access(tmp_path / "out" / "named", os.X_OK)
+
 
 # --- Shared template folders -------------------------------------------------------------------
 

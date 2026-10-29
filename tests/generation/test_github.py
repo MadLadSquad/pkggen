@@ -120,6 +120,13 @@ def test_version_lock_on_a_later_page(gh, http):
     assert gh.generate(package(version="v9.9"))["tag"] == "v9.9"
 
 
+@pytest.mark.parametrize("value", [1.1, 2024, True])
+def test_unquoted_version_is_an_error(gh, value):
+    # YAML reads `version: 1.10` as 1.1: matching str(1.1) could pick the wrong tag
+    with pytest.raises(gh.lib.TinyError, match="must be the exact tag name or commit hash in quotes"):
+        gh.generate(package(version=value))
+
+
 @pytest.mark.parametrize("config, message", [
     ({}, "no release found in u/r excluding drafts, excluding pre-releases"),
     ({"select": "^x", "include-drafts": True, "include-pre-releases": True}, "no release found in u/r matching '^x'"),
@@ -275,7 +282,7 @@ def test_config_errors(gh, pkg, message):
 # --- Subprocess contract -------------------------------------------------------------------------
 
 def test_example_package_offline(http_subprocess, example_config):
-    import generate
+    from pkggen import generate
     calls = http_subprocess(example_routes())
     # The first example package, with its group's defaults
     pkg = generate.load_packages(example_config, ["untitled-cli-parser"])[0][0]

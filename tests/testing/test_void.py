@@ -46,3 +46,10 @@ def test_build_registers_shared_libraries(describe):
     finalize = scripts(target["finalize"])
     assert 'xbps-rindex --compression xz -a "$PWD"/*.xbps' in finalize
     assert "/pkggen/repo/common/shlibs" in finalize
+
+
+def test_base_chroot_filter_only_excludes_ada_toolchain(describe):
+    targets, _ = describe("void")
+    setup = scripts(targets[0]["setup"])
+    assert "grep -v -E -e '^chroot-' -e '^(gcc-ada|libada-devel)$'" in setup
+    assert "grep -v 'ada'" not in setup

@@ -28,7 +28,10 @@ xbps-install -y bash git curl xz bzip2 unzip
 """),
     # ethereal: xbps-src uses the container itself as its masterdir. Its
     # base-chroot package conflicts with the image's own bash, grep and
-    # util-linux, so its other dependencies are installed instead
+    # util-linux, so its other dependencies are installed instead. Left out of
+    # them: the chroot-* tools (they're what conflicts) and the Ada toolchain
+    # (gcc-ada, libada-devel), which only building gcc itself needs. The names
+    # are matched whole, so packages that merely contain "ada" stay in
     lib.step("set up xbps-src", f"""\
 if [ ! -d {CHECKOUT} ]; then git clone --depth 1 {VOID_PACKAGES} {CHECKOUT}; fi
 cd {CHECKOUT}
@@ -43,7 +46,7 @@ case "$arch" in
 esac
 cp "etc/xbps.d/$conf" /etc/xbps.d/00-pkggen-bootstrap.conf
 xbps-install -S
-deps=$(xbps-query -R -x base-chroot | sed 's/[<>=].*//' | grep -v -e '^chroot-' -e 'ada')
+deps=$(xbps-query -R -x base-chroot | sed 's/[<>=].*//' | grep -v -E -e '^chroot-' -e '^(gcc-ada|libada-devel)$')
 test -n "$deps"
 xbps-install -y gawk $deps
 ./xbps-src binary-bootstrap

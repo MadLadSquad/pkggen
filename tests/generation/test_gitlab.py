@@ -140,6 +140,13 @@ def test_pagination(gl, http):
     assert gl.generate(package(version="v9"))["tag"] == "v9"
 
 
+@pytest.mark.parametrize("value", [1.1, 2024, True])
+def test_unquoted_version_is_an_error(gl, value):
+    # YAML reads `version: 1.10` as 1.1: matching str(1.1) could pick the wrong tag
+    with pytest.raises(gl.lib.TinyError, match="must be the exact tag name or commit hash in quotes"):
+        gl.generate(package(version=value))
+
+
 # --- Tags and commits ---------------------------------------------------------------------------
 
 def test_tags(gl, http):

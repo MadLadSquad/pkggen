@@ -8,9 +8,7 @@ import json
 import os
 import sys
 
-import dependencies
-import generate
-import utils
+from .. import dependencies, generate, utils
 
 
 def release_rows(projects, name, distributions, include_outdated):

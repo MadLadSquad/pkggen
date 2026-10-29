@@ -3,9 +3,10 @@ import json
 
 import pytest
 
+from pkggen import utils
+from pkggen.utilities import repology
 from tests.support.helpers import run_cli, strip_ansi
 from tests.support.http_shim.pkggen_test_http import Routes
-from utilities import repology
 
 URL = "https://repology.org/api/v1/project/zlib"
 
@@ -72,7 +73,6 @@ def test_not_found(http_subprocess, capsys, status, items):
 
 def test_errors_are_one_line(http_subprocess, capsys):
     http_subprocess(Routes().json(URL, {"error": "down"}, status=500))
-    import utils
     with pytest.raises(utils.GenericError, match="look 'zlib' up on repology: HTTP 500"):
         repology.query_repology("zlib", False, False)
 

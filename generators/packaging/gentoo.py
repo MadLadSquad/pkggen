@@ -30,14 +30,6 @@ MANIFEST_HASHES = {
 DEFAULT_MANIFEST_HASHES = ["BLAKE2B", "SHA512"]
 
 
-def as_list(value):
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return value.split()
-    return [str(v) for v in value]
-
-
 def package_category(package):
     """The category a package sets in pkggen.yaml (`gentoo.category`, else `category`), or None."""
     gentoo = package.get("gentoo") if isinstance(package.get("gentoo"), dict) else {}
@@ -45,7 +37,7 @@ def package_category(package):
 
 
 def get_category(job):
-    categories = as_list(job.repository.get("categories"))
+    categories = lib.words(job.repository.get("categories"))
     category = package_category(job.context)
 
     if not category:
@@ -54,7 +46,7 @@ def get_category(job):
                                      "Set 'category' for the package in pkggen.yaml")
         category = categories[0]
         job.warn(f"{job.name} has no 'category', so it went into '{category}'. Set 'category' in pkggen.yaml to choose one")
-    elif categories and category not in categories and not as_list(job.repository.get("masters")):
+    elif categories and category not in categories and not lib.words(job.repository.get("masters")):
         # With masters (e.g. gentoo), the overlay also has the master repositories' categories
         job.warn(f"category '{category}' isn't listed in 'repositories.gentoo.categories', "
                  "so Portage won't see it until it's added to profiles/categories")
@@ -73,7 +65,7 @@ def keyword(job, arch):
 
 
 def write_manifest(job, out):
-    names = [name.upper() for name in as_list(job.repository.get("manifest-hashes"))] or DEFAULT_MANIFEST_HASHES
+    names = [name.upper() for name in lib.words(job.repository.get("manifest-hashes"))] or DEFAULT_MANIFEST_HASHES
     unknown = [name for name in names if name not in MANIFEST_HASHES]
     if unknown:
         raise lib.PackagingError(f"unsupported manifest hash {', '.join(unknown)} in 'repositories.gentoo.manifest-hashes'. "
@@ -141,7 +133,7 @@ def render(job, dep, names):
 def local_atom(job, local):
     """category/name of one of pkggen.yaml's own packages."""
     category = (package_category(local.get("package") or {})
-                or next(iter(as_list(job.repository.get("categories"))), None))
+                or next(iter(lib.words(job.repository.get("categories"))), None))
     if not category:
         raise lib.PackagingError(f"the dependency '{local['name']}' has no 'category' and "
                                  "'repositories.gentoo.categories' is empty. Set 'category' for it in pkggen.yaml")

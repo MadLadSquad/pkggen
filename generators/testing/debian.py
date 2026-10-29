@@ -39,14 +39,6 @@ apt-get install -y --no-install-recommends build-essential reprepro curl ca-cert
 """)
 
 
-def as_list(value):
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return value.split()
-    return [str(v) for v in value]
-
-
 def find_suite(job, spec):
     """The repositories.debian.suites entry for this target, if there is one."""
     names = {spec["codename"], spec.get("suite")}
@@ -70,7 +62,7 @@ def distributions_stanza(job, spec, suite):
     lines += [
         f"Codename: {suite['codename'] if suite else spec['codename']}",
         f"Architectures: {job.host_arch} source",
-        f"Components: {' '.join(as_list((suite or {}).get('components')) or as_list(repo.get('components')) or ['main'])}",
+        f"Components: {' '.join(lib.words((suite or {}).get('components')) or lib.words(repo.get('components')) or ['main'])}",
     ]
     description = (suite or {}).get("description") or repo.get("description")
     if description:

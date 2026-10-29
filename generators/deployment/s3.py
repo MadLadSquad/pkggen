@@ -12,6 +12,7 @@
 # objects no target has any more are deleted last, except `preserve` matches.
 #
 # Requests are signed with AWS Signature Version 4, using requests (no SDK).
+# Files over MULTIPART_THRESHOLD are uploaded with a multipart upload.
 import base64
 import hashlib
 import hmac
@@ -21,6 +22,7 @@ import re
 import xml.etree.ElementTree as ElementTree
 from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit
+from xml.sax.saxutils import escape
 
 import requests
 
@@ -38,6 +40,12 @@ EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 # Media types mimetypes doesn't know; the targets' `publish` adds their formats' own
 CONTENT_TYPES = {".asc": "text/plain", ".gpg": "application/pgp-signature", ".zst": "application/zstd"}
 PACKAGE, INDEX, METADATA = 0, 1, 2  # upload order
+
+# Files larger than this are uploaded in parts (a single PUT can't be over 5 GiB),
+# each part read into memory on its own. Parts must be at least 5 MiB, and an
+# upload has at most 10,000 of them: 64 MiB parts allow objects of up to 625 GiB
+MULTIPART_THRESHOLD = 64 << 20
+PART_SIZE = 64 << 20
 
 
 class Layout:
@@ -221,21 +229,69 @@ class Bucket:
         return None if response.status_code == 404 else response.content
 
     def put(self, key, data, metadata, content_type):
-        headers = {"Content-Type": content_type,
-                   "Content-MD5": base64.b64encode(hashlib.md5(data).digest()).decode("ascii")}
-        if metadata:
-            # Indexes change in place: caches in front of the bucket must check them every time
-            headers["Cache-Control"] = "no-cache"
+        headers = {"Content-Type": content_type, "Content-MD5": content_md5(data)}
+        headers.update(object_headers(metadata))
         self.request("PUT", key, data=data, headers=headers)
+
+    def upload(self, key, path, metadata, content_type):
+        """Upload a file: with one PUT, or in parts when it's larger than MULTIPART_THRESHOLD."""
+        if os.path.getsize(path) <= MULTIPART_THRESHOLD:
+            with open(path, "rb") as f:
+                self.put(key, f.read(), metadata, content_type)
+            return
+        response = self.request("POST", key, query="uploads",
+                                headers={"Content-Type": content_type, **object_headers(metadata)})
+        try:
+            root = ElementTree.fromstring(response.content)
+        except ElementTree.ParseError:
+            root = None
+        upload_id = None if root is None else (root.findtext(f"{S3_NS}UploadId") or root.findtext("UploadId"))
+        if not upload_id:
+            raise lib.DeployError(f"POST {key} didn't return an upload id: {error_message(response)}")
+        upload = "uploadId=" + uri_encode(upload_id, False)
+        try:
+            parts = []
+            with open(path, "rb") as f:
+                for number, data in enumerate(iter(lambda: f.read(PART_SIZE), b""), start=1):
+                    response = self.request("PUT", key, query=f"partNumber={number}&{upload}", data=data,
+                                            headers={"Content-MD5": content_md5(data)})
+                    parts.append((number, response.headers.get("ETag") or ""))
+            body = "".join(f"<Part><PartNumber>{number}</PartNumber><ETag>{escape(etag)}</ETag></Part>"
+                           for number, etag in parts)
+            response = self.request("POST", key, query=upload, headers={"Content-Type": "application/xml"},
+                                    data=f"<CompleteMultipartUpload>{body}</CompleteMultipartUpload>".encode("utf-8"))
+            # The upload can still fail after the 200 status line: the error is then in the body
+            try:
+                completed = ElementTree.fromstring(response.content)
+            except ElementTree.ParseError:
+                completed = None
+            if completed is None or completed.tag.endswith("Error"):
+                raise lib.DeployError(f"POST {key} failed: {error_message(response)}")
+        except BaseException:
+            try:
+                self.request("DELETE", key, query=upload)  # don't leave the parts behind, they're billed
+            except lib.DeployError:
+                pass
+            raise
 
     def delete(self, key):
         self.request("DELETE", key)
 
 
+def content_md5(data):
+    return base64.b64encode(hashlib.md5(data).digest()).decode("ascii")
+
+
+def object_headers(metadata):
+    # Indexes change in place: caches in front of the bucket must check them every time
+    return {"Cache-Control": "no-cache"} if metadata else {}
+
+
 def error_message(response):
     try:
         root = ElementTree.fromstring(response.content)
-        code, message = root.findtext("Code"), root.findtext("Message")
+        code = root.findtext("Code") or root.findtext(f"{S3_NS}Code")
+        message = root.findtext("Message") or root.findtext(f"{S3_NS}Message")
         if code:
             return f"HTTP {response.status_code} {code}: {message or ''}".strip()
     except ElementTree.ParseError:
@@ -260,6 +316,24 @@ def md5_file(path):
         for chunk in iter(lambda: f.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def multipart_etag(path):
+    """The ETag S3 gives a file uploaded in PART_SIZE parts: the MD5 of the parts' MD5s, then -<parts>."""
+    digests = []
+    with open(path, "rb") as f:
+        for data in iter(lambda: f.read(PART_SIZE), b""):
+            digests.append(hashlib.md5(data).digest())
+    return f"{hashlib.md5(b''.join(digests)).hexdigest()}-{len(digests)}"
+
+
+def unchanged(etag, path):
+    """Whether the object with this ETag (None: there's none) has the file's content."""
+    if not etag:
+        return False
+    if "-" in etag:  # uploaded in parts
+        return etag == multipart_etag(path)
+    return etag == md5_file(path)
 
 
 def main(job):
@@ -301,7 +375,7 @@ def main(job):
         for name in names_in_root:
             path = os.path.join(root, name)
             files[lib.normalise(os.path.relpath(path, folder))] = path
-    changed = sorted((relative for relative, path in files.items() if remote.get(relative) != md5_file(path)),
+    changed = sorted((relative for relative, path in files.items() if not unchanged(remote.get(relative), path)),
                      key=lambda relative: (layout.tier(relative), relative))
     patterns = [re.compile(p) for p in config.get("preserve") or ()]
     protected = [paths[name] for name in skipped]
@@ -328,8 +402,7 @@ def main(job):
 
     job.say(f"{summary}")
     for relative in changed:
-        with open(files[relative], "rb") as f:
-            bucket.put(relative, f.read(), layout.tier(relative) > PACKAGE, layout.content_type(relative))
+        bucket.upload(relative, files[relative], layout.tier(relative) > PACKAGE, layout.content_type(relative))
     for relative in stale:
         bucket.delete(relative)
     job.say(f"uploaded {len(changed)}, deleted {len(stale)}")

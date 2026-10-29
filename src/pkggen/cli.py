@@ -4,22 +4,12 @@ It's both the console script of an installed pkggen (pkggen.cli:main) and what
 the src/pkggen/pkggen launcher runs from a checkout.
 """
 import argparse
-import os
 import sys
+from datetime import datetime
 
-# The modules import each other by their plain names, so their folder has to be on
-# sys.path, also when this runs as pkggen.cli
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from . import deploy, gen_repo, generate, testing, utils, version
+from .utilities.repology import query_repology
 
-import utils  # noqa: E402
-import version  # noqa: E402
-import generate  # noqa: E402
-import gen_repo  # noqa: E402
-import testing  # noqa: E402
-import deploy  # noqa: E402
-from datetime import datetime  # noqa: E402
-
-from utilities.repology import query_repology  # noqa: E402
 
 def positive_int(value):
     try:
@@ -29,6 +19,7 @@ def positive_int(value):
     if number < 1:
         raise argparse.ArgumentTypeError(f"must be a whole number of at least 1, got {value!r}")
     return number
+
 
 def run():
     parser = argparse.ArgumentParser(
@@ -44,15 +35,28 @@ def run():
     generate_parser.add_argument("-p", "--packages", help="Only generate these packages", nargs='+')
     generate_parser.add_argument("-d", "--distributions", help="Only package for these distributions", nargs='+')
 
-    gen_repo_parser = subparsers.add_parser("gen-repo", help="Generate repository folder structures")
-    gen_repo_subparsers = gen_repo_parser.add_subparsers(dest="distribution", required=True)
-
-    gen_repo_options = argparse.ArgumentParser(add_help=False)
-    gen_repo_options.add_argument("-o", "--output", help="Set the output directory for the generator")
-    gen_repo_options.add_argument("-f", "--force", help="Overwrite files that already exist", action="store_true")
-
-    for dist in gen_repo.get_distributions():
-        gen_repo_subparsers.add_parser(dist, help=f"Generate repository for {dist}", parents=[gen_repo_options])
+    dist_error = None
+    if "gen-repo" in sys.argv[1:]:
+        try:
+            distributions = gen_repo.get_distributions()
+        except utils.GenericError as e:
+            dist_error = e
+            distributions = None
+        if dist_error is not None:
+            # Takes any arguments (see parse_known_args() below), so the error is the missing list
+            subparsers.add_parser("gen-repo", help="Generate repository folder structures", add_help=False)
+        else:
+            gen_repo_parser = subparsers.add_parser("gen-repo", help="Generate repository folder structures")
+            gen_repo_subparsers = gen_repo_parser.add_subparsers(dest="distribution", required=True)
+            gen_repo_options = argparse.ArgumentParser(add_help=False)
+            gen_repo_options.add_argument("-o", "--output", help="Set the output directory for the generator")
+            gen_repo_options.add_argument("-f", "--force", help="Overwrite files that already exist",
+                                          action="store_true")
+            for dist in distributions:
+                gen_repo_subparsers.add_parser(dist, help=f"Generate repository for {dist}",
+                                               parents=[gen_repo_options])
+    else:
+        subparsers.add_parser("gen-repo", help="Generate repository folder structures")
 
     test_parser = subparsers.add_parser("test", help="Build and install the packages in a container per distribution release")
     test_parser.add_argument("-p", "--packages", help="Only test these packages", nargs='+')
@@ -79,6 +83,12 @@ def run():
 
     subparsers.add_parser("version")
 
+    if dist_error is not None:
+        # `gen-repo --help` or `gen-repo -o dir arch` must report the missing distribution list, not
+        # argparse's "unrecognized arguments". "gen-repo" may also only be a value (`generate -p gen-repo`)
+        args, _ = parser.parse_known_args()
+        if args.command == "gen-repo":
+            raise dist_error
     args = parser.parse_args()
     if args.command == "generate":
         sys.exit(generate.generate(args.packages, args.distributions))
