@@ -184,16 +184,14 @@ def release_of(target, known):
     return rp if rp and len(shared) == 1 else target["name"]
 
 
-def testing_dir():
-    return os.path.join(utils.get_generators_path(), "testing")
+LAYER = "testing"
 
 
 def testable_distributions():
     """{name: rp-names} of the distributions with both a packaging and a testing generator."""
-    generators = utils.get_generators_path()
+    testing, packaging = utils.list_generators(LAYER), utils.list_generators("packaging")
     return {dist["name"]: list(dist.get("rp-names") or []) for dist in utils.load_distributions()
-            if os.path.isfile(os.path.join(generators, "testing", f"{dist['name']}.py"))
-            and os.path.isfile(os.path.join(generators, "packaging", f"{dist['name']}.py"))}
+            if dist["name"] in testing and dist["name"] in packaging}
 
 
 def select_distributions(config, available, distribution_filter):
@@ -219,11 +217,12 @@ def select_distributions(config, available, distribution_filter):
 
 def describe(dist, payload):
     """Run a testing generator and return its {targets, skipped, warnings}."""
-    script = os.path.join(testing_dir(), f"{dist}.py")
-    # The child writes UTF-8 even where the locale's code page isn't (Windows)
+    script = utils.find_generator(LAYER, dist)
+    if script is None:
+        raise RuntimeError(f"there's no testing generator for {dist} in {utils.shown_dirs()}")
     process = subprocess.run([sys.executable, script], input=json.dumps(payload), text=True,
                              capture_output=True, encoding="utf-8", errors="replace",
-                             env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                             env=utils.generator_env(LAYER))
     if process.returncode != 0:
         raise RuntimeError(utils.ANSI_RE.sub("", process.stderr).strip()
                            or f"the testing generator exited with code {process.returncode}")

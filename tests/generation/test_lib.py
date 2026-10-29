@@ -218,7 +218,7 @@ def script(tmp_path):
     path = tmp_path / "fake.py"
     path.write_text(textwrap.dedent(f"""\
         import sys
-        sys.path.insert(0, {str(paths.GENERATORS / "generation")!r})
+        sys.path.insert(0, {str(paths.GENERATORS / "generation" / "_lib")!r})
         import lib, requests
 
         def generate(package):

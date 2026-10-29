@@ -12,32 +12,181 @@ def fake_generators(path):
     return str(path)
 
 
+def same(a, b):
+    return os.path.normcase(str(a)) == os.path.normcase(str(b))
+
+
 def test_generators_path_defaults_to_the_checkout(monkeypatch, tmp_path):
     monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
     monkeypatch.chdir(tmp_path)
-    assert os.path.normcase(utils.get_generators_path()) == os.path.normcase(str(paths.GENERATORS))
+    assert same(utils.builtin_generators_dir(), paths.GENERATORS)
+    # The user's and system's folders of the test environment don't exist: only the built-in one is left
+    assert [os.path.normcase(d) for d in utils.generator_dirs()] == [os.path.normcase(str(paths.GENERATORS))]
 
 
 def test_generators_path_prefers_the_bundled_copy(monkeypatch, tmp_path):
     monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
     bundled, checkout = fake_generators(tmp_path / "bundled"), fake_generators(tmp_path / "checkout")
-    monkeypatch.setattr(utils, "BUNDLED_GENERATORS", (bundled, checkout))
-    assert utils.get_generators_path() == bundled
-    monkeypatch.setattr(utils, "BUNDLED_GENERATORS", (str(tmp_path / "missing"), checkout))
-    assert utils.get_generators_path() == checkout
+    share = str(tmp_path / "share")
+    monkeypatch.setattr(utils, "INSTALLED_GENERATORS", (bundled, checkout, share))
+    assert utils.builtin_generators_dir() == bundled
+    monkeypatch.setattr(utils, "INSTALLED_GENERATORS", (str(tmp_path / "missing"), checkout, share))
+    assert utils.builtin_generators_dir() == checkout
+    # Distribution packages may move them to <prefix>/share/pkggen/generators
+    monkeypatch.setattr(utils, "INSTALLED_GENERATORS", (str(tmp_path / "missing"), str(tmp_path / "gone"),
+                                                        fake_generators(tmp_path / "share")))
+    assert utils.builtin_generators_dir() == share
+    assert utils.generator_dirs() == [share]
 
 
 def test_generators_path_falls_back_to_cwd(monkeypatch, tmp_path):
     monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
-    monkeypatch.setattr(utils, "BUNDLED_GENERATORS", (str(tmp_path / "missing"),))
+    monkeypatch.setattr(utils, "INSTALLED_GENERATORS", (str(tmp_path / "missing"),))
     monkeypatch.chdir(tmp_path)
-    assert utils.get_generators_path() == str(tmp_path)
+    assert utils.builtin_generators_dir() is None
+    assert utils.generator_dirs() == [str(tmp_path)]
 
 
-def test_generators_path_is_made_absolute(monkeypatch, tmp_path):
+def test_generators_path_is_a_list_made_absolute(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", "gens")
-    assert utils.get_generators_path() == str(tmp_path / "gens")
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", os.pathsep.join(["mine", "", "gens", "mine"]))
+    # Only these folders, in this order, without duplicates; the last one is the base
+    assert utils.generator_dirs() == [str(tmp_path / "mine"), str(tmp_path / "gens")]
+    assert utils.base_generators_dir() == str(tmp_path / "gens")
+
+
+def user_and_system(monkeypatch, tmp_path):
+    """Use the default folders: a user folder, two system folders and the checkout's generators."""
+    monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
+    if os.name == "nt":
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "home"))
+        monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "local"))
+        system = [tmp_path / "local"]
+    else:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("XDG_DATA_DIRS", os.pathsep.join([str(tmp_path / "local"), "relative/ignored",
+                                                             str(tmp_path / "usr")]))
+        system = [tmp_path / "local", tmp_path / "usr"]
+    folders = [p / "pkggen" / "generators" for p in [tmp_path / "home", *system]]
+    for folder in folders:
+        folder.mkdir(parents=True)
+    return [str(f) for f in folders]
+
+
+def test_default_search_order(monkeypatch, tmp_path):
+    folders = user_and_system(monkeypatch, tmp_path)
+    assert [os.path.normcase(d) for d in utils.generator_dirs()] == \
+        [os.path.normcase(d) for d in folders + [str(paths.GENERATORS)]]
+    # Folders that don't exist are left out
+    os.rmdir(folders[0])
+    assert len(utils.generator_dirs()) == len(folders)
+
+
+def test_xdg_data_dirs_default(monkeypatch):
+    if os.name == "nt":
+        pytest.skip("XDG folders")
+    monkeypatch.setenv("XDG_DATA_HOME", "/home/u/.local/share")
+    monkeypatch.setenv("XDG_DATA_DIRS", "")
+    assert utils.common.default_generator_dirs() == [
+        "/home/u/.local/share/pkggen/generators", "/usr/local/share/pkggen/generators",
+        "/usr/share/pkggen/generators"]
+
+
+def test_builtin_folder_is_never_listed_twice(monkeypatch, tmp_path):
+    if os.name == "nt":
+        pytest.skip("XDG folders")
+    # A distribution package's /usr/share/pkggen/generators is both a system folder and the built-in one
+    share = tmp_path / "usr"
+    builtin = fake_generators(share / "pkggen" / "generators")
+    monkeypatch.delenv("PKGGEN_GENERATORS_PATH")
+    monkeypatch.setenv("XDG_DATA_DIRS", str(share))
+    monkeypatch.setattr(utils, "INSTALLED_GENERATORS", (builtin,))
+    assert utils.generator_dirs() == [builtin]
+
+
+def generator(root, layer, name, text="print('hi')\n"):
+    path = root / layer / f"{name}.py"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return str(path)
+
+
+def test_find_and_list_generators_across_folders(monkeypatch, tmp_path, capsys):
+    mine, base = tmp_path / "mine", tmp_path / "base"
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", os.pathsep.join([str(mine), str(base)]))
+    own = generator(mine, "generation", "sourceforge")
+    builtin = generator(base, "generation", "github")
+    (base / "generation" / "_lib").mkdir()
+    (base / "generation" / "notes.txt").write_text("")
+    assert utils.list_generators("generation") == ["github", "sourceforge"]
+    assert utils.find_generator("generation", "sourceforge") == own
+    assert utils.find_generator("generation", "github") == builtin
+    for name in ("missing", "lib", "../base/generation/github", "", None):
+        assert utils.find_generator("generation", name) is None
+    assert capsys.readouterr().err == ""
+
+
+def test_a_higher_priority_generator_wins_with_a_warning(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(utils, "_warned", set())
+    mine, base = tmp_path / "mine", tmp_path / "base"
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", os.pathsep.join([str(mine), str(base)]))
+    own, builtin = generator(mine, "packaging", "arch"), generator(base, "packaging", "arch")
+    assert utils.list_generators("packaging") == ["arch"]
+    assert utils.has_generator("packaging", "arch")
+    assert capsys.readouterr().err == ""  # listing doesn't warn
+    assert utils.find_generator("packaging", "arch") == own
+    assert utils.find_generator("packaging", "arch") == own
+    err = capsys.readouterr().err
+    assert utils.ANSI_RE.sub("", err) == f"Warning: the packaging generator 'arch' in {own} replaces {builtin}\n"
+
+
+def test_a_stray_lib_py_warns(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(utils, "_warned", set())
+    mine, base = tmp_path / "mine", tmp_path / "base"
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", os.pathsep.join([str(mine), str(base)]))
+    generator(mine, "generation", "lib")
+    own = generator(mine, "generation", "mine")
+    assert utils.list_generators("generation") == ["mine"]
+    assert utils.find_generator("generation", "mine") == own
+    assert "lib.py is reserved" in capsys.readouterr().err
+
+
+def test_generator_env(monkeypatch, tmp_path):
+    mine, base = tmp_path / "mine", tmp_path / "base"
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", os.pathsep.join([str(mine), str(base)]))
+    monkeypatch.setenv("PYTHONPATH", "existing")
+    env = utils.generator_env("packaging", {"KEEP": "1", "PYTHONPATH": "given"})
+    assert env["KEEP"] == "1" and env["PYTHONIOENCODING"] == "utf-8"
+    assert env["PKGGEN_GENERATORS_DIRS"] == os.pathsep.join([str(mine), str(base)])
+    # The base folder's lib comes first, in front of what was there
+    assert env["PYTHONPATH"] == os.pathsep.join([str(base / "packaging" / "_lib"), "given"])
+    assert utils.generator_env("testing")["PYTHONPATH"] == os.pathsep.join([str(base / "testing" / "_lib"),
+                                                                            "existing"])
+
+
+def test_distributions_are_merged_across_folders(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(utils, "_warned", set())
+    mine, base = tmp_path / "mine", tmp_path / "base"
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", os.pathsep.join([str(mine), str(tmp_path / "none"), str(base)]))
+    write_distributions(base, "distributions:\n  - {name: arch, rp-names: [arch]}\n"
+                              "  - {name: debian, rp-names: [debian_13]}\n")
+    write_distributions(mine, "distributions:\n  - {name: freebsd, rp-names: [freebsd]}\n"
+                              "  - {name: arch, rp-names: [arch, artix]}\n")
+    assert utils.load_distributions() == [{"name": "arch", "rp-names": ["arch", "artix"]},
+                                          {"name": "debian", "rp-names": ["debian_13"]},
+                                          {"name": "freebsd", "rp-names": ["freebsd"]}]
+    assert "the distribution 'arch' in " in capsys.readouterr().err
+    # A folder without the file is fine; none at all isn't
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(tmp_path / "none"))
+    with pytest.raises(utils.GenericError, match="Couldn't find the distributions list"):
+        utils.load_distributions()
+
+
+def test_distribution_names_are_not_paths(monkeypatch, tmp_path):
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(tmp_path))
+    write_distributions(tmp_path, "distributions:\n  - {name: ../arch, rp-names: [arch]}\n")
+    with pytest.raises(utils.GenericError, match="needs a 'name' key"):
+        utils.load_distributions()
 
 
 def test_run_path_defaults_to_cwd_and_honours_env(monkeypatch, tmp_path):
@@ -175,7 +324,7 @@ def test_generic_error_keeps_plain_message():
 
 
 def test_default_paths_are_this_repository():
-    assert utils.get_generators_path() == str(paths.GENERATORS)
+    assert utils.generator_dirs() == [str(paths.GENERATORS)]
 
 
 def test_get_pkggen_config_utf8_and_invalid_bytes(monkeypatch, tmp_path):

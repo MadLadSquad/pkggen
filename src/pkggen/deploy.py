@@ -17,7 +17,7 @@ from . import generate, testing, utils
 from .generate import GREEN, RED, RESET, YELLOW, plural, say
 
 DEPLOY_DIR = "deploy"
-SCRIPT_ENV = {"PYTHONIOENCODING": "utf-8"}
+LAYER = "deployment"
 
 
 class Deployment:
@@ -35,19 +35,11 @@ class Deployment:
 
     @property
     def script(self):
-        return os.path.join(deployment_dir(), f"{self.generator}.py")
-
-
-def deployment_dir():
-    return os.path.join(utils.get_generators_path(), "deployment")
+        return utils.find_generator(LAYER, self.generator)
 
 
 def available_generators():
-    directory = deployment_dir()
-    if not os.path.isdir(directory):
-        return []
-    return sorted(entry.name[:-3] for entry in os.scandir(directory)
-                  if entry.is_file() and entry.name.endswith(".py") and entry.name != "lib.py")
+    return utils.list_generators(LAYER)
 
 
 # --- Configuration -----------------------------------------------------------------
@@ -85,8 +77,8 @@ def load_deployments(config, distribution_filter):
                 continue
             name = entry.get("generator")
             if not isinstance(name, str) or name not in generators:
-                errors.append(f"'{where}.generator' must name a deployment generator in {deployment_dir()} "
-                              f"(available: {', '.join(generators) or 'none'})")
+                errors.append(f"'{where}.generator' must name a deployment generator in {LAYER}/ of "
+                              f"{utils.shown_dirs()} (available: {', '.join(generators) or 'none'})")
                 continue
             targets = entry.get("targets")
             if targets is not None and not (isinstance(targets, list) and targets
@@ -214,7 +206,7 @@ def check_all(deployments, config, package_filter, skip_tests, dry_run):
     for dep in deployments:
         process = subprocess.run([sys.executable, dep.script], input=json.dumps(
             job(dep, config, package_filter, skip_tests, dry_run, check=True)), text=True, capture_output=True,
-            encoding="utf-8", errors="replace", env={**os.environ, **SCRIPT_ENV})
+            encoding="utf-8", errors="replace", env=utils.generator_env(LAYER))
         if process.returncode != 0:
             message = utils.ANSI_RE.sub("", process.stderr).strip() or f"exit code {process.returncode}"
             errors.append(f"'{dep.where}': the {dep.generator} deployment generator failed: {message}")
@@ -234,7 +226,7 @@ def check_all(deployments, config, package_filter, skip_tests, dry_run):
 def run_deployment(dep, payload):
     """Run a deployment generator. Its stderr (progress, prompts) is shown live and kept for the summary."""
     process = subprocess.Popen([sys.executable, dep.script], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, env={**os.environ, **SCRIPT_ENV})
+                               stderr=subprocess.PIPE, env=utils.generator_env(LAYER))
     captured = []
 
     def tee():

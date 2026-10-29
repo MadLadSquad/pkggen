@@ -26,7 +26,7 @@ def _load(module_name, path):
 
 
 def load_generator(layer, name):
-    """Import generators/<layer>/<name>.py with that layer's own lib.py as `lib`.
+    """Import generators/<layer>/<name>.py with that layer's own lib.py (<layer>/_lib/lib.py) as `lib`.
 
     Every layer has a module called `lib`, so it's swapped into sys.modules only
     while the generator imports it. The generator keeps its reference afterwards.
@@ -34,7 +34,7 @@ def load_generator(layer, name):
     """
     directory = paths.GENERATORS / layer
     saved = sys.modules.get("lib")
-    lib = _load(f"pkggen_test_{layer}_lib", directory / "lib.py")
+    lib = _load(f"pkggen_test_{layer}_lib", directory / "_lib" / "lib.py")
     if name == "lib":
         return lib
     sys.modules["lib"] = lib
@@ -63,10 +63,16 @@ class Result:
 
 
 def subprocess_env(extra=None):
-    """The test environment, with the HTTP shim importable by every subprocess."""
+    """The test environment, with the HTTP shim importable by every subprocess.
+
+    A PYTHONPATH in extra goes in front of the shim's instead of replacing it.
+    """
+    extra = dict(extra or {})
+    first = extra.pop("PYTHONPATH", None)
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(paths.HTTP_SHIM), env.get("PYTHONPATH")]))
-    env.update({k: str(v) for k, v in (extra or {}).items() if v is not None})
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [first and str(first), str(paths.HTTP_SHIM),
+                                                      env.get("PYTHONPATH")]))
+    env.update({k: str(v) for k, v in extra.items() if v is not None})
     for key, value in (extra or {}).items():
         if value is None:
             env.pop(key, None)
@@ -83,10 +89,15 @@ def run(args, stdin=None, cwd=None, env=None, timeout=300):
                   process.stderr.decode("utf-8", "replace"))
 
 
+def generator_env(layer, env=None):
+    """What pkggen adds to a generator's environment: its layer's lib on PYTHONPATH (see utils.generator_env())."""
+    return {"PYTHONPATH": str(paths.GENERATORS / layer / "_lib"), **(env or {})}
+
+
 def run_generator(layer, name, payload, cwd=None, env=None):
-    """Run generators/<layer>/<name>.py with payload (a dict, or raw str/bytes) on stdin."""
+    """Run generators/<layer>/<name>.py with payload (a dict, or raw str/bytes) on stdin, as pkggen does."""
     stdin = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
-    return run([paths.GENERATORS / layer / f"{name}.py"], stdin=stdin, cwd=cwd, env=env)
+    return run([paths.GENERATORS / layer / f"{name}.py"], stdin=stdin, cwd=cwd, env=generator_env(layer, env))
 
 
 def run_cli(*args, cwd=None, env=None, timeout=300):

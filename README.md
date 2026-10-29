@@ -123,8 +123,20 @@ From a clone of this repository:
 ```sh
 pip install ./src
 ```
-This installs the `pkggen` command, its dependencies and the bundled generators. Use `pip install -e ./src` instead to work on pkggen itself,
-and set `PKGGEN_GENERATORS_PATH` to use your own copy of the `generators` folder.
+This installs the `pkggen` command, its dependencies and the bundled generators. Use `pip install -e ./src` instead to work on pkggen itself.
+
+### Your own generators
+pkggen looks for generators in these folders, in this order, and then in its own:
+
+| | Linux, macOS, BSD | Windows |
+|---|---|---|
+| Your own | `~/.local/share/pkggen/generators` (`$XDG_DATA_HOME`) | `%LOCALAPPDATA%\pkggen\generators` |
+| System-wide | `/usr/local/share/pkggen/generators`, then `/usr/share/pkggen/generators` (`$XDG_DATA_DIRS`) | `%PROGRAMDATA%\pkggen\generators` |
+
+Each folder is laid out like pkggen's `generators/` folder (`generation/`, `packaging/`, `deployment/hooks/`, `templates/`, ...),
+and only needs the files you add. A generator's `import lib` gets pkggen's helpers for its layer. A new distribution goes in that folder's
+`distributions/distributions.yaml`. A generator with the same name as one in a later folder replaces it, with a warning.
+Set `PKGGEN_GENERATORS_PATH` to a list of folders to search only those.
 
 ## Getting started and learning
 Get started by navigating [to our documentation](https://github.com/MadLadSquad/pkggen/wiki/Home).

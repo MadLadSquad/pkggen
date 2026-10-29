@@ -1,4 +1,5 @@
 import json
+import os
 import queue
 import textwrap
 
@@ -77,7 +78,6 @@ def stub_generators(tmp_path, monkeypatch):
     """))
     (root / "generation").mkdir()
     (root / "generation" / "stub.py").write_text(STUB_FETCH)
-    (root / "generation" / "lib.py").write_text("")
     (root / "packaging").mkdir()
     for dist in ("alpha", "beta"):
         (root / "packaging" / f"{dist}.py").write_text(STUB_PACKAGING)
@@ -206,7 +206,7 @@ def test_load_packages_collects_every_error():
     for fragment in [
         "'not-a-group' must be a package group",
         "group 'no-generator' has no 'generator'",
-        "uses the fetch generator 'sourceforge', which doesn't exist",
+        "uses the fetch generator 'sourceforge', which isn't in generation/ of",
         "(available: github, gitlab, url)",
         "group 'empty' needs a non-empty 'packages' list",
         "'maintainer' is set on group 'group-maintainer'",
@@ -743,3 +743,48 @@ def test_generate_validates_test_distribution_versions(stub_generators, project,
 
 def test_dependencies_releases_does_not_fall_back_on_unknown_version():
     assert dependencies.releases(["typo"], ["a_1", "a_2"], None, generate.release_key) == []
+
+
+# --- Generators in other folders -------------------------------------------------------
+
+USER_FETCH = textwrap.dedent("""\
+    import lib, pkggen_common
+
+    def generate(package):
+        # lib is the base folder's fetch lib, and load_generator() searches every folder
+        helper = lib.load_generator("generation", "helper")
+        return {"version": helper.VERSION, "artifacts": [], "lib": lib.__file__,
+                "dirs": pkggen_common.generator_dirs()}
+
+    lib.run(generate)
+""")
+
+
+def test_a_user_fetch_generator_imports_pkggens_lib(monkeypatch, tmp_path):
+    from tests.support import paths
+    user = tmp_path / "user"
+    (user / "generation").mkdir(parents=True)
+    (user / "generation" / "mine.py").write_text(USER_FETCH)
+    (user / "generation" / "helper.py").write_text("VERSION = '2.0'\n")
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", f"{user}{os.pathsep}{paths.GENERATORS}")
+    monkeypatch.setenv("PKGGEN_RUN_PATH", str(tmp_path))
+    positions = queue.Queue()
+    positions.put(0)
+    result = generate.run_fetch({"name": "p"}, utils.find_generator("generation", "mine"), positions)
+    assert result["version"] == "2.0"
+    assert os.path.samefile(result["lib"], paths.GENERATORS / "generation" / "_lib" / "lib.py")
+    assert result["dirs"] == [str(user), str(paths.GENERATORS)]
+
+
+def test_default_templates_come_from_the_highest_priority_folder(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(utils, "_warned", set())
+    user, base = tmp_path / "user", tmp_path / "base"
+    monkeypatch.setenv("PKGGEN_GENERATORS_PATH", f"{user}{os.pathsep}{base}")
+    (base / "templates" / "arch").mkdir(parents=True)
+    (base / "templates" / "debian").mkdir(parents=True)
+    (user / "templates" / "arch").mkdir(parents=True)
+    assert generate.default_templates("debian") == str(base / "templates" / "debian")
+    assert generate.default_templates("arch") == str(user / "templates" / "arch")
+    assert "the default arch templates in " in capsys.readouterr().err
+    # None has them: the base folder's path, for the packaging generator's error
+    assert generate.default_templates("void") == str(base / "templates" / "void")

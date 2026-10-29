@@ -68,7 +68,6 @@ def generators(tmp_path, monkeypatch):
     for layer, script, dists in (("generation", STUB_FETCH, ["stub"]), ("packaging", STUB_PACKAGING, ["alpha", "beta", "notesting"]),
                                  ("testing", STUB_TESTING, ["alpha", "beta"])):
         (root / layer).mkdir()
-        (root / layer / "lib.py").write_text("")
         for name in dists:
             (root / layer / f"{name}.py").write_text(script)
     monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(root))

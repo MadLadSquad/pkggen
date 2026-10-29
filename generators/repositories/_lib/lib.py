@@ -10,10 +10,10 @@ import os
 import sys
 
 # generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
-# Loaded by path once per process, under a name no other module has
+# Loaded by path once per process, under a name no other module has. This file is generators/<layer>/_lib/lib.py.
 if "pkggen_common" not in sys.modules:
-    _spec = importlib.util.spec_from_file_location(
-        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    _spec = importlib.util.spec_from_file_location("pkggen_common", os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "common.py"))
     sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(sys.modules["pkggen_common"])
 from pkggen_common import *  # noqa: E402,F401,F403

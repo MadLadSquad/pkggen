@@ -1,4 +1,6 @@
 """The deployment hooks (generators/deployment/hooks/<distribution>.py) and how lib loads them."""
+import os
+
 import pytest
 import yaml
 
@@ -36,8 +38,9 @@ def test_hooks_use_the_lib_that_loaded_them(deploy_lib):
 
 
 def test_hook_without_the_api(deploy_lib, monkeypatch, tmp_path):
-    (tmp_path / "broken.py").write_text("SIGNING = 'gpg'\n")
-    monkeypatch.setattr(deploy_lib, "HOOKS_PATH", str(tmp_path))
+    (tmp_path / "deployment" / "hooks").mkdir(parents=True)
+    (tmp_path / "deployment" / "hooks" / "broken.py").write_text("SIGNING = 'gpg'\n")
+    monkeypatch.setenv("PKGGEN_GENERATORS_DIRS", str(tmp_path))
     with pytest.raises(deploy_lib.DeployError, match="doesn't define OPTIONS, check, sign"):
         deploy_lib.load_hook("broken")
 
@@ -71,3 +74,16 @@ def _generator(deploy_lib):
     class Generator:
         lib = deploy_lib
     return Generator
+
+
+def test_hooks_from_other_generators_folders(deploy_lib, monkeypatch, tmp_path, capfd):
+    hooks = tmp_path / "deployment" / "hooks"
+    hooks.mkdir(parents=True)
+    hook = "SIGNING = None\nOPTIONS = ()\nNAME = '{}'\ndef check(job, errors): pass\ndef sign(job, folder, published): pass\n"
+    (hooks / "freebsd.py").write_text(hook.format("freebsd"))
+    (hooks / "arch.py").write_text(hook.format("mine"))
+    monkeypatch.setenv("PKGGEN_GENERATORS_DIRS", f"{tmp_path}{os.pathsep}{paths.GENERATORS}")
+    assert deploy_lib.load_hook("freebsd").NAME == "freebsd"
+    assert deploy_lib.load_hook("arch").NAME == "mine"
+    assert f"the deployment hook {hooks / 'arch.py'} replaces " in capfd.readouterr().err
+    assert deploy_lib.load_hook("debian").SIGNING == "gpg"  # the built-in ones are still found

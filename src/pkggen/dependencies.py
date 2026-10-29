@@ -22,7 +22,7 @@ from . import utils
 from .version import PKGGEN_VERSION
 
 ROLES = ("build", "libraries", "runtime", "development")
-GENERATOR = "repology"
+LAYER, GENERATOR = "dependencies", "repology"
 USER_AGENT = f"pkggen/{PKGGEN_VERSION} (+https://github.com/MadLadSquad/pkggen)"
 # Repology project names: lowercase words, also with ':' (e.g. "python:requests")
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.+:-]*$")
@@ -187,11 +187,13 @@ def for_job(package, distribution, chosen, resolved, local):
 
 def run_generator(names, rp_names, wildcards=(), env=None):
     """Run the dependency generator for `names`. Returns (projects, warning lines); raises RuntimeError."""
-    script = os.path.join(utils.get_generators_path(), "dependencies", f"{GENERATOR}.py")
+    script = utils.find_generator(LAYER, GENERATOR)
+    if script is None:
+        raise RuntimeError(f"the dependency generator {LAYER}/{GENERATOR}.py isn't in {utils.shown_dirs()}")
     job = {"projects": list(names), "repositories": list(rp_names), "wildcards": list(wildcards),
            "user_agent": USER_AGENT}
     process = subprocess.run([sys.executable, script], input=json.dumps(job), text=True, encoding="utf-8",
-                             capture_output=True, env=env)
+                             capture_output=True, env=utils.generator_env(LAYER, env))
     lines = [utils.ANSI_RE.sub("", line).strip() for line in process.stderr.splitlines()]
     warnings = [line for line in lines if "Warning" in line]
     if process.returncode != 0:

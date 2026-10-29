@@ -58,6 +58,12 @@ def isolated_env(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(config))
     monkeypatch.setenv("APPDATA", str(config))
     monkeypatch.setenv("PKGGEN_GENERATORS_PATH", str(paths.GENERATORS))
+    # The user's and the system's generators folders (used without PKGGEN_GENERATORS_PATH) are empty ones
+    data = tmp_path_factory.mktemp("data")
+    for var, folder in (("XDG_DATA_HOME", "user"), ("XDG_DATA_DIRS", "system"), ("LOCALAPPDATA", "user"),
+                        ("PROGRAMDATA", "system")):
+        (data / folder).mkdir(exist_ok=True)
+        monkeypatch.setenv(var, str(data / folder))
     monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
     # git (used by `pkggen deploy`) ignores the user's and the system's configuration
     git_config = config / "gitconfig"
@@ -68,6 +74,7 @@ def isolated_env(tmp_path_factory, monkeypatch):
                 "PKGGEN_TEST_HTTP_LOG", "SOURCE_DATE_EPOCH", "PKGGEN_TEST_ENGINE", "PKGGEN_FAKE_ENGINE",
                 "CONTAINER_HOST", "DOCKER_HOST", "PKGGEN_TEST_NOW", "PKGGEN_TEST_AUR_URL",
                 "GIT_SSH_COMMAND", "GIT_CONFIG_COUNT", "GIT_DIR", "GIT_WORK_TREE", "PKGGEN_CACHE_DIR",
+                "PKGGEN_GENERATORS_DIRS",
                 "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "GNUPGHOME"):
         monkeypatch.delenv(var, raising=False)
     for var in [v for v in os.environ if v.startswith(("PKGGEN_PASSWORD_", "PKGGEN_SSH_KEY_", "PKGGEN_GPG_",

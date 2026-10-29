@@ -21,6 +21,7 @@ from . import dependencies, utils
 
 # Top-level pkggen.yaml keys that aren't package groups
 RESERVED_KEYS = {"repositories", "test", "deployment"}
+FETCH_LAYER, PACKAGING_LAYER = "generation", "packaging"
 # Keys of a package group that aren't defaults for its packages
 GROUP_KEYS = {"generator", "packages"}
 # Package keys that can't be set as group defaults: they differ per package
@@ -240,10 +241,7 @@ def load_packages(config, package_filter):
     Returns a list of (package, fetch generator path). Raises one error that
     lists every problem found in pkggen.yaml.
     """
-    generators_dir = os.path.join(utils.get_generators_path(), "generation")
-    available = sorted(entry.name[:-3] for entry in os.scandir(generators_dir)
-                       if entry.is_file() and entry.name.endswith(".py") and entry.name != "lib.py") \
-        if os.path.isdir(generators_dir) else []
+    available = utils.list_generators(FETCH_LAYER)
 
     known_distributions = {}  # filled from distributions.yaml when a package uses `distributions`
     errors = []
@@ -262,8 +260,8 @@ def load_packages(config, package_filter):
         if not generator:
             group_errors.append(f"group '{key}' has no 'generator'")
         elif generator not in available:
-            group_errors.append(f"group '{key}' uses the fetch generator '{generator}', which doesn't exist in "
-                                f"{generators_dir} (available: {', '.join(available) or 'none'})")
+            group_errors.append(f"group '{key}' uses the fetch generator '{generator}', which isn't in "
+                                f"{FETCH_LAYER}/ of {utils.shown_dirs()} (available: {', '.join(available) or 'none'})")
         if not isinstance(entries, list) or not entries:
             group_errors.append(f"group '{key}' needs a non-empty 'packages' list")
         for field in PACKAGE_ONLY_KEYS:
@@ -275,7 +273,7 @@ def load_packages(config, package_filter):
             continue
 
         defaults = {k: v for k, v in group.items() if k not in GROUP_KEYS}
-        script = os.path.join(generators_dir, f"{generator}.py")
+        script = utils.find_generator(FETCH_LAYER, generator)
         for i, package in enumerate(entries):
             if not isinstance(package, dict) or not package.get("name"):
                 errors.append(f"'{key}.packages[{i}]' needs a 'name'")
@@ -309,13 +307,13 @@ def load_packages(config, package_filter):
 
 def load_distributions(config, distribution_filter, failures):
     """Distributions with a packaging generator and a `repositories.<dist>` block."""
-    packaging_dir = os.path.join(utils.get_generators_path(), "packaging")
     repositories = config.get("repositories") or {}
 
     known = utils.load_distributions()
     rp_names = {dist["name"]: list(dist.get("rp-names") or []) for dist in known}
     aliases = {dist["name"]: utils.target_aliases(dist) for dist in known}
-    candidates = [name for name in rp_names if os.path.isfile(os.path.join(packaging_dir, f"{name}.py"))]
+    available = utils.list_generators(PACKAGING_LAYER)
+    candidates = [name for name in rp_names if name in available]
 
     if distribution_filter:
         unknown = sorted(set(distribution_filter) - set(candidates))
@@ -335,7 +333,7 @@ def load_distributions(config, distribution_filter, failures):
             failures.append(Failure("package", "*", f"the repository {utils.display_path(repo_path)} doesn't exist "
                                                     f"yet. Run `pkggen gen-repo {dist}` first", dist))
             continue
-        distributions.append(Distribution(dist, os.path.join(packaging_dir, f"{dist}.py"), repo_path,
+        distributions.append(Distribution(dist, utils.find_generator(PACKAGING_LAYER, dist), repo_path,
                                           repositories[dist] or {}, rp_names[dist], aliases[dist]))
     return distributions
 
@@ -362,7 +360,8 @@ def run_fetch(package, script, positions):
     try:
         payload = json.dumps({**package, "position": position})
         process = subprocess.Popen([sys.executable, script], stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=fetch_environment())
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   env=utils.generator_env(FETCH_LAYER, fetch_environment()))
 
         captured = []
 
@@ -416,6 +415,15 @@ def build_context(package, result):
     return context
 
 
+def default_templates(distribution):
+    """generators/templates/<distribution>/ from the highest-priority generators folder that has it.
+
+    The base folder's when none has it, so the packaging generator's error names it.
+    """
+    return (utils.find_shared("templates", distribution, kind=f"the default {distribution} templates")
+            or os.path.join(utils.base_generators_dir(), "templates", distribution))
+
+
 def run_packaging(distribution, context, releases=None, package_dependencies=None):
     run_path = utils.get_run_path()
     templates_root = os.path.join(run_path, "packages", distribution.name)
@@ -427,7 +435,7 @@ def run_packaging(distribution, context, releases=None, package_dependencies=Non
         # Packages with the same `templates` share one folder
         "templates_path": os.path.join(templates_root, context.get("templates") or context["name"]),
         "templates_root": templates_root,
-        "default_templates_path": os.path.join(utils.get_generators_path(), "templates", distribution.name),
+        "default_templates_path": default_templates(distribution.name),
         "run_path": run_path,
         # The releases the package is built for, and its dependencies with repology's packages in them
         "releases": releases if releases is not None else list(distribution.rp_names),
@@ -436,7 +444,7 @@ def run_packaging(distribution, context, releases=None, package_dependencies=Non
     # The child writes UTF-8 even where the locale's code page isn't (Windows)
     process = subprocess.run([sys.executable, distribution.script], input=json.dumps(job), text=True,
                              capture_output=True, encoding="utf-8", errors="replace",
-                             env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                             env=utils.generator_env(PACKAGING_LAYER))
     if process.returncode != 0:
         raise RuntimeError(process.stderr.strip() or f"the packaging generator exited with code {process.returncode}")
     try:

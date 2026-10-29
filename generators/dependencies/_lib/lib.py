@@ -19,13 +19,14 @@ import requests
 from packaging.version import InvalidVersion, parse as parse_version
 
 # generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
-# Loaded by path once per process, under a name no other module has
+# Loaded by path once per process, under a name no other module has. This file is generators/<layer>/_lib/lib.py.
 if "pkggen_common" not in sys.modules:
-    _spec = importlib.util.spec_from_file_location(
-        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    _spec = importlib.util.spec_from_file_location("pkggen_common", os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "common.py"))
     sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(sys.modules["pkggen_common"])
 from pkggen_common import *  # noqa: E402,F401,F403
+from pkggen_common import LIB_FOLDER  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACKAGE_KEYS = ("repo", "subrepo", "srcname", "binname", "binnames", "visiblename", "version", "status", "summary")
@@ -33,7 +34,7 @@ PACKAGE_KEYS = ("repo", "subrepo", "srcname", "binname", "binnames", "visiblenam
 
 def load_fetch_lib():
     """The fetch generators' lib.py, for its HTTP cache (loaded by path: every layer's module is called `lib`)."""
-    path = os.path.join(os.path.dirname(HERE), "generation", "lib.py")
+    path = os.path.join(os.path.dirname(os.path.dirname(HERE)), "generation", LIB_FOLDER, "lib.py")
     spec = importlib.util.spec_from_file_location("pkggen_generation_lib", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

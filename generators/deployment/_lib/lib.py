@@ -45,10 +45,10 @@ from datetime import datetime, timedelta, timezone
 import yaml
 
 # generators/common.py: the helpers every layer shares (shquote, to_bool, secrets_path, ...), as lib.<name>.
-# Loaded by path once per process, under a name no other module has
+# Loaded by path once per process, under a name no other module has. This file is generators/<layer>/_lib/lib.py.
 if "pkggen_common" not in sys.modules:
-    _spec = importlib.util.spec_from_file_location(
-        "pkggen_common", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common.py"))
+    _spec = importlib.util.spec_from_file_location("pkggen_common", os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "common.py"))
     sys.modules["pkggen_common"] = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(sys.modules["pkggen_common"])
 from pkggen_common import *  # noqa: E402,F401,F403
@@ -508,7 +508,6 @@ def check_patterns(job, key, errors):
 #   sign(job, folder, published)  signs the repositories in folder; see sign_repository()
 # Hooks `import lib` to use the helpers below (this module, whatever its name).
 
-HOOKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hooks")
 HOOK_API = ("SIGNING", "OPTIONS", "check", "sign")
 HOOK_OPTIONS = ("key-name", "signed-by")  # what a hook's OPTIONS may name
 HOOK_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
@@ -517,12 +516,20 @@ _hooks = {}
 
 
 def load_hook(distribution):
-    """The deployment hook of a distribution: hooks/<distribution>.py, imported once."""
+    """The deployment hook of a distribution: deployment/hooks/<distribution>.py, imported once.
+
+    It comes from the highest-priority generators folder that has one (a warning names the ones it shadows).
+    """
     if distribution in _hooks:
         return _hooks[distribution]
-    path = os.path.join(HOOKS_PATH, f"{distribution}.py")
-    if not HOOK_NAME_RE.match(str(distribution)) or not os.path.isfile(path):
-        raise DeployError(f"there's no deployment hook for the distribution '{distribution}' (expected {path})")
+    relative = os.path.join("deployment", "hooks", f"{distribution}.py")
+    found = [p for p in find_all(relative) if os.path.isfile(p)] if HOOK_NAME_RE.match(str(distribution)) else []
+    if not found:
+        raise DeployError(f"there's no deployment hook for the distribution '{distribution}' (looked for "
+                          f"{relative} in {', '.join(generator_dirs())})")
+    path = found[0]
+    if len(found) > 1:
+        log(f"{YELLOW}Warning: the deployment hook {path} replaces {', '.join(found[1:])}{RESET}")
     spec = importlib.util.spec_from_file_location(f"pkggen_deployment_hook_{distribution.replace('-', '_')}", path)
     module = importlib.util.module_from_spec(spec)
     # The hook's `import lib` is this module, also when it was loaded under another name (as the tests do)

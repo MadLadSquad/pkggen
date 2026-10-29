@@ -10,16 +10,12 @@ import sys
 
 SEED_KEY = "seed-files"
 
-def get_repo_generators_path():
-    return os.path.join(utils.get_generators_path(), "repositories")
+LAYER = "repositories"
 
 def get_distributions():
     # Only offer distributions that also have a repository generator
-    repo_generators_path = get_repo_generators_path()
-    return [
-        dist["name"] for dist in utils.load_distributions()
-        if os.path.exists(os.path.join(repo_generators_path, f"{dist['name']}.py"))
-    ]
+    available = utils.list_generators(LAYER)
+    return [dist["name"] for dist in utils.load_distributions() if dist["name"] in available]
 
 def seed_folder(distribution, config):
     """The absolute `repositories.<dist>.seed-files` folder, or None. Fails if it's set but missing."""
@@ -59,8 +55,8 @@ def copy_seed_files(source, destination, force):
 
 
 def gen_repo(distribution, output_dir=None, force=False):
-    generator_path = os.path.join(get_repo_generators_path(), f"{distribution}.py")
-    if not os.path.exists(generator_path):
+    generator_path = utils.find_generator(LAYER, distribution)
+    if generator_path is None:
         raise utils.GenericError(f"Couldn't find repository generator for {distribution}!")
 
     pkggen = utils.get_pkggen_config()
@@ -78,7 +74,7 @@ def gen_repo(distribution, output_dir=None, force=False):
         input=json.dumps(pkggen),
         text=True,
         cwd=cwd,
-        env={**os.environ, "PKGGEN_FORCE": "1" if force else "0"},
+        env=utils.generator_env(LAYER, {**os.environ, "PKGGEN_FORCE": "1" if force else "0"}),
     )
 
     if result.returncode != 0:
