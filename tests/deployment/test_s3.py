@@ -1,9 +1,12 @@
 """The S3 deployment generator, against an in-memory S3 served through `responses`."""
 import base64
 import hashlib
+import os
+import pathlib
 import re
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, unquote, urlsplit
 from xml.sax.saxutils import escape
@@ -305,40 +308,66 @@ def test_signature_version_4_matches_aws_examples(s3_generator):
 # --- Signing ---------------------------------------------------------------------------
 
 
+def gnupg_home(cleanups):
+    """An empty GnuPG home in the system's temporary folder: gpg-agent and keyboxd put their
+    sockets in it on macOS, where a socket's path can't be over 104 bytes (tmp_path's are)."""
+    home = tempfile.mkdtemp(prefix="gpg-")
+    os.chmod(home, 0o700)
+    env = {**os.environ, "GNUPGHOME": home}
+
+    def remove():
+        if shutil.which("gpgconf"):
+            subprocess.run(["gpgconf", "--kill", "all"], env=env, capture_output=True)
+        shutil.rmtree(home, ignore_errors=True)
+    cleanups.append(remove)
+    return env
+
+
+def run_gpg(env, *args, check=True):
+    process = subprocess.run(["gpg", "--batch", "--yes", *args], env=env, capture_output=True, text=True)
+    if check:
+        assert process.returncode == 0, f"gpg {' '.join(args)} failed:\n{process.stderr}"
+    return process
+
+
 @pytest.fixture
-def gpg_key(tmp_path, monkeypatch):
-    """A throwaway signing key, given to pkggen as armored text in PKGGEN_GPG_KEY_TEST."""
-    home = tmp_path / "keymaker"
-    home.mkdir(mode=0o700)
-    env = {"GNUPGHOME": str(home)}
+def gpg_key(monkeypatch):
+    """A throwaway signing key, given to pkggen as armored text in PKGGEN_GPG_KEY_TEST.
 
-    def gpg(*args):
-        return subprocess.run(["gpg", "--batch", "--yes", *args], env={**__import__("os").environ, **env},
-                              check=True, capture_output=True, text=True).stdout
-    gpg("--passphrase", "", "--quick-gen-key", "Repository <repo@example.org>", "ed25519", "sign", "never")
-    monkeypatch.setenv("PKGGEN_GPG_KEY_TEST", gpg("--armor", "--export-secret-keys"))
-    yield gpg
-    subprocess.run(["gpgconf", "--kill", "gpg-agent"], env={**__import__("os").environ, **env}, capture_output=True)
+    Yields the environment verify() checks signatures in: one that only knows the published public key.
+    """
+    cleanups = []
+    try:
+        maker = gnupg_home(cleanups)
+        run_gpg(maker, "--passphrase", "", "--quick-gen-key", "Repository <repo@example.org>", "ed25519", "sign",
+                "never")
+        monkeypatch.setenv("PKGGEN_GPG_KEY_TEST", run_gpg(maker, "--armor", "--export-secret-keys").stdout)
+        yield gnupg_home(cleanups)
+    finally:
+        for remove in cleanups:
+            remove()
 
 
-def verify(gpg, tmp_path, files, signature, signed=None):
+def verify(gpg_key, tmp_path, files, signature, signed=None):
     """gpg --verify with only the published public key."""
     (tmp_path / "check").mkdir(exist_ok=True)
     for name, data in files.items():
         (tmp_path / "check" / name.replace("/", "_")).write_bytes(data)
-    home = tmp_path / "verify"
-    home.mkdir(mode=0o700, exist_ok=True)
-    env = {**__import__("os").environ, "GNUPGHOME": str(home)}
-    subprocess.run(["gpg", "--batch", "--import", str(tmp_path / "check" / "keys_public.asc")], env=env,
-                   check=True, capture_output=True)
+    run_gpg(gpg_key, "--import", str(tmp_path / "check" / "keys_public.asc"))
     args = [str(tmp_path / "check" / signature.replace("/", "_"))]
     if signed:
         args.append(str(tmp_path / "check" / signed.replace("/", "_")))
-    return subprocess.run(["gpg", "--batch", "--verify", *args], env=env, capture_output=True).returncode == 0
+    return run_gpg(gpg_key, "--verify", *args, check=False).returncode == 0
+
+
+def homes_of(generator):
+    """The GnuPG homes pkggen's Signer made that are still there."""
+    return set(pathlib.Path(tempfile.gettempdir()).glob(generator.lib.GNUPG_HOME_PREFIX + "*"))
 
 
 @needs_gpg
 def test_signed_apt_repository(s3_generator, make_job, s3, tmp_path, gpg_key):
+    homes = homes_of(s3_generator)
     deployment = {**DEBIAN, "gpg-key": "test", "public-key": "keys/public.asc"}
     output = apt_output(tmp_path, "debian-13", "trixie", "1.0-1")
     deploy(s3_generator, make_job, deployment, [target(output, "debian-13")])
@@ -350,8 +379,8 @@ def test_signed_apt_repository(s3_generator, make_job, s3, tmp_path, gpg_key):
     assert b"Codename: trixie" in published["dists/trixie/InRelease"]
     assert verify(gpg_key, tmp_path, published, "dists/trixie/Release.gpg", "dists/trixie/Release")
     assert verify(gpg_key, tmp_path, published, "dists/trixie/InRelease")
-    # The key stays out of the work folder
-    assert not list((tmp_path / "work").glob("gnupg-*"))
+    # The GnuPG home the key was imported into is gone
+    assert not homes_of(s3_generator) - homes
 
     # Unchanged: the published signatures are kept, so nothing is uploaded
     s3.log.clear()

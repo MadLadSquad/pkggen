@@ -39,6 +39,9 @@ EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 
 # Media types mimetypes doesn't know; the targets' `publish` adds their formats' own
 CONTENT_TYPES = {".asc": "text/plain", ".gpg": "application/pgp-signature", ".zst": "application/zstd"}
+# Python's own table only: mimetypes.guess_type() also reads the host's (/etc/mime.types,
+# the Windows registry), which would make the uploaded types depend on who deploys
+MIME_TYPES = mimetypes.MimeTypes()
 PACKAGE, INDEX, METADATA = 0, 1, 2  # upload order
 
 # Files larger than this are uploaded in parts (a single PUT can't be over 5 GiB),
@@ -88,7 +91,7 @@ class Layout:
             for suffix in sorted(types, key=len, reverse=True):
                 if relative.endswith(suffix):
                     return types[suffix]
-        return (CONTENT_TYPES.get(os.path.splitext(relative)[1]) or mimetypes.guess_type(relative)[0]
+        return (CONTENT_TYPES.get(os.path.splitext(relative)[1]) or MIME_TYPES.guess_type(relative)[0]
                 or "application/octet-stream")
 
 

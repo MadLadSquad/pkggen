@@ -519,7 +519,7 @@ def test_generate_respects_distributions(stub_generators, project, capsys):
                     "group": packages({"name": "everywhere"}, {"name": "only-beta", "distributions": ["beta"]},
                                       {"name": "only-nopackaging", "distributions": ["nopackaging"]})})
     assert generate.generate() == 0
-    built = sorted(str(p.relative_to(root / "pkggen-build")) for p in (root / "pkggen-build").rglob("*.json"))
+    built = sorted(p.relative_to(root / "pkggen-build").as_posix() for p in (root / "pkggen-build").rglob("*.json"))
     assert built == ["alpha/everywhere.json", "beta/everywhere.json", "beta/only-beta.json"]
     err = strip_ansi(capsys.readouterr().err)
     assert "only-nopackaging is only packaged for nopackaging (see its 'distributions')" in err

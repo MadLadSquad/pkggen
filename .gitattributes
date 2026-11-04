@@ -2,3 +2,6 @@
 # snapshots are compared byte for byte, so both keep LF line endings on every OS
 generators/templates/** text eol=lf
 tests/golden/** text eol=lf
+# The example's seed files and non-.tmpl template files are copied byte for byte
+# too (and compared against the golden snapshot); text=auto leaves binaries alone
+example/** text=auto eol=lf

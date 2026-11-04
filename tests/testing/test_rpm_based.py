@@ -65,14 +65,16 @@ def test_zypper_builddep_passes_each_requirement_and_tolerates_skipped_repositor
     """Each build requirement is one argument (they can contain spaces), and exit code 106
     (some repositories couldn't be refreshed) doesn't fail the step."""
     gen = load_generator("testing", "rpm-based")
-    script = gen.FAMILIES["opensuse"]["builddep"].format(spec="foo.spec").replace(
-        "/pkggen/state", str(tmp_path))
+    # Forward slashes: sh reads backslashes in Windows paths as escapes
+    state = tmp_path.as_posix()
+    script = gen.FAMILIES["opensuse"]["builddep"].format(spec="foo.spec").replace("/pkggen/state", state)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "rpmspec").write_text("#!/bin/sh\nprintf '%s\\n' cmake 'go >= 1.25'\n")
-    (bin_dir / "zypper").write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {tmp_path}/args\nexit {code}\n")
+    (bin_dir / "rpmspec").write_text("#!/bin/sh\nprintf '%s\\n' cmake 'go >= 1.25'\n", newline="\n")
+    (bin_dir / "zypper").write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {state}/args\nexit {code}\n", newline="\n")
     for tool in bin_dir.iterdir():
         tool.chmod(0o755)
-    result = subprocess.run(["sh", "-ec", script], env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"})
+    result = subprocess.run(["sh", "-ec", script],
+                            env={**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"})
     assert (result.returncode == 0) == ok
     assert (tmp_path / "args").read_text().splitlines() == ["-n", "in", "cmake", "go >= 1.25"]

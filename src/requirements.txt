@@ -1,7 +1,7 @@
 cryptography==50.0.2
 Jinja2==3.1.6
-packaging==25.0
-PyYAML==6.0.2
-Requests==2.33.0
-setuptools==83.0.0
-tqdm==4.67.1
+packaging==26.3
+PyYAML==6.0.3
+Requests==2.34.2
+setuptools==84.2.1
+tqdm==4.70.1

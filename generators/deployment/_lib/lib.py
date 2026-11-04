@@ -574,6 +574,7 @@ def write_relative(folder, relative, data):
 
 FINGERPRINT_RE = re.compile(r"^(0x)?([0-9A-Fa-f]{16}|[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$")
 ARMORED_KEY = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+GNUPG_HOME_PREFIX = "pkggen-gpg-"
 
 
 def gpg_binary():
@@ -605,8 +606,10 @@ class Signer:
             else:
                 with open(os.path.expanduser(value), encoding="utf-8") as f:
                     armored = f.read()
-            os.makedirs(job.work_path, exist_ok=True)
-            self.home = tempfile.mkdtemp(prefix="gnupg-", dir=job.work_path)
+            # In the system's temporary folder, not work_path: gpg-agent's sockets go in
+            # the home on macOS and the BSDs, and a socket's path can't be longer than
+            # ~104 bytes there, which a project's pkggen-build/deploy/<id>/ easily is
+            self.home = tempfile.mkdtemp(prefix=GNUPG_HOME_PREFIX)
             os.chmod(self.home, 0o700)
             self.run(["--import"], data=armored, passphrase=False)
             self.key = self.fingerprint()
