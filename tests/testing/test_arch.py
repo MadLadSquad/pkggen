@@ -35,4 +35,6 @@ def test_repository_name(describe):
 
 def test_finalize_removes_build_leftovers(describe):
     finalize = scripts(describe("arch", packages=[entry(name="foo")])[0][0]["finalize"])
-    assert "rm -rf ./*/src ./*/pkg\nrm -f 'foo/foo-1.2.0.tar.xz'\n" in finalize
+    assert "rm -rf ./*/src ./*/pkg\nrm -f 'foo/foo-1.2.0.tar.xz'\nrm -f 'foo'/*.pkg.tar.*\n" in finalize
+    # after the built packages are moved to the pacman repository, so only the -debug- ones are removed
+    assert finalize.index('mv "$pkg" "$arch/"') < finalize.index("rm -f 'foo'/*.pkg.tar.*")

@@ -42,11 +42,13 @@ def install(package):
 
 
 def cleanup(job):
-    """Shell code that removes makepkg's build folders and downloaded sources from the PKGBUILD folders."""
+    """Shell code that removes makepkg's build folders, downloaded sources and the packages that weren't
+    moved to the pacman repository (the -debug- ones) from the PKGBUILD folders, which the AUR gets as they are."""
     code = "rm -rf ./*/src ./*/pkg\n"
     for package in job.packages:
         for artifact in package.artifacts:
             code += f"rm -f {lib.shquote(package.name + '/' + artifact['alias'])}\n"
+        code += f"rm -f {lib.shquote(package.name)}/*.pkg.tar.*\n"
     return code
 
 
@@ -59,11 +61,13 @@ def main(job):
     finalize = [
         lib.step("build the pacman repository", f"""\
 cd {lib.REPO}
-{cleanup(job)}arch=$(uname -m)
+arch=$(uname -m)
 mkdir -p "$arch"
 set -- {lib.STATE}/*.pkgs
 if [ -e "$1" ]; then
   cat "$@" | while read -r pkg; do mv "$pkg" "$arch/"; done
+fi
+{cleanup(job)}if [ -e "$1" ]; then
   cd "$arch"
   repo-add {lib.shquote(repo_name + '.db.tar.zst')} ./*.pkg.tar.*
 fi

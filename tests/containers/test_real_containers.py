@@ -16,6 +16,7 @@ import os
 import shutil
 
 import pytest
+import yaml
 
 from tests.support import paths
 from tests.support.helpers import run_cli
@@ -89,8 +90,12 @@ def test_build_and_install_in_containers(example_project, github_secrets, real_e
     if engine:
         assert f"with {engine}" in result.err_plain
 
+    config = yaml.safe_load((example_project / "pkggen.yaml").read_text())
+    arch_db = (config["repositories"]["arch"].get("name") or "pkggen") + ".db"
     expected = {
-        "arch": lambda d: list(d.glob(f"*/{PACKAGE}-*.pkg.tar.zst")) and list(d.glob("*/pkggen.db")),
+        # makepkg's -debug- package mustn't stay in the PKGBUILD folder, which goes to the AUR as it is
+        "arch": lambda d: (list(d.glob(f"*/{PACKAGE}-*.pkg.tar.zst")) and list(d.glob(f"*/{arch_db}"))
+                           and not list(d.glob(f"{PACKAGE}/*.pkg.tar.*"))),
         "debian": lambda d: list(d.glob(f"pool/main/u/{PACKAGE}/*.deb")) and (d / "dists").is_dir(),
         "fedora": lambda d: list(d.glob(f"RPMS/*/{PACKAGE}-*.rpm")) and (d / "RPMS" / "repodata").is_dir(),
         "opensuse": lambda d: list(d.glob(f"RPMS/*/{PACKAGE}-*.rpm")),
