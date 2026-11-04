@@ -279,7 +279,7 @@ def iso_date(value):
         return None
     # HTTP dates can contain a "T" too (GMT, Tue, Thu, Oct), so try ISO 8601 first
     try:
-        date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        date = datetime.fromisoformat(value)
     except ValueError:
         try:
             date = parsedate_to_datetime(value)

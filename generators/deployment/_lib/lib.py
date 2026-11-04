@@ -250,7 +250,7 @@ def now():
     """The current time. PKGGEN_TEST_NOW (an ISO 8601 date) replaces it in tests."""
     fake = os.getenv("PKGGEN_TEST_NOW")
     if fake:
-        value = datetime.fromisoformat(fake.replace("Z", "+00:00"))
+        value = datetime.fromisoformat(fake)
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc)
 
@@ -584,6 +584,37 @@ def gpg_binary():
     return path
 
 
+def sibling_program(program, name):
+    """The program called name in program's folder (gpgconf next to gpg), or None."""
+    folder = os.path.dirname(os.path.abspath(program))
+    for candidate in (name, name + ".exe"):
+        path = os.path.join(folder, candidate)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def program_path(program, path):
+    """path as program reads it.
+
+    On Windows, MSYS2's and Cygwin's programs (Git for Windows' gpg is one) take
+    C:\\... for a relative path, so gpg would put GNUPGHOME under the current
+    folder: their paths are converted with the cygpath next to them (/c/...).
+    """
+    path = str(path)
+    cygpath = sibling_program(program, "cygpath") if os.name == "nt" else None
+    if not cygpath:
+        return path
+    process = subprocess.run([cygpath, "-u", path], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    converted = process.stdout.strip()
+    return converted if process.returncode == 0 and converted else path
+
+
+def gpgconf_binary(gpg):
+    """The gpgconf of the same GnuPG as gpg."""
+    return sibling_program(gpg, "gpgconf") or shutil.which("gpgconf")
+
+
 class Signer:
     """Signs with the deployment's `gpg-key`, in a GnuPG home pkggen owns unless it's a fingerprint."""
 
@@ -617,7 +648,7 @@ class Signer:
     def env(self):
         env = dict(os.environ)
         if self.home:
-            env["GNUPGHOME"] = self.home
+            env["GNUPGHOME"] = program_path(self.gpg, self.home)
         return env
 
     def run(self, args, data=None, passphrase=True):
@@ -651,13 +682,15 @@ class Signer:
             return
         # Armored, like reprepro's Release.gpg: text files are easier to keep in git
         mode = {"clearsign": ["--clearsign"], "detach": ["--detach-sign", "--armor"]}[kind]
-        self.run(["--local-user", self.key, "--digest-algo", "SHA512", *mode, "--output", output, path])
+        self.run(["--local-user", self.key, "--digest-algo", "SHA512", *mode,
+                  "--output", program_path(self.gpg, output), program_path(self.gpg, path)])
 
     def close(self):
         if self.home:
             # Stop the gpg-agent that gpg started for this home before deleting it
-            if shutil.which("gpgconf"):
-                subprocess.run(["gpgconf", "--kill", "gpg-agent"], env=self.env(), capture_output=True,
+            gpgconf = gpgconf_binary(self.gpg)
+            if gpgconf:
+                subprocess.run([gpgconf, "--kill", "gpg-agent"], env=self.env(), capture_output=True,
                                stdin=subprocess.DEVNULL)
             shutil.rmtree(self.home, ignore_errors=True)
 

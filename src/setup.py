@@ -46,7 +46,6 @@ setup(
     version=version(),
     description="Automatically generate desktop packages for multiple distributions",
     license="MIT",
-    python_requires=">=3.10",
     packages=find_packages(include=["pkggen", "pkggen.*"]),
     package_data={"pkggen": ["pkggen"]},
     install_requires=[

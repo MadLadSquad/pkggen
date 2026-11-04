@@ -62,6 +62,7 @@ def start_from_file(routes_path, log_dir=None):
     """Start mocking every requests call in this process (used by sitecustomize)."""
     import atexit
     import os
+    import tempfile
 
     with open(routes_path, encoding="utf-8") as f:
         routes = json.load(f)["routes"]
@@ -74,7 +75,10 @@ def start_from_file(routes_path, log_dir=None):
         if log_dir:
             calls = [{"method": call.request.method, "url": call.request.url,
                       "headers": dict(call.request.headers)} for call in mock.calls]
-            with open(os.path.join(log_dir, f"{os.getpid()}.json"), "w", encoding="utf-8") as f:
+            # Not just <pid>.json: Windows reuses a process's id right away, so a later
+            # generator would overwrite an earlier one's log
+            fd, _ = tempfile.mkstemp(prefix=f"{os.getpid()}-", suffix=".json", dir=log_dir)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(calls, f)
         mock.stop(allow_assert=False)
 

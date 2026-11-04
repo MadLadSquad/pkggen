@@ -117,7 +117,7 @@ def parse_date(value):
     if not value:
         return None
     try:
-        date = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        date = datetime.fromisoformat(str(value))
     except ValueError:
         return None
     return date if date.tzinfo else date.replace(tzinfo=timezone.utc)

@@ -19,6 +19,8 @@ from tests.support.helpers import load_generator
 ENDPOINT = "https://account.r2.example.com"
 BUCKET = "debs"
 needs_gpg = pytest.mark.skipif(shutil.which("gpg") is None, reason="needs GnuPG")
+# For program_path(): Git for Windows' gpg takes C:\\... paths for relative ones
+DEPLOYMENT_LIB = load_generator("deployment", "lib")
 
 
 class FakeS3:
@@ -313,11 +315,13 @@ def gnupg_home(cleanups):
     sockets in it on macOS, where a socket's path can't be over 104 bytes (tmp_path's are)."""
     home = tempfile.mkdtemp(prefix="gpg-")
     os.chmod(home, 0o700)
-    env = {**os.environ, "GNUPGHOME": home}
+    gpg = shutil.which("gpg")
+    env = {**os.environ, "GNUPGHOME": DEPLOYMENT_LIB.program_path(gpg, home)}
 
     def remove():
-        if shutil.which("gpgconf"):
-            subprocess.run(["gpgconf", "--kill", "all"], env=env, capture_output=True)
+        gpgconf = DEPLOYMENT_LIB.gpgconf_binary(gpg)
+        if gpgconf:
+            subprocess.run([gpgconf, "--kill", "all"], env=env, capture_output=True)
         shutil.rmtree(home, ignore_errors=True)
     cleanups.append(remove)
     return env
@@ -353,10 +357,14 @@ def verify(gpg_key, tmp_path, files, signature, signed=None):
     (tmp_path / "check").mkdir(exist_ok=True)
     for name, data in files.items():
         (tmp_path / "check" / name.replace("/", "_")).write_bytes(data)
-    run_gpg(gpg_key, "--import", str(tmp_path / "check" / "keys_public.asc"))
-    args = [str(tmp_path / "check" / signature.replace("/", "_"))]
+    gpg = shutil.which("gpg")
+
+    def path(name):
+        return DEPLOYMENT_LIB.program_path(gpg, tmp_path / "check" / name.replace("/", "_"))
+    run_gpg(gpg_key, "--import", path("keys/public.asc"))
+    args = [path(signature)]
     if signed:
-        args.append(str(tmp_path / "check" / signed.replace("/", "_")))
+        args.append(path(signed))
     return run_gpg(gpg_key, "--verify", *args, check=False).returncode == 0
 
 
